@@ -8,9 +8,8 @@ export default async function MarketLayout({
   children: React.ReactNode
 }) {
   try {
-    const cookieStore = cookies()
     const supabase = createServerComponentClient({ 
-      cookies: () => cookieStore 
+      cookies 
     })
     
     const { data: { user }, error } = await supabase.auth.getUser()

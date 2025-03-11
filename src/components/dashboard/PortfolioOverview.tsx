@@ -15,8 +15,9 @@ import {
 import { formatCurrency } from '@/lib/utils';
 import { Icons } from '@/components/ui/icons';
 import { quidaxService } from '@/lib/quidax';
+import type { MarketTicker } from '@/app/types/market';
 
-interface Wallet {
+interface WalletBalance {
   currency: string;
   balance: string;
 }
@@ -29,29 +30,24 @@ interface MarketPrice {
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 
-export function PortfolioOverview({ wallets }: { wallets: Wallet[] }) {
+export function PortfolioOverview({ wallets }: { wallets: WalletBalance[] }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [marketPrices, setMarketPrices] = useState<MarketPrice[]>([]);
   const [totalValue, setTotalValue] = useState(0);
 
   useEffect(() => {
-    async function loadMarketPrices() {
+    const fetchMarketPrices = async () => {
       try {
         setIsLoading(true);
         setError(null);
 
-        // Get market prices from Quidax
         const tickers = await quidaxService.getMarketTickers();
-        const prices: MarketPrice[] = Object.entries(tickers).map(([pair, data]) => {
-          const currency = pair.split('_')[0].toUpperCase();
-          return {
-            currency,
-            price: parseFloat(data.last),
-            change_24h: parseFloat(data.price_change_percent),
-          };
-        });
-
+        const prices = Object.entries(tickers).map(([currency, data]) => ({
+          currency,
+          price: parseFloat(data.ticker.last),
+          change_24h: parseFloat(data.ticker.last) - parseFloat(data.ticker.open),
+        }));
         setMarketPrices(prices);
 
         // Calculate total portfolio value
@@ -67,12 +63,9 @@ export function PortfolioOverview({ wallets }: { wallets: Wallet[] }) {
       } finally {
         setIsLoading(false);
       }
-    }
+    };
 
-    loadMarketPrices();
-    // Refresh prices every minute
-    const interval = setInterval(loadMarketPrices, 60000);
-    return () => clearInterval(interval);
+    fetchMarketPrices();
   }, [wallets]);
 
   const pieData = wallets.map((wallet, index) => ({

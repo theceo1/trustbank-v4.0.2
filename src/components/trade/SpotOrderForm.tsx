@@ -134,11 +134,46 @@ export default function SpotOrderForm({
 
     setLoading(true);
     try {
-      // TODO: Implement order submission
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Authentication required');
+
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('quidax_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!profile?.quidax_id) throw new Error('Profile not found');
+
+      const response = await fetch('/api/trades/spot/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          market,
+          side: orderSide,
+          ord_type: orderType,
+          price: orderType === 'limit' ? price : undefined,
+          volume: amount,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to place order');
+
       toast({
         title: 'Order Placed',
         description: `Successfully placed ${orderSide} order for ${amount} ${baseAsset}`,
       });
+
+      // Reset form
+      setAmount('');
+      setTotal('');
+      setSliderValue([0]);
+      
+      // Refresh balances
+      fetchBalances();
     } catch (error: any) {
       toast({
         title: 'Order Failed',

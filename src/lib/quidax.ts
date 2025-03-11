@@ -143,11 +143,54 @@ export interface MarketTickers {
   [key: string]: MarketTicker;
 }
 
-class QuidaxService {
+interface CreateOrderParams {
+  market: string;
+  side: 'buy' | 'sell';
+  ord_type: 'limit' | 'market';
+  price?: string;
+  volume: string;
+  user_id: string;
+}
+
+interface Order {
+  id: string;
+  market: string;
+  side: string;
+  ord_type: string;
+  price: string;
+  volume: string;
+  state: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export class QuidaxService {
   private readonly baseUrl: string;
 
   constructor() {
-    this.baseUrl = '/api/markets';
+    this.baseUrl = 'https://www.quidax.com/api/v1';
+  }
+
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<Response> {
+    const QUIDAX_SECRET_KEY = process.env.QUIDAX_SECRET_KEY;
+
+    if (!QUIDAX_SECRET_KEY) {
+      throw new Error('QUIDAX_SECRET_KEY is not configured');
+    }
+
+    const url = `${this.baseUrl}${endpoint}`;
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${QUIDAX_SECRET_KEY}`,
+      ...options.headers,
+    };
+
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    });
+
+    return response;
   }
 
   async createSubAccount(userData: { 
@@ -327,6 +370,30 @@ class QuidaxService {
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Failed to fetch swap transactions');
     }
+  }
+
+  async createOrder(params: CreateOrderParams): Promise<Order> {
+    const response = await this.request(
+      `/users/${params.user_id}/orders`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          market: params.market,
+          side: params.side,
+          ord_type: params.ord_type,
+          price: params.price,
+          volume: params.volume
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to create order');
+    }
+
+    const data = await response.json();
+    return data.data;
   }
 }
 

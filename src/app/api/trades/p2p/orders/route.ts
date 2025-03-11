@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
-import { Database } from '@/lib/database.types';
+import type { Database } from '@/types/database.types';
 import { quidaxService } from '@/lib/quidax';
 
 export async function GET(request: Request) {
@@ -54,111 +54,45 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const body = await request.json();
+    const { type, currency, amount, price, payment_methods } = body;
+    
     const supabase = createRouteHandlerClient<Database>({ cookies });
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session) {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
       return NextResponse.json(
-        { status: 'error', message: 'Unauthorized' },
+        { error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
-    const json = await request.json();
-    const {
-      type,
-      currency,
-      price,
-      amount,
-      min_order,
-      max_order,
-      payment_methods,
-      terms,
-    } = json;
-
-    // Validate required fields
-    if (!type || !currency || !price || !amount || !min_order || !max_order || !payment_methods || !terms) {
-      return NextResponse.json(
-        { status: 'error', message: 'Missing required fields' },
-        { status: 400 }
-      );
-    }
-
-    // Get user's Quidax ID
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('quidax_id')
-      .eq('user_id', session.user.id)
-      .single();
-
-    if (!profile?.quidax_id) {
-      return NextResponse.json(
-        { status: 'error', message: 'Profile not found' },
-        { status: 404 }
-      );
-    }
-
-    // Check seller's balance for sell orders
-    if (type === 'sell') {
-      try {
-        const wallet = await quidaxService.getWallet(profile.quidax_id, currency);
-        const available = parseFloat(wallet.balance);
-        const required = parseFloat(amount);
-
-        if (available < required) {
-          return NextResponse.json(
-            { 
-              status: 'error', 
-              message: `Insufficient ${currency} balance. Available: ${available}, Required: ${required}` 
-            },
-            { status: 400 }
-          );
-        }
-      } catch (error) {
-        console.error('Error checking wallet balance:', error);
-        return NextResponse.json(
-          { status: 'error', message: 'Failed to verify balance' },
-          { status: 500 }
-        );
-      }
-    }
-
-    // Create the order
+    // Create P2P order
     const { data: order, error } = await supabase
       .from('p2p_orders')
-      .insert([
-        {
-          creator_id: session.user.id,
-          type,
-          currency,
-          price,
-          amount,
-          min_order,
-          max_order,
-          payment_methods,
-          terms,
-          status: 'active',
-        },
-      ])
+      .insert({
+        user_id: user.id,
+        type, // 'buy' or 'sell'
+        currency,
+        amount,
+        price,
+        payment_methods,
+        status: 'active',
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours expiry
+      })
       .select()
       .single();
 
-    if (error) {
-      console.error('Error creating P2P order:', error);
-      return NextResponse.json(
-        { status: 'error', message: 'Failed to create order' },
-        { status: 500 }
-      );
-    }
+    if (error) throw error;
 
-    return NextResponse.json({ status: 'success', data: order });
-  } catch (error) {
-    console.error('Error in P2P orders route:', error);
+    return NextResponse.json({
+      status: 'success',
+      data: order
+    });
+  } catch (error: any) {
     return NextResponse.json(
-      { status: 'error', message: 'Internal server error' },
-      { status: 500 }
+      { error: error.message },
+      { status: 400 }
     );
   }
 } 

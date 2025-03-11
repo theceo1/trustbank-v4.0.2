@@ -63,7 +63,7 @@ export class KYCService {
       const response = await this.dojah.verifyNIN(nin, selfieImage, firstName, lastName);
       
       // Check confidence value for selfie verification
-      const isVerified = response.entity.selfie_verification?.confidence_value >= 90;
+      const isVerified = response.entity.selfie_verification?.confidence_value ?? 0 >= 90;
       
       await this.updateKYCStatus(
         recordId,
@@ -112,7 +112,7 @@ export class KYCService {
     try {
       const response = await this.dojah.verifyPhotoID(selfieImage, photoIdImage, firstName, lastName);
       
-      const isVerified = response.entity.selfie_verification?.confidence_value >= 90;
+      const isVerified = response.entity.selfie_verification?.confidence_value ?? 0 >= 90;
       
       await this.updateKYCStatus(
         recordId,

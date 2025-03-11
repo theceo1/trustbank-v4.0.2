@@ -7,6 +7,18 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowUp, ArrowDown, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
+interface MarketTicker {
+  ticker: {
+    buy: string;
+    sell: string;
+    low: string;
+    high: string;
+    open: string;
+    last: string;
+    vol: string;
+  };
+}
+
 interface MarketData {
   pair: string;
   lastPrice: string;
@@ -28,30 +40,54 @@ export default function MarketPage() {
   }, []);
 
   const fetchMarketData = async () => {
-    try {
+      try {
       setLoading(true);
-      const response = await fetch('/api/markets/tickers');
+        const response = await fetch('/api/markets/tickers');
       const data = await response.json();
 
       if (data.error) {
         throw new Error(data.error);
       }
 
-      const processedData = Object.entries(data).map(([pair, details]: [string, any]) => ({
-        pair: pair.toUpperCase(),
-        lastPrice: details.ticker.last,
-        change24h: calculateChange(details.ticker.open, details.ticker.last),
-        high24h: details.ticker.high,
-        low24h: details.ticker.low,
-        volume24h: details.ticker.vol,
-      }));
+      // Validate the data structure
+      if (!data || typeof data !== 'object') {
+        throw new Error('Invalid market data format');
+      }
+
+      const entries = Object.entries(data) as [string, unknown][];
+      
+      const processedData = entries
+        .filter((entry): entry is [string, MarketTicker] => {
+          const [_, details] = entry;
+          return details !== null &&
+                 typeof details === 'object' &&
+                 'ticker' in details &&
+                 typeof (details as any).ticker === 'object' &&
+                 'last' in (details as any).ticker &&
+                 'open' in (details as any).ticker &&
+                 'high' in (details as any).ticker &&
+                 'low' in (details as any).ticker &&
+                 'vol' in (details as any).ticker;
+        })
+        .map(([pair, details]) => ({
+          pair: pair.toUpperCase(),
+          lastPrice: details.ticker.last,
+          change24h: calculateChange(details.ticker.open, details.ticker.last),
+          high24h: details.ticker.high,
+          low24h: details.ticker.low,
+          volume24h: details.ticker.vol,
+        }));
+
+      if (processedData.length === 0) {
+        throw new Error('No valid market data available');
+      }
 
       setMarkets(processedData);
       setError(null);
-    } catch (error) {
-      console.error('Error fetching market data:', error);
+      } catch (error) {
+        console.error('Error fetching market data:', error);
       setError('Failed to fetch market data');
-    } finally {
+      } finally {
       setLoading(false);
     }
   };
