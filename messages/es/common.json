@@ -1,0 +1,36 @@
+{
+  "navigation": {
+    "home": "Inicio",
+    "trade": "Operar",
+    "wallet": "Billetera",
+    "profile": "Perfil",
+    "about": "Acerca de",
+    "contact": "Contacto"
+  },
+  "auth": {
+    "signIn": "Iniciar sesión",
+    "signUp": "Registrarse",
+    "signOut": "Cerrar sesión",
+    "email": "Correo electrónico",
+    "password": "Contraseña"
+  },
+  "legal": {
+    "terms": "Términos de servicio",
+    "privacy": "Política de privacidad",
+    "cookies": "Política de cookies",
+    "kyc": "Política KYC",
+    "aml": "Política AML",
+    "risk": "Divulgación de riesgos"
+  },
+  "common": {
+    "loading": "Cargando...",
+    "error": "Ha ocurrido un error",
+    "success": "Éxito",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "edit": "Editar",
+    "delete": "Eliminar",
+    "confirm": "Confirmar",
+    "lastUpdated": "Última actualización"
+  }
+} 

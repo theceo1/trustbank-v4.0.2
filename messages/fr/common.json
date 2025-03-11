@@ -1,0 +1,36 @@
+{
+  "navigation": {
+    "home": "Accueil",
+    "trade": "Trader",
+    "wallet": "Portefeuille",
+    "profile": "Profil",
+    "about": "À propos",
+    "contact": "Contact"
+  },
+  "auth": {
+    "signIn": "Connexion",
+    "signUp": "S'inscrire",
+    "signOut": "Déconnexion",
+    "email": "E-mail",
+    "password": "Mot de passe"
+  },
+  "legal": {
+    "terms": "Conditions d'utilisation",
+    "privacy": "Politique de confidentialité",
+    "cookies": "Politique des cookies",
+    "kyc": "Politique KYC",
+    "aml": "Politique LAB",
+    "risk": "Divulgation des risques"
+  },
+  "common": {
+    "loading": "Chargement...",
+    "error": "Une erreur est survenue",
+    "success": "Succès",
+    "cancel": "Annuler",
+    "save": "Enregistrer",
+    "edit": "Modifier",
+    "delete": "Supprimer",
+    "confirm": "Confirmer",
+    "lastUpdated": "Dernière mise à jour"
+  }
+} 

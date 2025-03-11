@@ -1,0 +1,36 @@
+{
+  "navigation": {
+    "home": "Home",
+    "trade": "Trade",
+    "wallet": "Wallet",
+    "profile": "Profile",
+    "about": "About",
+    "contact": "Contact"
+  },
+  "auth": {
+    "signIn": "Sign In",
+    "signUp": "Sign Up",
+    "signOut": "Sign Out",
+    "email": "Email",
+    "password": "Password"
+  },
+  "legal": {
+    "terms": "Terms of Service",
+    "privacy": "Privacy Policy",
+    "cookies": "Cookie Policy",
+    "kyc": "KYC Policy",
+    "aml": "AML Policy",
+    "risk": "Risk Disclosure"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "success": "Success",
+    "cancel": "Cancel",
+    "save": "Save",
+    "edit": "Edit",
+    "delete": "Delete",
+    "confirm": "Confirm",
+    "lastUpdated": "Last updated"
+  }
+} 

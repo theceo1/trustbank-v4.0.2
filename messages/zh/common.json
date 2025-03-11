@@ -1,0 +1,36 @@
+{
+  "navigation": {
+    "home": "首页",
+    "trade": "交易",
+    "wallet": "钱包",
+    "profile": "个人中心",
+    "about": "关于我们",
+    "contact": "联系我们"
+  },
+  "auth": {
+    "signIn": "登录",
+    "signUp": "注册",
+    "signOut": "退出",
+    "email": "电子邮箱",
+    "password": "密码"
+  },
+  "legal": {
+    "terms": "服务条款",
+    "privacy": "隐私政策",
+    "cookies": "Cookie政策",
+    "kyc": "KYC政策",
+    "aml": "反洗钱政策",
+    "risk": "风险披露"
+  },
+  "common": {
+    "loading": "加载中...",
+    "error": "发生错误",
+    "success": "成功",
+    "cancel": "取消",
+    "save": "保存",
+    "edit": "编辑",
+    "delete": "删除",
+    "confirm": "确认",
+    "lastUpdated": "最后更新"
+  }
+} 
