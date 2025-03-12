@@ -33,14 +33,24 @@ export default function DashboardPage() {
 
       setUser(user);
 
+      // Fetch user profile to get first name
+      const { data: profileData, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('first_name, last_name')
+        .eq('user_id', user.id)
+        .single();
+
+      if (profileError) throw profileError;
+
       const { data: walletsData, error: walletsError } = await supabase
         .from('wallets')
         .select('*')
         .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .eq('currency', 'NGN')
+        .single();
 
       if (walletsError) throw walletsError;
-      setWallets(walletsData || []);
+      setWallets([walletsData]);
 
     } catch (error) {
       console.error('Error loading dashboard data:', error);
@@ -69,20 +79,14 @@ export default function DashboardPage() {
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-xl font-medium text-emerald-600 dark:text-emerald-400">
-              Welcome back, {user?.email?.split("@")[0]}
+              Welcome back, {user?.user_metadata?.first_name || 'there'}
             </h1>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
               Here{"'"}s an overview of your financial activities
             </p>
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
-            <Button variant="ghost" size="icon" className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300">
-              <Icons.bell className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300">
-              <Icons.settings className="h-4 w-4" />
-            </Button>
-            <Button variant="destructive" size="sm" className="hidden sm:flex">
+            <Button variant="destructive" size="sm" className="text-white dark:text-white">
               Verify Account
             </Button>
           </div>
@@ -95,10 +99,10 @@ export default function DashboardPage() {
           <div className="flex justify-between items-center mb-6">
             <div className="flex items-center gap-2">
               <Icons.wallet className="h-4 w-4 opacity-90" />
-              <h2 className="text-sm font-medium">Account Balance</h2>
+              <h2 className="text-sm font-medium">NGN Wallet Balance</h2>
             </div>
             <div className="flex items-center gap-2">
-              <Button size="sm" className="bg-white/10 hover:bg-white/20 text-white text-xs border border-white/10">
+              <Button size="sm" className="bg-white text-emerald-600 hover:bg-white/90 text-xs">
                 + Deposit
               </Button>
               <Button variant="ghost" size="icon" className="text-white/80 hover:text-white hover:bg-white/10">
@@ -107,8 +111,10 @@ export default function DashboardPage() {
             </div>
           </div>
           <div className="space-y-0.5">
-            <p className="text-xl font-medium text-white/90">₦•••••••</p>
-            <p className="text-xs text-white/70">Available: ₦•••••••</p>
+            <p className="text-xl font-medium text-white/90">
+              ₦ {wallets[0]?.balance ? parseFloat(wallets[0].balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
+            </p>
+            <p className="text-xs text-white/70">Available Balance</p>
           </div>
         </div>
 

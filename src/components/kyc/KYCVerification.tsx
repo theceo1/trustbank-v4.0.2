@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,7 @@ import { Camera, Upload, Loader2, CheckCircle2, AlertCircle } from 'lucide-react
 import { KYCService } from '@/lib/services/kyc';
 import { KYCTier } from '@/lib/types/kyc';
 import { motion } from 'framer-motion';
+import { compressImage } from '@/lib/utils/imageCompression';
 
 interface KYCVerificationProps {
   userId: string;
@@ -23,18 +24,29 @@ export function KYCVerification({ userId, tier, onVerificationComplete }: KYCVer
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1);
   const [progress, setProgress] = useState(0);
-  const [formData, setFormData] = useState({
-    nin: '',
-    bvn: '',
-    firstName: '',
-    lastName: '',
-    dob: '',
+  const [formData, setFormData] = useState(() => {
+    // Load saved form data from localStorage if available
+    const savedData = localStorage.getItem(`kyc_form_${userId}`);
+    return savedData ? JSON.parse(savedData) : {
+      nin: '',
+      bvn: '',
+      firstName: '',
+      lastName: '',
+      dob: '',
+    };
   });
   const [selfieImage, setSelfieImage] = useState<string | null>(null);
   const [photoIdImage, setPhotoIdImage] = useState<string | null>(null);
+  const [processingImage, setProcessingImage] = useState(false);
+  const [verificationStep, setVerificationStep] = useState<'form' | 'processing' | 'submitting'>('form');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const kycService = new KYCService();
+
+  // Save form data to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem(`kyc_form_${userId}`, JSON.stringify(formData));
+  }, [formData, userId]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -45,36 +57,61 @@ export function KYCVerification({ userId, tier, onVerificationComplete }: KYCVer
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
+    // Update file size limit to 20MB
+    if (file.size > 20 * 1024 * 1024) {
       toast({
         title: "Error",
-        description: "File size should be less than 5MB",
+        description: "File size should be less than 20MB",
         variant: "destructive"
       });
       return;
     }
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64String = reader.result as string;
-      const base64Data = base64String.split(',')[1];
+    try {
+      setProcessingImage(true);
       
-      if (e.target.name === 'selfie') {
-        setSelfieImage(base64Data);
-      } else {
-        setPhotoIdImage(base64Data);
-      }
-    };
-    reader.readAsDataURL(file);
+      // Compress image before converting to base64
+      const compressedFile = await compressImage(file, {
+        maxSizeMB: 1,
+        maxWidthOrHeight: 2048,
+        useWebWorker: true
+      });
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        const base64Data = base64String.split(',')[1];
+        
+        if (e.target.name === 'selfie') {
+          setSelfieImage(base64Data);
+          setProgress(prev => Math.min(prev + 33, 100));
+        } else {
+          setPhotoIdImage(base64Data);
+          setProgress(prev => Math.min(prev + 33, 100));
+        }
+      };
+      reader.readAsDataURL(compressedFile);
+    } catch (error) {
+      toast({
+        title: "Image Processing Failed",
+        description: "Failed to process the image. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setProcessingImage(false);
+    }
   };
 
   const handleVerification = async () => {
     try {
+      setVerificationStep('processing');
       setLoading(true);
       
       // Create KYC record
       const record = await kycService.createKYCRecord(userId, tier);
+      setProgress(40);
       
+      setVerificationStep('submitting');
       switch (tier) {
         case 'basic':
           if (!formData.nin || !selfieImage) {
@@ -116,6 +153,11 @@ export function KYCVerification({ userId, tier, onVerificationComplete }: KYCVer
           break;
       }
 
+      setProgress(100);
+      
+      // Clear saved form data after successful submission
+      localStorage.removeItem(`kyc_form_${userId}`);
+
       toast({
         title: "Verification Submitted",
         description: "Your verification is being processed. You will be notified once completed.",
@@ -123,6 +165,7 @@ export function KYCVerification({ userId, tier, onVerificationComplete }: KYCVer
 
       onVerificationComplete?.();
     } catch (error) {
+      setProgress(0);
       toast({
         title: "Verification Failed",
         description: error instanceof Error ? error.message : "An error occurred during verification",
@@ -130,6 +173,7 @@ export function KYCVerification({ userId, tier, onVerificationComplete }: KYCVer
       });
     } finally {
       setLoading(false);
+      setVerificationStep('form');
     }
   };
 
@@ -276,51 +320,58 @@ export function KYCVerification({ userId, tier, onVerificationComplete }: KYCVer
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-    >
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-xl font-semibold text-green-600">
-            {tier === 'basic' && 'Basic Verification (Tier 1)'}
-            {tier === 'intermediate' && 'Intermediate Verification (Tier 2)'}
-            {tier === 'advanced' && 'Advanced Verification (Tier 3)'}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-6">
-            <Alert>
-              <AlertCircle className="w-4 h-4" />
-              <AlertDescription>
-                {tier === 'basic' && 'Please provide your NIN and a selfie photo for basic verification.'}
-                {tier === 'intermediate' && 'Please provide your BVN and personal details for intermediate verification.'}
-                {tier === 'advanced' && 'Please provide your photo ID and a selfie photo for advanced verification.'}
-              </AlertDescription>
-            </Alert>
+    <Card>
+      <CardHeader>
+        <CardTitle>Identity Verification - {tier.charAt(0).toUpperCase() + tier.slice(1)} Tier</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-6">
+          <Progress value={progress} className="w-full" />
+          
+          <Alert>
+            <AlertDescription>
+              Please ensure all documents are clear and legible. Maximum file size is 20MB.
+            </AlertDescription>
+          </Alert>
 
-            <Progress value={progress} className="w-full" />
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            {verificationStep === 'form' && renderVerificationForm()}
+            {verificationStep === 'processing' && (
+              <div className="flex flex-col items-center space-y-4">
+                <Loader2 className="w-8 h-8 animate-spin text-green-600" />
+                <p>Processing your documents...</p>
+              </div>
+            )}
+            {verificationStep === 'submitting' && (
+              <div className="flex flex-col items-center space-y-4">
+                <Loader2 className="w-8 h-8 animate-spin text-green-600" />
+                <p>Submitting verification...</p>
+              </div>
+            )}
+          </motion.div>
 
-            {renderVerificationForm()}
-
-            <Button
-              className="w-full"
-              onClick={handleVerification}
-              disabled={loading}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Verifying...
-                </>
-              ) : (
-                'Submit Verification'
-              )}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
+          <Button
+            onClick={handleVerification}
+            disabled={loading || processingImage}
+            className="w-full bg-green-600 hover:bg-green-700"
+            aria-busy={loading}
+            aria-disabled={loading || processingImage}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Verifying...
+              </>
+            ) : (
+              'Submit Verification'
+            )}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 } 
