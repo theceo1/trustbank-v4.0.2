@@ -1,0 +1,550 @@
+'use client';
+
+import { useState, useEffect, useCallback } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2, ArrowDownUp, Repeat, Wallet } from "lucide-react";
+import { useQuidaxAPI } from '@/hooks/useQuidaxAPI';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { formatCryptoAmount, formatNairaAmount } from "@/lib/utils";
+import { useRouter } from "next/navigation";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+
+interface InstantSwapModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  wallet: any;
+}
+
+interface TradeDetails {
+  type: string;
+  amount: string;
+  currency: string;
+  rate: number;
+  fees: {
+    total: number;
+    platform: number;
+    service: number;
+  };
+  total: number;
+  quote_amount: string;
+  ngn_equivalent: number;
+}
+
+const TRADE_LIMITS = {
+  MIN_NGN: 1000, // Minimum 1,000 NGN
+  MAX_NGN: 10000000, // Maximum 10M NGN
+  MIN_CRYPTO: {
+    BTC: 0.0001,
+    ETH: 0.01,
+    USDT: 10,
+    USDC: 10,
+    DOGE: 100,
+    TRUMP: 100,
+  }
+};
+
+const CURRENCY_PAIRS = [
+  { value: 'BTC', label: 'Bitcoin (BTC)', icon: '₿' },
+  { value: 'ETH', label: 'Ethereum (ETH)', icon: 'Ξ' },
+  { value: 'USDT', label: 'Tether (USDT)', icon: '₮' },
+  { value: 'USDC', label: 'USD Coin (USDC)', icon: '$' },
+  { value: 'DOGE', label: 'Dogecoin (DOGE)', icon: 'Ð' },
+  { value: 'TRUMP', label: 'TrumpCoin (TRUMP)', icon: '🇺🇸' },
+];
+
+function TradePreviewModal({ 
+  isOpen, 
+  onClose, 
+  onConfirm, 
+  trade,
+  countdown,
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  onConfirm: () => void; 
+  trade: TradeDetails;
+  countdown: number;
+}) {
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Confirm Trade Details</DialogTitle>
+          <DialogDescription>
+            Quote expires in {countdown} seconds
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-6">
+          {/* Trade Summary */}
+          <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+            <div className="text-lg font-semibold text-center mb-2">Trade Summary</div>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span>You Pay</span>
+                <div className="text-right">
+                  <div className="font-medium">₦{formatNairaAmount(trade.ngn_equivalent)}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {formatCryptoAmount(trade.amount)} {trade.currency}
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-between items-center">
+                <span>You Receive</span>
+                <div className="text-right">
+                  <div className="font-medium">{formatCryptoAmount(trade.quote_amount)} {trade.currency}</div>
+                  <div className="text-sm text-muted-foreground">
+                    ≈ ₦{formatNairaAmount(Number(trade.quote_amount) * trade.rate)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Exchange Rate */}
+          <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+            <div className="text-sm font-medium mb-2">Exchange Rate</div>
+            <div className="text-lg font-semibold">
+              1 {trade.currency} = ₦{formatNairaAmount(trade.rate)}
+            </div>
+          </div>
+
+          {/* Fees Breakdown */}
+          <div className="space-y-2">
+            <div className="text-sm font-medium">Fees Breakdown</div>
+            <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg space-y-2">
+              <div className="flex justify-between">
+                <span>Service Fee (3%)</span>
+                <span>₦{formatNairaAmount(trade.fees.service)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Network Fee</span>
+                <span>₦{formatNairaAmount(trade.fees.platform)}</span>
+              </div>
+              <div className="border-t pt-2 mt-2 flex justify-between font-medium">
+                <span>Total Fees</span>
+                <span>₦{formatNairaAmount(trade.fees.total)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-col gap-2">
+            <div className="text-center">
+              <p className="text-sm text-gray-500">
+                Quote expires in{' '}
+                <span className={`font-medium ${countdown <= 5 ? 'text-red-500' : 'text-gray-700'}`}>
+                  {countdown}s
+                </span>
+              </p>
+            </div>
+            <Button
+              onClick={onConfirm}
+              disabled={countdown === 0}
+              className="w-full bg-green-600 hover:bg-green-700"
+            >
+              {countdown === 0 ? 'Quote Expired' : 'Confirm Trade'}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalProps) {
+  const [fromCurrency, setFromCurrency] = useState('BTC');
+  const [toCurrency, setToCurrency] = useState('ETH');
+  const [amount, setAmount] = useState('');
+  const [isNairaInput, setIsNairaInput] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [quote, setQuote] = useState<any>(null);
+  const [countdown, setCountdown] = useState<number>(14);
+  const [showTradePreview, setShowTradePreview] = useState(false);
+  const [userBalance, setUserBalance] = useState<any>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { toast } = useToast();
+  const { createSwapQuotation, confirmSwapQuotation } = useQuidaxAPI();
+  const router = useRouter();
+  const supabase = createClientComponentClient();
+  const [error, setError] = useState<string | null>(null);
+  const [isQuoteExpired, setIsQuoteExpired] = useState<boolean>(false);
+  const [isConfirming, setIsConfirming] = useState<boolean>(false);
+  const [quidaxId, setQuidaxId] = useState('');
+
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    setIsAuthenticated(!!session);
+    if (session) {
+      fetchUserBalance();
+    }
+  };
+
+  const fetchUserBalance = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: balances, error } = await supabase
+        .from('wallets')
+        .select('*')
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      setUserBalance(balances);
+    } catch (error) {
+      console.error('Error fetching balance:', error);
+    }
+  };
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (quote && countdown > 0) {
+      timer = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            setIsQuoteExpired(true);
+            clearInterval(timer);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [quote]);
+
+  const getCurrentRate = useCallback(() => {
+    if (!quote) return 1;
+    return quote.rate;
+  }, [quote]);
+
+  const convertAmount = (value: string, isNaira: boolean) => {
+    const rate = getCurrentRate();
+    const numValue = Number(value);
+    return isNaira ? numValue / rate : numValue * rate;
+  };
+
+  const validateAmount = (value: string): string | null => {
+    const numValue = Number(value);
+    if (isNairaInput) {
+      if (numValue < TRADE_LIMITS.MIN_NGN) {
+        return `Minimum amount is ₦${formatNairaAmount(TRADE_LIMITS.MIN_NGN)}`;
+      }
+      if (numValue > TRADE_LIMITS.MAX_NGN) {
+        return `Maximum amount is ₦${formatNairaAmount(TRADE_LIMITS.MAX_NGN)}`;
+      }
+    } else {
+      const minCrypto = TRADE_LIMITS.MIN_CRYPTO[fromCurrency as keyof typeof TRADE_LIMITS.MIN_CRYPTO];
+      if (numValue < minCrypto) {
+        return `Minimum amount is ${minCrypto} ${fromCurrency}`;
+      }
+    }
+    return null;
+  };
+
+  useEffect(() => {
+    const fetchQuidaxId = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: profile, error } = await supabase
+          .from('user_profiles')
+          .select('quidax_id')
+          .eq('user_id', user.id)
+          .single();
+
+        if (error) throw error;
+        setQuidaxId(profile?.quidax_id || '');
+      } catch (err) {
+        console.error('Error fetching Quidax ID:', err);
+        setError('Failed to fetch user profile');
+      }
+    };
+
+    fetchQuidaxId();
+  }, [supabase]);
+
+  const handleGetQuote = async () => {
+    if (!quidaxId) {
+      setError('Please complete your profile setup first');
+      return;
+    }
+
+    if (!amount) {
+      setError('Please enter an amount');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      setQuote(null);
+      setIsQuoteExpired(false);
+      setCountdown(14);
+
+      const cryptoAmount = isNairaInput ? convertAmount(amount, isNairaInput).toString() : amount;
+      const result = await createSwapQuotation({
+        from_currency: fromCurrency.toLowerCase(),
+        to_currency: toCurrency.toLowerCase(),
+        from_amount: cryptoAmount,
+        user_id: quidaxId,
+      });
+
+      if (result.status === 'success' && result.data) {
+        setQuote(result.data);
+        setShowTradePreview(true);
+      } else {
+        throw new Error(result.message || 'Failed to get quote');
+      }
+    } catch (err) {
+      console.error('Error getting quote:', err);
+      setError(err instanceof Error ? err.message : 'Failed to get quote');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAmountChange = (value: string) => {
+    setAmount(value);
+  };
+
+  const handleMaxAmount = () => {
+    if (!userBalance) return;
+    const maxAmount = isNairaInput 
+      ? userBalance.find((b: any) => b.currency === 'NGN')?.balance || '0'
+      : userBalance.find((b: any) => b.currency === fromCurrency)?.balance || '0';
+    setAmount(maxAmount.toString());
+  };
+
+  const handleClose = () => {
+    setQuote(null);
+    setAmount('');
+    setCountdown(14);
+    setShowTradePreview(false);
+    onClose();
+  };
+
+  const toggleInputCurrency = () => {
+    setIsNairaInput(!isNairaInput);
+    setAmount('');
+  };
+
+  const handleConfirmSwap = async () => {
+    if (!quote || isQuoteExpired) return;
+
+    try {
+      setIsConfirming(true);
+      setError(null);
+
+      const result = await confirmSwapQuotation({
+        quotation_id: quote.id,
+        from_currency: fromCurrency.toLowerCase(),
+        to_currency: toCurrency.toLowerCase(),
+        from_amount: amount,
+        user_id: quidaxId,
+      });
+
+      if (result.status === 'success' && result.data) {
+        toast({
+          title: "Success",
+          description: "Swap confirmed successfully!",
+        });
+        onClose();
+      } else {
+        throw new Error(result.message || 'Failed to confirm swap');
+      }
+    } catch (err) {
+      console.error('Error confirming swap:', err);
+      setError(err instanceof Error ? err.message : 'Failed to confirm swap');
+    } finally {
+      setIsConfirming(false);
+    }
+  };
+
+  return (
+    <>
+      <Dialog open={isOpen} onOpenChange={handleClose}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Instant Swap</DialogTitle>
+            <DialogDescription>
+              Instantly swap between cryptocurrencies at the best rates.
+            </DialogDescription>
+          </DialogHeader>
+
+          {isAuthenticated && userBalance && (
+            <div className="bg-gray-50 dark:bg-gray-900/20 p-3 rounded-lg mb-4">
+              <div className="flex items-center gap-2 text-sm">
+                <Wallet className="h-4 w-4" />
+                <span>Available Balance:</span>
+                <span className="font-medium text-green-600 dark:text-green-500">
+                  {isNairaInput 
+                    ? `₦${formatNairaAmount(userBalance.find((b: any) => b.currency === 'NGN')?.balance || 0)}`
+                    : `${formatCryptoAmount(userBalance.find((b: any) => b.currency === fromCurrency)?.balance || 0)} ${fromCurrency}`
+                  }
+                </span>
+              </div>
+            </div>
+          )}
+
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="fromCurrency">From</Label>
+              <Select value={fromCurrency} onValueChange={setFromCurrency}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select currency" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CURRENCY_PAIRS.map((pair) => (
+                    <SelectItem key={pair.value} value={pair.value}>
+                      <span className="flex items-center gap-2">
+                        <span>{pair.icon}</span>
+                        {pair.label}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="amount">Amount</Label>
+                <div className="flex items-center gap-2">
+                  {isAuthenticated && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleMaxAmount}
+                      className="h-6 text-xs"
+                    >
+                      Max
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={toggleInputCurrency}
+                    className="h-6 text-xs"
+                  >
+                    <Repeat className="h-3 w-3 mr-1" />
+                    Switch to {isNairaInput ? 'Crypto' : 'NGN'}
+                  </Button>
+                </div>
+              </div>
+              <Input
+                id="amount"
+                type="number"
+                value={amount}
+                onChange={(e) => handleAmountChange(e.target.value)}
+                placeholder={isNairaInput ? '₦0.00' : '0.00'}
+              />
+              {amount && (
+                <div className="text-xs text-muted-foreground">
+                  ≈ {isNairaInput 
+                    ? `${formatCryptoAmount(convertAmount(amount, true))} ${fromCurrency}` 
+                    : `₦${formatNairaAmount(convertAmount(amount, false))}`
+                  }
+                </div>
+              )}
+            </div>
+
+            <Button
+              variant="ghost"
+              size="icon"
+              className="mx-auto"
+              onClick={() => {
+                const temp = fromCurrency;
+                setFromCurrency(toCurrency);
+                setToCurrency(temp);
+              }}
+            >
+              <ArrowDownUp className="h-4 w-4" />
+            </Button>
+
+            <div className="grid gap-2">
+              <Label htmlFor="toCurrency">To</Label>
+              <Select value={toCurrency} onValueChange={setToCurrency}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select currency" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CURRENCY_PAIRS.map((pair) => (
+                    <SelectItem key={pair.value} value={pair.value}>
+                      <span className="flex items-center gap-2">
+                        <span>{pair.icon}</span>
+                        {pair.label}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Button 
+              onClick={handleGetQuote} 
+              disabled={loading || !amount}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Getting Quote...
+                </>
+              ) : !isAuthenticated ? (
+                'Proceed to Sign In'
+              ) : (
+                'Get Quote'
+              )}
+            </Button>
+            <Button variant="outline" onClick={handleClose}>
+              Cancel
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {quote && (
+        <TradePreviewModal
+          isOpen={showTradePreview}
+          onClose={() => setShowTradePreview(false)}
+          onConfirm={handleConfirmSwap}
+          trade={{
+            type: 'swap',
+            amount: amount,
+            currency: fromCurrency,
+            rate: quote.rate,
+            fees: {
+              service: quote.fee * quote.rate * 0.03,
+              platform: quote.network_fee || 0,
+              total: (quote.fee * quote.rate * 0.03) + (quote.network_fee || 0),
+            },
+            total: quote.total * quote.rate,
+            quote_amount: quote.quote_amount,
+            ngn_equivalent: Number(amount) * quote.rate,
+          }}
+          countdown={countdown}
+        />
+      )}
+    </>
+  );
+} 

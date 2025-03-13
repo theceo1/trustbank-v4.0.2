@@ -58,7 +58,10 @@ export default function ProfilePage() {
   if (authLoading || profileLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-green-600" />
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-green-600 mx-auto mb-4" />
+          <p className="text-sm text-gray-600">Loading...</p>
+        </div>
       </div>
     );
   }
@@ -69,6 +72,17 @@ export default function ProfilePage() {
         <Info className="h-4 w-4" />
         <AlertDescription>
           Please <Link href="/login" className="underline">log in</Link> to access your profile.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <Alert variant="destructive">
+        <Info className="h-4 w-4" />
+        <AlertDescription>
+          Profile not found. Please contact support if this issue persists.
         </AlertDescription>
       </Alert>
     );

@@ -31,7 +31,51 @@ export function WalletCard({
   expanded = true,
 }: WalletCardProps) {
   const { isHidden } = useBalance();
-  const fiatValue = price ? parseFloat(balance) * price : 0;
+  
+  // Calculate fiat value
+  const calculateFiatValue = () => {
+    try {
+      const balanceNum = parseFloat(balance || '0');
+      if (isNaN(balanceNum)) return 0;
+      
+      // If currency is NGN, return the balance as is
+      if (currency.toUpperCase() === 'NGN') return balanceNum;
+      
+      // For other currencies, multiply by price
+      const priceNum = price || 0;
+      return balanceNum * priceNum;
+    } catch (error) {
+      console.error('Error calculating fiat value:', error);
+      return 0;
+    }
+  };
+
+  const fiatValue = calculateFiatValue();
+
+  const formatBalance = (value: string | number, currency: string) => {
+    const numValue = typeof value === 'string' ? parseFloat(value) : value;
+    if (isNaN(numValue)) return '0.00';
+    
+    return numValue.toLocaleString(undefined, {
+      minimumFractionDigits: currency === 'BTC' ? 8 : 2,
+      maximumFractionDigits: currency === 'BTC' ? 8 : 2
+    });
+  };
+
+  const formatFiatValue = (value: number) => {
+    return value.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  };
+
+  // Debug logging
+  console.log('Wallet value calculation:', {
+    currency,
+    balance,
+    price,
+    fiatValue,
+  });
 
   return (
     <div className="rounded-xl border bg-card shadow-lg p-6 space-y-4 hover:shadow-xl transition-shadow duration-200">
@@ -40,14 +84,14 @@ export function WalletCard({
           {currency.toUpperCase()}
         </h3>
         <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-          {isHidden ? '••••••' : parseFloat(balance).toLocaleString(undefined, { minimumFractionDigits: currency === 'BTC' ? 8 : 2, maximumFractionDigits: currency === 'BTC' ? 8 : 2 })}
+          {isHidden ? '••••••' : formatBalance(balance, currency)}
         </p>
       </div>
       
       <div className="space-y-1">
         <p className="text-sm text-gray-500 dark:text-gray-400">Estimated Value</p>
         <p className="text-base font-medium text-gray-900 dark:text-gray-100">
-          {isHidden ? '••••••' : `₦${fiatValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          {isHidden ? '••••••' : `₦${formatFiatValue(fiatValue)}`}
         </p>
       </div>
 

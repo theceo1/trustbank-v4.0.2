@@ -1,42 +1,49 @@
 import axios from 'axios';
 import { cookies } from 'next/headers';
 
+const QUIDAX_API_URL = process.env.QUIDAX_API_URL || 'https://www.quidax.com/api/v1';
+const QUIDAX_SECRET_KEY = process.env.QUIDAX_SECRET_KEY;
+const QUIDAX_PUBLIC_KEY = process.env.NEXT_PUBLIC_QUIDAX_PUBLIC_KEY;
+
+// Configure a single axios instance
 const quidaxApi = axios.create({
-  baseURL: 'https://www.quidax.com/api/v1',
+  baseURL: QUIDAX_API_URL,
   headers: {
-    'Authorization': `Bearer ${process.env.NEXT_PUBLIC_QUIDAX_PUBLIC_KEY}`,
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-  },
+  }
 });
 
-const QUIDAX_API_URL = 'https://www.quidax.com/api/v1';
-const QUIDAX_SECRET_KEY = process.env.QUIDAX_SECRET_KEY;
-
-export async function fetchQuidaxData(endpoint: string, options?: RequestInit) {
+// Add authentication interceptor
+quidaxApi.interceptors.request.use(config => {
   if (!QUIDAX_SECRET_KEY) {
     throw new Error('QUIDAX_SECRET_KEY is not configured');
   }
+  
+  config.headers.Authorization = `Bearer ${QUIDAX_SECRET_KEY}`;
+  return config;
+});
 
-  const response = await fetch(`${QUIDAX_API_URL}${endpoint}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${QUIDAX_SECRET_KEY}`,
-      ...options?.headers,
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Quidax API error: ${response.statusText}`);
+// Add Cloudflare error interceptor
+quidaxApi.interceptors.response.use(
+  response => response,
+  error => {
+    if (error.response?.data?.includes('Cloudflare')) {
+      throw new Error('Quidax API is currently unavailable. Please try again later');
+    }
+    return Promise.reject(error);
   }
+);
 
-  const data = await response.json();
-  if (data.status === 'error') {
-    throw new Error(`Quidax API error: ${data.message}`);
+export async function fetchQuidaxData(endpoint: string) {
+  try {
+    const response = await quidaxApi.get(endpoint);
+    return response.data.data;
+  } catch (error: any) {
+    const errorMessage = error.response?.data?.message || error.message;
+    console.error('Quidax API error:', { endpoint, error: errorMessage });
+    throw new Error(`Quidax API error: ${errorMessage}`);
   }
-
-  return data;
 }
 
 export async function getWallets(userId: string = 'me') {
@@ -168,7 +175,7 @@ export class QuidaxService {
   private readonly baseUrl: string;
 
   constructor() {
-    this.baseUrl = 'https://www.quidax.com/api/v1';
+    this.baseUrl = QUIDAX_API_URL;
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<Response> {
@@ -256,8 +263,20 @@ export class QuidaxService {
 
   async getWalletAddress(userId: string, currency: string): Promise<string> {
     try {
-      const response = await quidaxApi.get(`/users/${userId}/wallets/${currency}/address`);
-      return response.data.data.address;
+      const response = await fetch(`${this.baseUrl}/users/${userId}/wallets/${currency}/address`, {
+        headers: {
+          'Authorization': `Bearer ${process.env.QUIDAX_SECRET_KEY}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch wallet address: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.data.address;
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Failed to fetch wallet address');
     }

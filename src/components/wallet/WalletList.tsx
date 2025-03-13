@@ -107,6 +107,15 @@ export function WalletList({
     onSwap(wallet);
   };
 
+  const getMarketPrice = (currency: string) => {
+    // For NGN, return 1 as it's the base currency
+    if (currency.toUpperCase() === 'NGN') return 1;
+
+    // Find the market data for this currency
+    const market = marketData.find(m => m.currency === currency.toUpperCase());
+    return market?.price || 0;
+  };
+
   return (
     <div className="space-y-6">
       {/* Controls */}
@@ -187,23 +196,26 @@ export function WalletList({
             ? Array(6)
                 .fill(0)
                 .map((_, i) => <WalletSkeleton key={i} />)
-            : filteredWallets.map((wallet) => (
-                <WalletCard
-                  key={wallet.id}
-                  currency={wallet.currency}
-                  balance={wallet.balance}
-                  price={
-                    marketData.find((m: MarketData) => m.currency === wallet.currency)?.price
-                  }
-                  onDeposit={() => handleDeposit(wallet)}
-                  onWithdraw={() => handleWithdraw(wallet)}
-                  onSwap={
-                    wallet.currency !== 'NGN'
-                      ? () => handleSwap(wallet)
-                      : undefined
-                  }
-                />
-              ))}
+            : filteredWallets.map((wallet) => {
+                const price = getMarketPrice(wallet.currency);
+                console.log(`Market price for ${wallet.currency}:`, price);
+                
+                return (
+                  <WalletCard
+                    key={wallet.id}
+                    currency={wallet.currency}
+                    balance={wallet.balance}
+                    price={price}
+                    onDeposit={() => handleDeposit(wallet)}
+                    onWithdraw={() => handleWithdraw(wallet)}
+                    onSwap={
+                      wallet.currency.toUpperCase() !== 'NGN'
+                        ? () => handleSwap(wallet)
+                        : undefined
+                    }
+                  />
+                );
+              })}
         </div>
       </ScrollArea>
 

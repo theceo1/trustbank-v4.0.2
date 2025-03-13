@@ -25,8 +25,8 @@ export async function middleware(request: NextRequest) {
 
   try {
     // Get user session
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError || !session?.user) {
+    const { data: { user }, error: sessionError } = await supabase.auth.getUser();
+    if (sessionError || !user) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 401 }
@@ -37,7 +37,7 @@ export async function middleware(request: NextRequest) {
     const { data: securitySettings, error: settingsError } = await supabase
       .from('security_settings')
       .select('two_factor_enabled, two_factor_secret')
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .single();
 
     if (settingsError || !securitySettings?.two_factor_enabled) {

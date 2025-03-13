@@ -53,3 +53,31 @@ export function formatNumber(value: number | string, options: {
   const formatted = formatter.format(num);
   return style === 'currency' ? formatted.replace('NGN', '₦') : formatted;
 }
+
+export function formatCryptoAmount(value: number | string): string {
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(num)) return '0';
+  
+  // For very small numbers, use scientific notation
+  if (num < 0.000001) {
+    return num.toExponential(6);
+  }
+  
+  // For regular numbers, use standard formatting
+  return num.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 8
+  });
+}
+
+export function formatNairaAmount(value: number | string): string {
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(num)) return '₦ 0.00';
+  
+  return new Intl.NumberFormat('en-NG', {
+    style: 'currency',
+    currency: 'NGN',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(num).replace('NGN', '₦');
+}

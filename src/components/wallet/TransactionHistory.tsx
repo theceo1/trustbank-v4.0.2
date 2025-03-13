@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { Icons } from '@/components/ui/icons';
 import { useBalance } from './BalanceContext';
+import Link from 'next/link';
 
 interface Transaction {
   id: string;
@@ -19,6 +20,8 @@ interface TransactionHistoryProps {
 
 export function TransactionHistory({ transactions = [] }: TransactionHistoryProps) {
   const { isHidden } = useBalance();
+  // Only show the 5 most recent transactions
+  const recentTransactions = transactions.slice(0, 5);
 
   const getStatusColor = (status: Transaction['status']) => {
     switch (status) {
@@ -68,13 +71,23 @@ export function TransactionHistory({ transactions = [] }: TransactionHistoryProp
     }
   };
 
+  const formatAmount = (amount: number, currency: string) => {
+    if (typeof amount !== 'number') return '0.00';
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 8,
+    }).format(amount);
+  };
+
   return (
     <div className="rounded-xl border bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 p-6 shadow-lg">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-base font-medium text-gray-900 dark:text-gray-100">Recent Transactions</h2>
-        <Button variant="ghost" size="sm" className="text-xs text-orange-600 dark:text-orange-500 hover:text-orange-700 dark:hover:text-orange-400">
-          View All ↗
-        </Button>
+        <Link href="/transactions">
+          <Button variant="ghost" size="sm" className="text-xs text-orange-600 dark:text-orange-500 hover:text-orange-700 dark:hover:text-orange-400">
+            View All ↗
+          </Button>
+        </Link>
       </div>
 
       <div className="flex items-center gap-2 sm:gap-4 mb-6">
@@ -84,9 +97,9 @@ export function TransactionHistory({ transactions = [] }: TransactionHistoryProp
         <Button variant="ghost" size="sm" className="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300">Swaps</Button>
       </div>
 
-      {transactions.length > 0 ? (
+      {recentTransactions.length > 0 ? (
         <div className="space-y-3">
-          {transactions.map((tx) => (
+          {recentTransactions.map((tx) => (
             <div key={tx.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
               <div className="flex items-center gap-3">
                 <div className={`p-2 rounded-lg ${
@@ -105,7 +118,7 @@ export function TransactionHistory({ transactions = [] }: TransactionHistoryProp
               </div>
               <div className="text-right">
                 <p className="text-sm font-medium text-gray-900 dark:text-gray-200">
-                  {isHidden ? '••••••' : `${tx.type === 'deposit' ? '+' : '-'}${tx.amount} ${tx.currency}`}
+                  {isHidden ? '••••••' : `${tx.type === 'deposit' ? '+' : '-'}${formatAmount(tx.amount, tx.currency)} ${tx.currency}`}
                 </p>
                 <p className={`text-xs capitalize ${getStatusColor(tx.status)}`}>
                   {tx.status}

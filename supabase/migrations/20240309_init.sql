@@ -104,6 +104,8 @@ create policy "Users can view own profile" on public.user_profiles
   for select using (auth.uid() = user_id);
 create policy "Users can update own profile" on public.user_profiles
   for update using (auth.uid() = user_id);
+create policy "Users can insert own profile" on public.user_profiles
+  for insert with check (auth.uid() = user_id);
 
 -- Wallets policies
 create policy "Users can view own wallets" on public.wallets

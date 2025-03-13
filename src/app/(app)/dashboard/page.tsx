@@ -6,12 +6,22 @@ import { Icons } from '@/components/ui/icons';
 import Link from 'next/link';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
+import { InstantSwapModal } from '@/components/InstantSwapModal';
+
+interface User {
+  id: string;
+  first_name?: string;
+  user_metadata?: {
+    first_name?: string;
+  };
+}
 
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [wallets, setWallets] = useState<any[]>([]);
+  const [isSwapModalOpen, setIsSwapModalOpen] = useState(false);
   const router = useRouter();
   const supabase = createClientComponentClient();
 
@@ -31,16 +41,13 @@ export default function DashboardPage() {
         return;
       }
 
-      setUser(user);
-
-      // Fetch user profile to get first name
-      const { data: profileData, error: profileError } = await supabase
-        .from('user_profiles')
-        .select('first_name, last_name')
-        .eq('user_id', user.id)
-        .single();
-
-      if (profileError) throw profileError;
+      // Get user's name from auth metadata and update user state
+      const userData: User = {
+        id: user.id,
+        first_name: user.user_metadata?.first_name || 'there',
+        user_metadata: user.user_metadata
+      };
+      setUser(userData);
 
       const { data: walletsData, error: walletsError } = await supabase
         .from('wallets')
@@ -79,13 +86,20 @@ export default function DashboardPage() {
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-xl font-medium text-emerald-600 dark:text-emerald-400">
-              Welcome back, {user?.user_metadata?.first_name || 'there'}
+              Welcome back, {user?.first_name || 'there'}
             </h1>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
               Here{"'"}s an overview of your financial activities
             </p>
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
+            <Button 
+              onClick={() => setIsSwapModalOpen(true)}
+              className="bg-green-600 hover:bg-green-700 text-white"
+              size="sm"
+            >
+              Instant Swap
+            </Button>
             <Button variant="destructive" size="sm" className="text-white dark:text-white">
               Verify Account
             </Button>
@@ -221,6 +235,23 @@ export default function DashboardPage() {
               <Icons.chevronRight className="h-4 w-4 text-gray-400 dark:text-gray-500" />
             </Link>
 
+            <Button
+              onClick={() => setIsSwapModalOpen(true)}
+              className="w-full flex items-center justify-between p-2.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50"
+              variant="ghost"
+            >
+              <div className="flex items-center gap-3">
+                <div className="bg-green-50 dark:bg-green-900/20 p-2 rounded-lg">
+                  <Icons.arrowUpDown className="h-4 w-4 text-green-600 dark:text-green-400" />
+                </div>
+                <div className="text-left">
+                  <h3 className="text-sm font-medium text-gray-900 dark:text-gray-300">Instant Swap</h3>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Instantly swap between cryptocurrencies</p>
+                </div>
+              </div>
+              <Icons.chevronRight className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+            </Button>
+
             <Link href="/wallet" className="flex items-center justify-between p-2.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50">
               <div className="flex items-center gap-3">
                 <div className="bg-emerald-50 dark:bg-emerald-900/20 p-2 rounded-lg">
@@ -283,6 +314,13 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Instant Swap Modal */}
+      <InstantSwapModal
+        isOpen={isSwapModalOpen}
+        onClose={() => setIsSwapModalOpen(false)}
+        wallet={wallets[0]}
+      />
     </div>
   );
 } 
