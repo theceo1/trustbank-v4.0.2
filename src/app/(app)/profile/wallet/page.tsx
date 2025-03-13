@@ -11,6 +11,8 @@ import { BalanceProvider } from '@/components/wallet/BalanceContext'
 import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { InstantSwapModal } from '@/components/InstantSwapModal'
+import { WithdrawModal } from '@/components/wallet/WithdrawModal'
+import { DepositModal } from '@/components/wallet/DepositModal'
 
 interface MarketData {
   currency: string;
@@ -30,6 +32,9 @@ export default function WalletPage() {
   const [error, setError] = useState('');
   const [walletData, setWalletData] = useState<WalletData | null>(null);
   const [isInstantSwapOpen, setIsInstantSwapOpen] = useState(false);
+  const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
+  const [isDepositOpen, setIsDepositOpen] = useState(false);
+  const [selectedWallet, setSelectedWallet] = useState<any>(null);
   const supabase = createClientComponentClient();
 
   useEffect(() => {
@@ -72,7 +77,7 @@ export default function WalletPage() {
         <div className="min-h-[60vh] flex items-center justify-center">
           <div className="flex flex-col items-center gap-4">
             <div className="animate-spin">
-              <Icons.spinner className="h-8 w-8 text-orange-500" />
+              <Icons.spinner className="h-8 w-8 text-green-600" />
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400">Loading your wallet...</p>
           </div>
@@ -150,8 +155,8 @@ export default function WalletPage() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Button 
             onClick={() => {
-              // TODO: Implement deposit modal once provided
-              console.log('Deposit modal pending implementation');
+              setIsDepositOpen(true);
+              setSelectedWallet(wallets[0]); // Set the first wallet as default, adjust as needed
             }} 
             className="w-full h-auto py-2.5 bg-green-600 hover:bg-green-700 text-white flex flex-col items-center gap-1"
           >
@@ -160,8 +165,8 @@ export default function WalletPage() {
           </Button>
           <Button 
             onClick={() => {
-              // TODO: Implement withdraw modal once provided
-              console.log('Withdraw modal pending implementation');
+              setIsWithdrawOpen(true);
+              setSelectedWallet(wallets[0]); // Set the first wallet as default, adjust as needed
             }} 
             className="w-full h-auto py-2.5 bg-blue-600 hover:bg-blue-700 text-white flex flex-col items-center gap-1"
           >
@@ -218,6 +223,31 @@ export default function WalletPage() {
           <TransactionHistory transactions={transactions} />
         </div>
       </BalanceProvider>
+
+      {/* Deposit Modal */}
+      {isDepositOpen && selectedWallet && (
+        <DepositModal
+          isOpen={isDepositOpen}
+          onClose={() => {
+            setIsDepositOpen(false);
+            setSelectedWallet(null);
+          }}
+          wallet={selectedWallet}
+        />
+      )}
+
+      {/* Withdraw Modal */}
+      {isWithdrawOpen && selectedWallet && (
+        <WithdrawModal
+          isOpen={isWithdrawOpen}
+          onClose={() => {
+            setIsWithdrawOpen(false);
+            setSelectedWallet(null);
+          }}
+          wallet={selectedWallet}
+          userId={userId}
+        />
+      )}
 
       {/* Instant Swap Modal */}
       {isInstantSwapOpen && (
