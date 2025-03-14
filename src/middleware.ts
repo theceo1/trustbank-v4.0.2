@@ -37,10 +37,22 @@ export async function middleware(request: NextRequest) {
       '/legal/aml',
       '/legal/kyc',
       '/legal/risk',
-      '/legal/cookies'
+      '/legal/cookies',
+      '/calculator',
+      '/market',
+      '/learn',
+      '/status',
+      '/support',
     ]
     
-    const publicApiRoutes = ['/api/auth/login', '/api/auth/signup']
+    const publicApiRoutes = [
+      '/api/auth/login',
+      '/api/auth/signup',
+      '/api/markets/price',
+      '/api/markets/overview',
+      '/api/markets/tickers',
+      '/api/markets/data'
+    ]
     
     // Check if the current path matches any public route
     const isPublicRoute = publicRoutes.some(route => 

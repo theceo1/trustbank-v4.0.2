@@ -27,46 +27,36 @@ export function AuthProvider({ children, initialSession }: AuthProviderProps) {
   const supabase = createClientComponentClient();
 
   useEffect(() => {
-    console.log('AuthProvider initializing with session:', initialSession);
-
-    async function initializeAuth() {
-      try {
-        if (!initialSession) {
-          console.log('No initial session, fetching session...');
-          const { data: { user }, error: authError } = await supabase.auth.getUser();
-          if (authError || !user) {
-            console.error('Error getting initial session:', authError);
-            setUser(null);
-          } else {
-            setUser(user);
-          }
-        }
-      } catch (error) {
-        console.error('Error initializing auth:', error);
-      } finally {
-        setLoading(false);
-      }
+    if (initialSession) {
+      setUser(initialSession);
+      setLoading(false);
     }
 
-    initializeAuth();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', { event, session });
-      setUser(session?.user ?? null);
+      
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        setUser(session?.user ?? null);
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+      }
+      
       setLoading(false);
     });
 
     return () => {
-      console.log('Cleaning up auth subscription');
       subscription.unsubscribe();
     };
   }, [supabase.auth, initialSession]);
 
   const signOut = async () => {
-    setLoading(true);
-    await supabase.auth.signOut();
-    setUser(null);
-    setLoading(false);
+    try {
+      setLoading(true);
+      await supabase.auth.signOut();
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
