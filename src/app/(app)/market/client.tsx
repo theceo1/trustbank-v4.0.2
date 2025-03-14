@@ -4,10 +4,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowUp, ArrowDown, ArrowRight, LineChart, Activity, Bitcoin } from 'lucide-react';
+import { ArrowUp, ArrowDown, ArrowRight, LineChart, Activity, Bitcoin, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Session } from '@supabase/auth-helpers-nextjs';
+import { toast } from 'sonner';
+import { formatCurrency, formatNumber } from '@/lib/utils';
 
 interface MarketData {
   pair: string;
@@ -82,14 +84,14 @@ export function MarketClient({ session }: MarketClientProps) {
       }
 
       const data = await response.json();
-
       if (data.error) {
         throw new Error(data.error);
       }
 
-      return data;
+      return data.data;
     } catch (error) {
       console.error('Error fetching price data:', error);
+      toast.error('Failed to fetch price data');
       return null;
     }
   }, []);
@@ -103,10 +105,14 @@ export function MarketClient({ session }: MarketClientProps) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data = await response.json();
+      if (data.error) {
+        throw new Error(data.error);
+      }
       setMarkets(data);
       setLastFetchTimes(prev => ({ ...prev, market: Date.now() }));
     } catch (error) {
       console.error('Error fetching market data:', error);
+      toast.error('Failed to fetch market data');
     }
   }, [shouldFetchData]);
 
@@ -119,34 +125,51 @@ export function MarketClient({ session }: MarketClientProps) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data = await response.json();
-      setOverviewData(data);
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      setOverviewData(data.data);
       setLastFetchTimes(prev => ({ ...prev, overview: Date.now() }));
     } catch (error) {
       console.error('Error fetching overview data:', error);
+      toast.error('Failed to fetch overview data');
     }
   }, [shouldFetchData]);
 
   useEffect(() => {
     const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+      
       try {
+        const fetchPromises = [];
+        
         if (shouldFetchData('price')) {
           const pair = getCurrencyPair(selectedCurrency);
-          const priceData = await fetchPriceData(pair);
-          if (priceData) {
-            setPriceData(priceData);
-            setLastFetchTimes(prev => ({ ...prev, price: Date.now() }));
-          }
+          fetchPromises.push(
+            fetchPriceData(pair).then(data => {
+              if (data) {
+                setPriceData(data);
+                setLastFetchTimes(prev => ({ ...prev, price: Date.now() }));
+              }
+            })
+          );
         }
 
         if (shouldFetchData('market')) {
-          await fetchMarketData();
+          fetchPromises.push(fetchMarketData());
         }
 
         if (shouldFetchData('overview')) {
-          await fetchOverviewData();
+          fetchPromises.push(fetchOverviewData());
         }
+
+        await Promise.all(fetchPromises);
       } catch (error) {
         console.error('Error in fetch cycle:', error);
+        setError('Failed to fetch market data');
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -163,138 +186,158 @@ export function MarketClient({ session }: MarketClientProps) {
     };
   }, [selectedCurrency, shouldFetchData, fetchMarketData, fetchOverviewData, fetchPriceData, getCurrencyPair]);
 
-  const formatNGN = (value: string | number) => {
+  const formatMarketCap = (value: string | number) => {
     const num = typeof value === 'string' ? parseFloat(value) : value;
-    const formatted = new Intl.NumberFormat('en-NG', {
-      style: 'currency',
-      currency: 'NGN',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(num);
-    return formatted.replace('NGN', '₦ '); // Add space after ₦
+    if (num >= 1e12) return `$${(num / 1e12).toFixed(2)}T`;
+    if (num >= 1e9) return `$${(num / 1e9).toFixed(2)}B`;
+    if (num >= 1e6) return `$${(num / 1e6).toFixed(2)}M`;
+    return `$${num.toFixed(2)}`;
   };
 
-  const formatCurrency = (value: string | number) => {
+  const formatVolume = (value: string | number) => {
     const num = typeof value === 'string' ? parseFloat(value) : value;
-    let formatted: string;
-    
-    if (num >= 1e12) {
-      formatted = `$ ${(num / 1e12).toFixed(2)} T`;
-    } else if (num >= 1e9) {
-      formatted = `$ ${(num / 1e9).toFixed(2)} B`;
-    } else if (num >= 1e6) {
-      formatted = `$ ${(num / 1e6).toFixed(2)} M`;
-    } else {
-      formatted = `$ ${num.toFixed(2)}`;
-    }
-    
-    return formatted; // Already has space after $
+    return formatNumber(num, { maximumFractionDigits: 2 });
   };
 
-  const formatVolume = (value: number | string) => {
-    const num = typeof value === 'string' ? parseFloat(value) : value;
-    return num.toLocaleString('en-US', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
-  };
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] p-4">
+        <p className="text-red-500 mb-4">{error}</p>
+        <Button onClick={() => window.location.reload()}>
+          Retry
+        </Button>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-4 p-4">
+    <div className="space-y-8 p-6">
       {/* Market Overview Section */}
-      <div className="rounded-lg bg-white dark:bg-gray-800/50 shadow-md p-4">
-        <h2 className="text-xl font-bold mb-1">Market Overview</h2>
-        <p className="text-xs text-muted-foreground mb-3">Real-time cryptocurrency market statistics and trends</p>
+      <div className="rounded-lg bg-white dark:bg-gray-800/50 shadow-md p-6">
+        <h2 className="text-2xl font-bold mb-2">Market Overview</h2>
+        <p className="text-sm text-muted-foreground mb-6">Real-time cryptocurrency market statistics and trends</p>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card className="bg-card/50 backdrop-blur-sm border-none shadow-sm">
-            <CardContent className="pt-4">
+            <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-base font-semibold">Total Market Cap</p>
-                  <h3 className="text-lg font-bold mt-1">{overviewData?.totalMarketCap || 'Loading...'}</h3>
+                  <p className="text-base font-semibold text-muted-foreground">Total Market Cap</p>
+                  <h3 className="text-2xl font-bold mt-2">
+                    {loading ? (
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    ) : (
+                      formatMarketCap(overviewData?.totalMarketCap || '0')
+                    )}
+                  </h3>
                 </div>
-                <Activity className="h-4 w-4 text-orange-500" />
+                <Activity className="h-6 w-6 text-orange-500" />
               </div>
-              <p className="text-xs text-muted-foreground mt-3">Last updated: {overviewData?.lastUpdated || 'Loading...'}</p>
+              <p className="text-xs text-muted-foreground mt-4">
+                Last updated: {overviewData?.lastUpdated || 'N/A'}
+              </p>
             </CardContent>
           </Card>
 
           <Card className="bg-blue-50 dark:bg-blue-950/20 border-none shadow-sm">
-            <CardContent className="pt-4">
+            <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-base font-semibold">24h Trading Volume</p>
-                  <h3 className="text-lg font-bold mt-1">{overviewData?.tradingVolume24h || 'Loading...'}</h3>
+                  <p className="text-base font-semibold text-muted-foreground">24h Trading Volume</p>
+                  <h3 className="text-2xl font-bold mt-2">
+                    {loading ? (
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    ) : (
+                      formatMarketCap(overviewData?.tradingVolume24h || '0')
+                    )}
+                  </h3>
                 </div>
-                <LineChart className="h-4 w-4 text-blue-500" />
+                <LineChart className="h-6 w-6 text-blue-500" />
               </div>
-              <p className="text-xs text-muted-foreground mt-3">Last updated: {overviewData?.lastUpdated || 'Loading...'}</p>
+              <p className="text-xs text-muted-foreground mt-4">
+                Last updated: {overviewData?.lastUpdated || 'N/A'}
+              </p>
             </CardContent>
           </Card>
 
           <Card className="bg-green-50 dark:bg-green-950/20 border-none shadow-sm">
-            <CardContent className="pt-4">
+            <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-base font-semibold">BTC Dominance</p>
-                  <h3 className="text-lg font-bold mt-1">{overviewData?.btcDominance || 'Loading...'}</h3>
+                  <p className="text-base font-semibold text-muted-foreground">BTC Dominance</p>
+                  <h3 className="text-2xl font-bold mt-2">
+                    {loading ? (
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    ) : (
+                      `${overviewData?.btcDominance || '0'}%`
+                    )}
+                  </h3>
                 </div>
-                <Bitcoin className="h-4 w-4 text-green-500" />
+                <Bitcoin className="h-6 w-6 text-green-500" />
               </div>
-              <p className="text-xs text-muted-foreground mt-3">Last updated: {overviewData?.lastUpdated || 'Loading...'}</p>
+              <p className="text-xs text-muted-foreground mt-4">
+                Last updated: {overviewData?.lastUpdated || 'N/A'}
+              </p>
             </CardContent>
           </Card>
         </div>
       </div>
 
       {/* Price Tracker Section */}
-      <div className="rounded-lg bg-white dark:bg-gray-800/50 shadow-md p-4">
-        <h2 className="text-xl font-bold mb-1">Price Tracker</h2>
-        <p className="text-xs text-muted-foreground mb-3">Monitor real-time cryptocurrency prices in NGN</p>
+      <div className="rounded-lg bg-white dark:bg-gray-800/50 shadow-md p-6">
+        <h2 className="text-2xl font-bold mb-2">Price Tracker</h2>
+        <p className="text-sm text-muted-foreground mb-6">Monitor real-time cryptocurrency prices in NGN</p>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="lg:col-span-1">
-            <Select value={selectedCurrency} onValueChange={setSelectedCurrency}>
-              <SelectTrigger>
-                <SelectValue />
+        <div className="space-y-6">
+          <div className="flex items-center gap-4">
+            <Select
+              value={selectedCurrency}
+              onValueChange={setSelectedCurrency}
+            >
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Select currency" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Bitcoin">Bitcoin</SelectItem>
-                <SelectItem value="Ethereum">Ethereum</SelectItem>
-                <SelectItem value="Tether">Tether</SelectItem>
-                <SelectItem value="USD Coin">USD Coin</SelectItem>
+                <SelectItem value="Bitcoin">Bitcoin (BTC)</SelectItem>
+                <SelectItem value="Ethereum">Ethereum (ETH)</SelectItem>
+                <SelectItem value="Tether">Tether (USDT)</SelectItem>
+                <SelectItem value="USD Coin">USD Coin (USDC)</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          <Card className="lg:col-span-2 bg-purple-50 dark:bg-purple-950/20 border-none shadow-sm">
-            <CardContent className="pt-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-semibold">{priceData?.pair || 'Loading...'}</h3>
-                  <Badge variant="secondary" className="bg-green-600 text-white hover:bg-green-700 text-xs">Live</Badge>
-                </div>
-                <div className="text-right">
-                  <p className={`text-xs ${parseFloat(priceData?.priceChangePercent || '0') >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                    {parseFloat(priceData?.priceChangePercent || '0') >= 0 ? '+' : ''}{parseFloat(priceData?.priceChangePercent || '0')}%
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Vol: {formatVolume(parseFloat(priceData?.volume || '0'))} {selectedCurrency.split(' ')[0]}
-                  </p>
-                </div>
+          <div className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-900/50 dark:to-gray-800/50 rounded-lg p-8">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">{getCurrencyPair(selectedCurrency)}</h3>
+              <Badge variant="outline" className="text-xs">Live</Badge>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex items-baseline gap-4">
+                <span className="text-4xl font-bold">
+                  {loading ? (
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                  ) : (
+                    formatCurrency(priceData?.price || '0', 'NGN')
+                  )}
+                </span>
+                {priceData?.priceChangePercent && (
+                  <Badge 
+                    variant={parseFloat(priceData.priceChangePercent) >= 0 ? "default" : "destructive"}
+                    className={parseFloat(priceData.priceChangePercent) >= 0 ? "bg-green-500 hover:bg-green-600" : ""}
+                  >
+                    {parseFloat(priceData.priceChangePercent) >= 0 ? '+' : ''}{priceData.priceChangePercent}%
+                  </Badge>
+                )}
               </div>
-              <p className="text-2xl font-bold">{priceData?.price || 'Loading...'}</p>
-            </CardContent>
-          </Card>
+              
+              <div className="text-sm text-muted-foreground">
+                Vol: {formatVolume(priceData?.volume || '0')} {selectedCurrency}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-
-      {error && (
-        <div className="rounded-lg border border-red-200 p-3 text-red-600 text-sm">
-          {error}
-        </div>
-      )}
     </div>
   );
 } 

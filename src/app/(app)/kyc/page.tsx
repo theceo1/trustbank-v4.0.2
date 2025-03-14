@@ -14,10 +14,7 @@ export const metadata: Metadata = {
 };
 
 export default async function KYCPage() {
-  const cookieStore = await cookies();
-  const supabase = createServerComponentClient({ 
-    cookies: async () => cookieStore 
-  });
+  const supabase = createServerComponentClient({ cookies });
   
   // Get authenticated user data
   const { data: { user }, error: userError } = await supabase.auth.getUser();
