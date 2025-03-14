@@ -12,8 +12,9 @@ interface MarketData {
 export async function GET(request: Request) {
   try {
     // Create a new cookie store and supabase client
+    const cookieStore = cookies();
     const supabase = createRouteHandlerClient({ 
-      cookies
+      cookies: () => cookieStore
     }, {
       supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY
     });

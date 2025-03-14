@@ -13,6 +13,9 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { InstantSwapModal } from '@/components/InstantSwapModal'
 import { WithdrawModal } from '@/components/wallet/WithdrawModal'
 import { DepositModal } from '@/components/wallet/DepositModal'
+import { GeneralDepositModal } from '@/components/wallet/GeneralDepositModal'
+import { GeneralWithdrawModal } from '@/components/wallet/GeneralWithdrawModal'
+import { GeneralSwapModal } from '@/components/wallet/GeneralSwapModal'
 
 interface MarketData {
   currency: string;
@@ -34,6 +37,9 @@ export default function WalletPage() {
   const [isInstantSwapOpen, setIsInstantSwapOpen] = useState(false);
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
   const [isDepositOpen, setIsDepositOpen] = useState(false);
+  const [isGeneralDepositOpen, setIsGeneralDepositOpen] = useState(false);
+  const [isGeneralWithdrawOpen, setIsGeneralWithdrawOpen] = useState(false);
+  const [isGeneralSwapOpen, setIsGeneralSwapOpen] = useState(false);
   const [selectedWallet, setSelectedWallet] = useState<any>(null);
   const supabase = createClientComponentClient();
 
@@ -133,14 +139,35 @@ export default function WalletPage() {
   const totalValue = wallets.reduce((total: number, wallet: any) => {
     const marketInfo = marketData.find(m => m.currency === wallet.currency?.toUpperCase());
     const value = (parseFloat(wallet.balance || '0') * (marketInfo?.price || 0));
-    console.log('Wallet value calculation:', {
-      currency: wallet.currency,
-      balance: wallet.balance,
-      price: marketInfo?.price,
-      value
-    });
     return total + value;
   }, 0);
+
+  const handleDepositClick = (specificWallet?: any) => {
+    if (specificWallet) {
+      setSelectedWallet(specificWallet);
+      setIsDepositOpen(true);
+    } else {
+      setIsGeneralDepositOpen(true);
+    }
+  };
+
+  const handleWithdrawClick = (specificWallet?: any) => {
+    if (specificWallet) {
+      setSelectedWallet(specificWallet);
+      setIsWithdrawOpen(true);
+    } else {
+      setIsGeneralWithdrawOpen(true);
+    }
+  };
+
+  const handleSwapClick = (specificWallet?: any) => {
+    if (specificWallet) {
+      setSelectedWallet(specificWallet);
+      setIsInstantSwapOpen(true);
+    } else {
+      setIsGeneralSwapOpen(true);
+    }
+  };
 
   return (
     <div className="container mx-auto px-4 sm:px-6 space-y-6">
@@ -154,31 +181,40 @@ export default function WalletPage() {
         {/* Action Buttons */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Button 
-            onClick={() => {
-              setIsDepositOpen(true);
-              setSelectedWallet(wallets[0]); // Set the first wallet as default, adjust as needed
-            }} 
-            className="w-full h-auto py-2.5 bg-green-600 hover:bg-green-700 text-white flex flex-col items-center gap-1"
+            onClick={() => handleDepositClick()}
+            className="w-full h-auto py-4 bg-green-600 hover:bg-green-700 text-white flex flex-col items-center gap-2"
           >
-            <Icons.download className="h-4 w-4" />
-            <span className="text-sm">Deposit</span>
+            <div className="bg-green-500/20 p-2 rounded-lg">
+              <Icons.download className="h-5 w-5" />
+            </div>
+            <div className="text-center">
+              <div className="font-medium">Deposit</div>
+              <div className="text-xs text-green-100">Add funds to your wallet</div>
+            </div>
           </Button>
           <Button 
-            onClick={() => {
-              setIsWithdrawOpen(true);
-              setSelectedWallet(wallets[0]); // Set the first wallet as default, adjust as needed
-            }} 
-            className="w-full h-auto py-2.5 bg-blue-600 hover:bg-blue-700 text-white flex flex-col items-center gap-1"
+            onClick={() => handleWithdrawClick()}
+            className="w-full h-auto py-4 bg-blue-600 hover:bg-blue-700 text-white flex flex-col items-center gap-2"
           >
-            <Icons.upload className="h-4 w-4" />
-            <span className="text-sm">Withdraw</span>
+            <div className="bg-blue-500/20 p-2 rounded-lg">
+              <Icons.upload className="h-5 w-5" />
+            </div>
+            <div className="text-center">
+              <div className="font-medium">Withdraw</div>
+              <div className="text-xs text-blue-100">Send funds to external wallet</div>
+            </div>
           </Button>
           <Button 
-            onClick={() => setIsInstantSwapOpen(true)} 
-            className="w-full h-auto py-2.5 bg-purple-600 hover:bg-purple-700 text-white flex flex-col items-center gap-1"
+            onClick={() => handleSwapClick()}
+            className="w-full h-auto py-4 bg-purple-600 hover:bg-purple-700 text-white flex flex-col items-center gap-2"
           >
-            <Icons.refresh className="h-4 w-4" />
-            <span className="text-sm">Instant Swap</span>
+            <div className="bg-purple-500/20 p-2 rounded-lg">
+              <Icons.refresh className="h-5 w-5" />
+            </div>
+            <div className="text-center">
+              <div className="font-medium">Instant Swap</div>
+              <div className="text-xs text-purple-100">Exchange between currencies</div>
+            </div>
           </Button>
         </div>
 
@@ -210,6 +246,9 @@ export default function WalletPage() {
               wallets={wallets}
               marketData={marketData}
               userId={userId}
+              onDeposit={handleDepositClick}
+              onWithdraw={handleWithdrawClick}
+              onSwap={handleSwapClick}
             />
 
             {/* Asset Distribution */}
@@ -224,39 +263,50 @@ export default function WalletPage() {
         </div>
       </BalanceProvider>
 
-      {/* Deposit Modal */}
-      {isDepositOpen && selectedWallet && (
-        <DepositModal
-          isOpen={isDepositOpen}
-          onClose={() => {
-            setIsDepositOpen(false);
-            setSelectedWallet(null);
-          }}
-          wallet={selectedWallet}
-        />
-      )}
+      {/* Wallet-specific Modals */}
+      <DepositModal
+        isOpen={isDepositOpen}
+        onClose={() => {
+          setIsDepositOpen(false);
+          setSelectedWallet(null);
+        }}
+        wallet={selectedWallet}
+      />
 
-      {/* Withdraw Modal */}
-      {isWithdrawOpen && selectedWallet && (
-        <WithdrawModal
-          isOpen={isWithdrawOpen}
-          onClose={() => {
-            setIsWithdrawOpen(false);
-            setSelectedWallet(null);
-          }}
-          wallet={selectedWallet}
-          userId={userId}
-        />
-      )}
+      <WithdrawModal
+        isOpen={isWithdrawOpen}
+        onClose={() => {
+          setIsWithdrawOpen(false);
+          setSelectedWallet(null);
+        }}
+        wallet={selectedWallet || undefined}
+        userId={userId}
+      />
 
-      {/* Instant Swap Modal */}
-      {isInstantSwapOpen && (
-        <InstantSwapModal
-          isOpen={isInstantSwapOpen}
-          onClose={() => setIsInstantSwapOpen(false)}
-          wallet={wallets[0]}
-        />
-      )}
+      <InstantSwapModal
+        isOpen={isInstantSwapOpen}
+        onClose={() => {
+          setIsInstantSwapOpen(false);
+          setSelectedWallet(null);
+        }}
+        wallet={selectedWallet}
+      />
+
+      {/* General Action Modals */}
+      <GeneralDepositModal
+        isOpen={isGeneralDepositOpen}
+        onClose={() => setIsGeneralDepositOpen(false)}
+      />
+
+      <GeneralWithdrawModal
+        isOpen={isGeneralWithdrawOpen}
+        onClose={() => setIsGeneralWithdrawOpen(false)}
+      />
+
+      <GeneralSwapModal
+        isOpen={isGeneralSwapOpen}
+        onClose={() => setIsGeneralSwapOpen(false)}
+      />
     </div>
   );
 } 

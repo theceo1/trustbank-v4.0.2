@@ -29,6 +29,8 @@ interface WithdrawModalProps {
 
 type NetworkType = 'Bitcoin Network' | 'ERC20' | 'TRC20' | 'BEP20' | 'Polygon Network';
 
+const CORE_CURRENCIES = ['NGN', 'BTC', 'ETH', 'USDT', 'USDC'];
+
 type NetworkConfig = {
   [key in 'BTC' | 'ETH' | 'USDT' | 'BNB' | 'MATIC']: NetworkType[];
 };
@@ -59,50 +61,75 @@ type InputCurrency = 'CRYPTO' | 'NGN' | 'USD';
 
 export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModalProps) {
   const { toast } = useToast();
+  const supabase = createClientComponentClient<Database>();
+  
+  // All state hooks at the top
   const [amount, setAmount] = useState("");
   const [amountInCrypto, setAmountInCrypto] = useState(0);
   const [address, setAddress] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [rate, setRate] = useState(0);
-  const [network, setNetwork] = useState<NetworkType | "">("");
-  const [withdrawType, setWithdrawType] = useState<"crypto" | "ngn">("crypto");
-  const [selectedCrypto, setSelectedCrypto] = useState(wallet.currency.toUpperCase());
-  const [inputCurrency, setInputCurrency] = useState<InputCurrency>('CRYPTO');
-  const [showPreview, setShowPreview] = useState(false);
-  const [availableCryptos, setAvailableCryptos] = useState<string[]>([]);
-  const [bankReference, setBankReference] = useState("");
-  const [walletData, setWalletData] = useState<any>(null);
-  const supabase = createClientComponentClient<Database>();
-  
-  // Bank withdrawal form state
-  const [bankName, setBankName] = useState("");
+  const [selectedNetwork, setSelectedNetwork] = useState("");
+  const [selectedBank, setSelectedBank] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [accountName, setAccountName] = useState("");
   const [isValidatingAccount, setIsValidatingAccount] = useState(false);
+  const [accountValidated, setAccountValidated] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [inputCurrency, setInputCurrency] = useState<InputCurrency>('CRYPTO');
+  const [error, setError] = useState<string | null>(null);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [expiryTime] = useState(Date.now() + 14000);
+  const [walletData, setWalletData] = useState<any>(null);
+  const [currency, setCurrency] = useState(wallet?.currency || '');
+  const [reference, setReference] = useState("");
 
-  const currency = selectedCrypto;
+  // Effect to reset state when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setAmount("");
+      setAmountInCrypto(0);
+      setAddress("");
+      setIsLoading(false);
+      setRate(0);
+      setSelectedNetwork("");
+      setSelectedBank("");
+      setAccountNumber("");
+      setAccountName("");
+      setIsValidatingAccount(false);
+      setAccountValidated(false);
+      setShowPreview(false);
+      setInputCurrency(wallet?.currency?.toLowerCase() === 'ngn' ? 'NGN' : 'CRYPTO');
+      setError(null);
+      setIsConfirming(false);
+      setCurrency(wallet?.currency || '');
+      setReference("");
+    }
+  }, [isOpen, wallet?.currency]);
 
-  // Get the current wallet's balance from walletData
-  const getCurrentWallet = () => {
-    if (!walletData) return null;
-    return walletData.wallets.find((w: any) => w.currency.toUpperCase() === currency.toUpperCase());
-  };
+  // Effect to fetch market rate
+  useEffect(() => {
+    const fetchRate = async () => {
+      if (wallet?.currency && isOpen) {
+        const newRate = await getMarketRate();
+        if (newRate) setRate(newRate);
+      }
+    };
+    fetchRate();
+  }, [wallet?.currency, isOpen]);
 
-  const getMarketRate = () => {
-    if (!walletData) return 0;
-    const marketInfo = walletData.marketData.find((m: any) => 
-      m.currency.toUpperCase() === currency.toUpperCase()
-    );
-    return marketInfo?.price || 0;
-  };
+  // Effect to update selected network
+  useEffect(() => {
+    if (wallet?.currency) {
+      setSelectedNetwork(wallet.currency.toUpperCase());
+    }
+  }, [wallet?.currency]);
 
-  const balance = getCurrentWallet()?.balance ? parseFloat(getCurrentWallet().balance) : 0;
-  const currentRate = getMarketRate();
-  const balanceInNGN = balance * currentRate;
-
-  // Fetch available cryptos and market data
+  // Effect to fetch wallet data
   useEffect(() => {
     const fetchData = async () => {
+      if (!isOpen) return;
+      
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
@@ -120,18 +147,6 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
         
         setWalletData(data);
 
-        // Filter wallets with balance > 0
-        const cryptosWithBalance = data.wallets
-          .filter((w: any) => parseFloat(w.balance) > 0)
-          .map((w: any) => w.currency.toUpperCase());
-
-        // If no balances, show core currencies
-        setAvailableCryptos(
-          cryptosWithBalance.length > 0 
-            ? cryptosWithBalance 
-            : ['BTC', 'ETH', 'USDT', 'XRP']
-        );
-
         // Set market rate
         const marketInfo = data.marketData.find((m: any) => 
           m.currency.toLowerCase() === currency.toLowerCase()
@@ -146,9 +161,9 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
         if (currentCurrency in networkConfig) {
           const networks = networkConfig[currentCurrency as keyof NetworkConfig];
           if (networks?.length === 1) {
-            setNetwork(networks[0]);
+            setSelectedNetwork(networks[0]);
           } else if (currentCurrency === 'USDT') {
-            setNetwork('TRC20'); // Default to TRC20 for USDT
+            setSelectedNetwork('TRC20');
           }
         }
       } catch (error) {
@@ -161,20 +176,44 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
       }
     };
 
-    if (isOpen) {
-      fetchData();
-    }
-  }, [isOpen, currency, supabase]);
+    fetchData();
+  }, [isOpen, currency, supabase, toast]);
 
-  // Update rate when currency changes
-  useEffect(() => {
-    if (walletData) {
-      const marketInfo = walletData.marketData.find((m: any) => 
-        m.currency.toUpperCase() === currency.toUpperCase()
-      );
-      setRate(marketInfo?.price || 0);
+  // Early return if modal is not open
+  if (!isOpen) {
+    return null;
+  }
+
+  // Get the current wallet's balance from walletData
+  const getCurrentWallet = () => {
+    if (!walletData) return null;
+    return walletData.wallets.find((w: any) => w.currency.toUpperCase() === currency.toUpperCase());
+  };
+
+  // Get market rate for the selected currency
+  const getMarketRate = async () => {
+    try {
+      if (!wallet?.currency) return 0;
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return 0;
+
+      const response = await fetch(`/api/markets/rate?from=${wallet.currency}&to=NGN`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+      const data = await response.json();
+      return data.rate || 0;
+    } catch (error) {
+      console.error('Error fetching market rate:', error);
+      return 0;
     }
-  }, [currency, walletData]);
+  };
+
+  const balance = getCurrentWallet()?.balance ? parseFloat(getCurrentWallet().balance) : 0;
+  const currentRate = rate || 0;
+  const balanceInNGN = balance * currentRate;
 
   const handleMaxAmount = () => {
     if (inputCurrency === 'CRYPTO') {
@@ -182,11 +221,11 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
       setAmountInCrypto(balance);
     } else if (inputCurrency === 'NGN') {
       setAmount(balanceInNGN.toString());
-      setAmountInCrypto(balanceInNGN / rate);
+      setAmountInCrypto(balanceInNGN / (rate || 1));
     } else {
       const usdAmount = balanceInNGN / 1585.23; // Hardcoded USD rate for now
       setAmount(usdAmount.toString());
-      setAmountInCrypto(usdAmount * 1585.23 / rate);
+      setAmountInCrypto(usdAmount * 1585.23 / (rate || 1));
     }
   };
 
@@ -197,17 +236,17 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
     if (inputCurrency === 'CRYPTO') {
       setAmountInCrypto(numValue);
     } else if (inputCurrency === 'NGN') {
-      setAmountInCrypto(numValue / rate);
+      setAmountInCrypto(numValue / (rate || 1));
     } else {
-      setAmountInCrypto((numValue * 1585.23) / rate); // Convert USD to NGN then to crypto
+      setAmountInCrypto((numValue * 1585.23) / (rate || 1)); // Convert USD to NGN then to crypto
     }
   };
 
   const validateAccountNumber = async (accNumber: string) => {
-    if (accNumber.length === 10 && bankName) {
+    if (accNumber.length === 10 && selectedBank) {
       setIsValidatingAccount(true);
       try {
-        const response = await fetch(`/api/bank/validate-account?bank=${bankName}&account=${accNumber}`);
+        const response = await fetch(`/api/bank/validate-account?bank=${selectedBank}&account=${accNumber}`);
         const data = await response.json();
         
         if (data.status === 'success' && data.data?.account_name) {
@@ -236,7 +275,7 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
   };
 
   const handleWithdraw = async () => {
-    if (!amount || (!address && !accountNumber) || (!network && currency.toLowerCase() !== 'ngn' && withdrawType === 'crypto')) {
+    if (!amount || (!address && !accountNumber) || (!selectedNetwork && currency.toLowerCase() !== 'ngn')) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
@@ -251,7 +290,29 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
   const handleConfirmWithdraw = async () => {
     setIsLoading(true);
     try {
-      if (withdrawType === 'crypto') {
+      if (currency.toLowerCase() === 'ngn') {
+        // Handle NGN withdrawal
+        const response = await fetch('/api/wallet/withdraw', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            currency,
+            amount: amountInCrypto.toString(),
+            withdrawType: 'ngn',
+            bankDetails: { 
+              bankName: selectedBank, 
+              accountNumber, 
+              accountName,
+              reference: reference
+            }
+          }),
+        });
+
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.message || 'NGN withdrawal failed');
+        }
+      } else {
         const withdrawal = await quidaxService.createWithdrawal(userId, {
           currency: currency.toLowerCase(),
           amount: amountInCrypto.toString(),
@@ -267,28 +328,6 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
           status: 'pending',
           quidax_transaction_id: withdrawal.id,
         });
-      } else {
-        // Handle NGN withdrawal
-        const response = await fetch('/api/wallet/withdraw', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            currency,
-            amount: amountInCrypto.toString(),
-            withdrawType,
-            bankDetails: { 
-              bankName, 
-              accountNumber, 
-              accountName,
-              reference: bankReference 
-            }
-          }),
-        });
-
-        if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.message || 'NGN withdrawal failed');
-        }
       }
 
       toast({
@@ -312,20 +351,42 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
   const renderCryptoWithdraw = () => (
     <div className="space-y-6">
       <div className="space-y-2">
-        <label className="text-sm font-medium">Select Cryptocurrency</label>
-        <Select value={selectedCrypto} onValueChange={setSelectedCrypto}>
+        <label className="text-sm font-medium">Select Currency</label>
+        <Select value={currency} onValueChange={setCurrency}>
           <SelectTrigger>
-            <SelectValue placeholder="Select cryptocurrency" />
+            <SelectValue placeholder="Select currency" />
           </SelectTrigger>
           <SelectContent>
-            {availableCryptos.map((crypto) => (
-              <SelectItem key={crypto} value={crypto}>
-                {crypto}
-              </SelectItem>
-            ))}
+            {walletData?.wallets
+              .filter((w: any) => parseFloat(w.balance) > 0 || CORE_CURRENCIES.includes(w.currency.toUpperCase()))
+              .map((w: any) => (
+                <SelectItem key={w.currency} value={w.currency.toUpperCase()}>
+                  {w.currency.toUpperCase()}
+                </SelectItem>
+              ))}
           </SelectContent>
         </Select>
       </div>
+
+      {currency && (
+        <>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Network</label>
+            <Select value={selectedNetwork} onValueChange={(value) => setSelectedNetwork(value as NetworkType)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select network" />
+              </SelectTrigger>
+              <SelectContent>
+                {networkConfig[currency as keyof NetworkConfig]?.map((net) => (
+                  <SelectItem key={net} value={net}>
+                    {net}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </>
+      )}
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
@@ -370,30 +431,12 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
         </p>
       </div>
 
-      {networkConfig[currency as keyof NetworkConfig]?.length > 0 && (
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Network</label>
-          <Select value={network} onValueChange={(value) => setNetwork(value as NetworkType)}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select network" />
-            </SelectTrigger>
-            <SelectContent>
-              {networkConfig[currency as keyof NetworkConfig]?.map((net) => (
-                <SelectItem key={net} value={net}>
-                  {net}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-
       <div className="space-y-2">
         <label className="text-sm font-medium">Withdrawal Address</label>
         <Input
           value={address}
           onChange={(e) => setAddress(e.target.value)}
-          placeholder={`Enter ${selectedCrypto} wallet address`}
+          placeholder={`Enter ${selectedNetwork} wallet address`}
         />
       </div>
 
@@ -411,14 +454,14 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
     <div className="space-y-6">
       <div className="space-y-2">
         <label className="text-sm font-medium">Select Cryptocurrency</label>
-        <Select value={selectedCrypto} onValueChange={setSelectedCrypto}>
+        <Select value={selectedNetwork} onValueChange={(value) => setSelectedNetwork(value as NetworkType)}>
           <SelectTrigger>
             <SelectValue placeholder="Select cryptocurrency" />
           </SelectTrigger>
           <SelectContent>
-            {availableCryptos.map((crypto) => (
-              <SelectItem key={crypto} value={crypto}>
-                {crypto}
+            {networkConfig[currency as keyof NetworkConfig]?.map((net) => (
+              <SelectItem key={net} value={net}>
+                {net}
               </SelectItem>
             ))}
           </SelectContent>
@@ -447,14 +490,14 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
         </div>
         {rate > 0 && (
           <p className="text-sm text-green-600">
-            ≈ {formatCurrency(amountInCrypto, selectedCrypto)}
+            ≈ {formatCurrency(amountInCrypto, selectedNetwork)}
           </p>
         )}
       </div>
 
       <div className="space-y-2">
         <label className="text-sm font-medium">Bank Name</label>
-        <Select value={bankName} onValueChange={setBankName}>
+        <Select value={selectedBank} onValueChange={(value) => setSelectedBank(value)}>
           <SelectTrigger>
             <SelectValue placeholder="Select your bank" />
           </SelectTrigger>
@@ -499,11 +542,11 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
       )}
 
       <div className="space-y-2">
-        <label className="text-sm font-medium">Bank Reference (Optional)</label>
+        <label className="text-sm font-medium">Reference (Optional)</label>
         <Input
-          value={bankReference}
-          onChange={(e) => setBankReference(e.target.value)}
-          placeholder="Enter bank reference or narration"
+          value={reference}
+          onChange={(e) => setReference(e.target.value)}
+          placeholder="Add a reference for this withdrawal"
         />
       </div>
 
@@ -526,7 +569,7 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
         onConfirm={handleConfirmWithdraw}
         onCancel={() => setShowPreview(false)}
         loading={isLoading}
-        expiryTime={Date.now() + 14000} // 14 seconds from now
+        expiryTime={expiryTime}
         rate={rate}
         amountInCrypto={amountInCrypto}
       />
@@ -546,7 +589,8 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
               Available balance: {formatCurrency(balance, currency)}
               {currency !== 'NGN' && currentRate > 0 && (
                 <span className="text-green-600">
-                  {' '}(≈ ₦{formatCurrency(balanceInNGN, 'NGN')})</span>
+                  {' '}(≈ {formatCurrency(balanceInNGN, 'NGN')})
+                </span>
               )}
             </span>
           </DialogDescription>
@@ -555,7 +599,7 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
         {currency.toLowerCase() === 'ngn' ? (
           renderNGNWithdraw()
         ) : (
-          <Tabs defaultValue="crypto" className="w-full" onValueChange={(value) => setWithdrawType(value as "crypto" | "ngn")}>
+          <Tabs defaultValue="crypto" className="w-full" onValueChange={(value) => setSelectedNetwork(value as NetworkType)}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="crypto">Crypto Withdrawal</TabsTrigger>
               <TabsTrigger value="ngn">NGN Withdrawal</TabsTrigger>
@@ -572,7 +616,7 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
         <DialogFooter>
           <Button
             onClick={handleWithdraw}
-            disabled={isLoading || !amount || (!address && !accountNumber) || (!network && currency.toLowerCase() !== 'ngn' && withdrawType === 'crypto')}
+            disabled={isLoading || !amount || (!address && !accountNumber) || (!selectedNetwork && currency.toLowerCase() !== 'ngn')}
             className="w-full bg-green-600 hover:bg-green-700 text-white"
           >
             {isLoading ? (

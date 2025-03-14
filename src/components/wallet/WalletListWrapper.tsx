@@ -8,22 +8,20 @@ interface WalletListWrapperProps {
   wallets: Wallet[];
   marketData: MarketData[];
   userId: string;
+  onDeposit?: (wallet: Wallet) => void;
+  onWithdraw?: (wallet: Wallet) => void;
+  onSwap?: (wallet: Wallet) => void;
 }
 
-export function WalletListWrapper({ wallets, marketData, userId }: WalletListWrapperProps) {
+export function WalletListWrapper({ 
+  wallets, 
+  marketData, 
+  userId,
+  onDeposit,
+  onWithdraw,
+  onSwap,
+}: WalletListWrapperProps) {
   const [searchQuery, setSearchQuery] = useState('');
-
-  const handleDeposit = (wallet: Wallet) => {
-    console.log('Deposit', wallet);
-  };
-
-  const handleWithdraw = (wallet: Wallet) => {
-    console.log('Withdraw', wallet);
-  };
-
-  const handleSwap = (wallet: Wallet) => {
-    console.log('Swap', wallet);
-  };
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
@@ -34,12 +32,12 @@ export function WalletListWrapper({ wallets, marketData, userId }: WalletListWra
       wallets={wallets}
       marketData={marketData}
       isLoading={false}
-      onDeposit={handleDeposit}
-      onWithdraw={handleWithdraw}
-      onSwap={handleSwap}
       searchQuery={searchQuery}
       onSearch={handleSearch}
       userId={userId}
+      onDeposit={onDeposit}
+      onWithdraw={onWithdraw}
+      onSwap={onSwap}
     />
   );
 } 

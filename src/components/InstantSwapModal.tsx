@@ -18,11 +18,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { formatCryptoAmount, formatNairaAmount } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Icons } from "@/components/ui/icons";
 
 interface InstantSwapModalProps {
   isOpen: boolean;
   onClose: () => void;
-  wallet: any;
+  wallet?: {
+    id: string;
+    currency: string;
+    balance: string;
+  };
 }
 
 interface TradeDetails {
@@ -40,6 +46,21 @@ interface TradeDetails {
   ngn_equivalent: number;
 }
 
+interface CurrencyPair {
+  value: string;
+  label: string;
+  icon: string;
+}
+
+interface QuoteState {
+  id: string;
+  rate: number;
+  fee: number;
+  network_fee: number;
+  total: number;
+  quote_amount: string;
+}
+
 const TRADE_LIMITS = {
   MIN_NGN: 1000, // Minimum 1,000 NGN
   MAX_NGN: 10000000, // Maximum 10M NGN
@@ -50,6 +71,14 @@ const TRADE_LIMITS = {
     USDC: 10,
     DOGE: 100,
     TRUMP: 100,
+  },
+  MAX_CRYPTO: {
+    BTC: 100,
+    ETH: 1000,
+    USDT: 100000,
+    USDC: 100000,
+    DOGE: 1000000,
+    TRUMP: 1000000,
   }
 };
 
@@ -140,7 +169,7 @@ function TradePreviewModal({
 
           <div className="mt-4 flex flex-col gap-2">
             <div className="text-center">
-              <p className="text-sm text-gray-500">
+              <p className={`text-sm text-gray-500 ${countdown <= 5 ? 'text-red-500' : 'text-gray-700'}`}>
                 Quote expires in{' '}
                 <span className={`font-medium ${countdown <= 5 ? 'text-red-500' : 'text-gray-700'}`}>
                   {countdown}s
@@ -162,15 +191,17 @@ function TradePreviewModal({
 }
 
 export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalProps) {
-  const [fromCurrency, setFromCurrency] = useState('BTC');
-  const [toCurrency, setToCurrency] = useState('ETH');
+  const [fromCurrency, setFromCurrency] = useState(wallet?.currency || '');
+  const [toCurrency, setToCurrency] = useState('');
   const [amount, setAmount] = useState('');
-  const [isNairaInput, setIsNairaInput] = useState(true);
+  const [inputCurrency, setInputCurrency] = useState<'CRYPTO' | 'NGN' | 'USD'>('CRYPTO');
   const [loading, setLoading] = useState(false);
-  const [quote, setQuote] = useState<any>(null);
+  const [quote, setQuote] = useState<QuoteState | null>(null);
   const [countdown, setCountdown] = useState<number>(14);
   const [showTradePreview, setShowTradePreview] = useState(false);
   const [userBalance, setUserBalance] = useState<any>(null);
+  const [showAllCurrencies, setShowAllCurrencies] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const { toast } = useToast();
   const { createSwapQuotation, confirmSwapQuotation } = useQuidaxAPI();
@@ -180,6 +211,66 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
   const [isQuoteExpired, setIsQuoteExpired] = useState<boolean>(false);
   const [isConfirming, setIsConfirming] = useState<boolean>(false);
   const [quidaxId, setQuidaxId] = useState('');
+
+  // Filter available currencies based on user balances
+  const availableFromCurrencies = userBalance?.filter((b: any) => parseFloat(b.balance) > 0)
+    .map((b: any) => b.currency.toUpperCase()) || [];
+
+  // Filter available currencies based on user balances and ensure unique keys
+  const fromCurrencyOptions = [...new Set(
+    availableFromCurrencies.length > 0 
+      ? availableFromCurrencies 
+      : CURRENCY_PAIRS.map(p => p.value)
+  )];
+
+  // Filter to currencies based on search and show all toggle
+  const toCurrencyOptions: CurrencyPair[] = CURRENCY_PAIRS
+    .filter(pair => {
+      if (pair.value === fromCurrency) return false;
+      if (!searchQuery) return true;
+      return pair.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+             pair.value.toLowerCase().includes(searchQuery.toLowerCase());
+    });
+
+  // Get market rate for currency pair
+  const getMarketRate = async (from: string, to: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return 1;
+
+      const response = await fetch(`/api/markets/rate?from=${from}&to=${to}`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+      const data = await response.json();
+      return data.rate || 1;
+    } catch (error) {
+      console.error('Error fetching market rate:', error);
+      return 1;
+    }
+  };
+
+  // Update rate when currencies change
+  useEffect(() => {
+    const fetchRate = async () => {
+      if (fromCurrency && toCurrency) {
+        const newRate = await getMarketRate(fromCurrency, toCurrency);
+        setQuote((prev: QuoteState | null) => prev ? { ...prev, rate: newRate } : null);
+      }
+    };
+    fetchRate();
+  }, [fromCurrency, toCurrency]);
+
+  // Calculate NGN equivalent
+  const calculateNGNEquivalent = (amount: string, currency: string): number => {
+    if (!amount || !currency) return 0;
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount)) return 0;
+    
+    const rate = quote?.rate || 1;
+    return currency === 'NGN' ? numAmount : numAmount * rate;
+  };
 
   useEffect(() => {
     checkAuth();
@@ -214,7 +305,7 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
     let timer: NodeJS.Timeout;
     if (quote && countdown > 0) {
       timer = setInterval(() => {
-        setCountdown((prev) => {
+        setCountdown((prev: number) => {
           if (prev <= 1) {
             setIsQuoteExpired(true);
             clearInterval(timer);
@@ -242,17 +333,21 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
 
   const validateAmount = (value: string): string | null => {
     const numValue = Number(value);
-    if (isNairaInput) {
+    if (inputCurrency === 'NGN') {
       if (numValue < TRADE_LIMITS.MIN_NGN) {
         return `Minimum amount is ₦${formatNairaAmount(TRADE_LIMITS.MIN_NGN)}`;
       }
       if (numValue > TRADE_LIMITS.MAX_NGN) {
         return `Maximum amount is ₦${formatNairaAmount(TRADE_LIMITS.MAX_NGN)}`;
       }
-    } else {
+    } else if (inputCurrency === 'CRYPTO') {
       const minCrypto = TRADE_LIMITS.MIN_CRYPTO[fromCurrency as keyof typeof TRADE_LIMITS.MIN_CRYPTO];
       if (numValue < minCrypto) {
         return `Minimum amount is ${minCrypto} ${fromCurrency}`;
+      }
+      const maxCrypto = TRADE_LIMITS.MAX_CRYPTO[fromCurrency as keyof typeof TRADE_LIMITS.MAX_CRYPTO];
+      if (numValue > maxCrypto) {
+        return `Maximum amount is ${maxCrypto} ${fromCurrency}`;
       }
     }
     return null;
@@ -299,7 +394,7 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
       setIsQuoteExpired(false);
       setCountdown(14);
 
-      const cryptoAmount = isNairaInput ? convertAmount(amount, isNairaInput).toString() : amount;
+      const cryptoAmount = inputCurrency === 'NGN' ? convertAmount(amount, true).toString() : amount;
       const result = await createSwapQuotation({
         from_currency: fromCurrency.toLowerCase(),
         to_currency: toCurrency.toLowerCase(),
@@ -323,11 +418,19 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
 
   const handleAmountChange = (value: string) => {
     setAmount(value);
+    // Convert amount based on input currency
+    if (inputCurrency === 'USD') {
+      // Convert USD to crypto using approximate rate
+      // This is a placeholder - you should use actual rates
+      const usdRate = 1585.23; // Example USD/NGN rate
+      const cryptoAmount = (parseFloat(value) * usdRate) / getCurrentRate();
+      // Update state or UI as needed
+    }
   };
 
   const handleMaxAmount = () => {
     if (!userBalance) return;
-    const maxAmount = isNairaInput 
+    const maxAmount = inputCurrency === 'NGN' 
       ? userBalance.find((b: any) => b.currency === 'NGN')?.balance || '0'
       : userBalance.find((b: any) => b.currency === fromCurrency)?.balance || '0';
     setAmount(maxAmount.toString());
@@ -339,11 +442,6 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
     setCountdown(14);
     setShowTradePreview(false);
     onClose();
-  };
-
-  const toggleInputCurrency = () => {
-    setIsNairaInput(!isNairaInput);
-    setAmount('');
   };
 
   const handleConfirmSwap = async () => {
@@ -378,6 +476,35 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
     }
   };
 
+  // Display available balance in NGN equivalent
+  const renderAvailableBalance = () => {
+    if (!isAuthenticated || !userBalance) return null;
+    
+    const currentBalance = userBalance.find((b: any) => 
+      b.currency.toUpperCase() === fromCurrency.toUpperCase()
+    );
+    
+    const balanceAmount = currentBalance ? parseFloat(currentBalance.balance) : 0;
+    const ngnEquivalent = calculateNGNEquivalent(balanceAmount.toString(), fromCurrency);
+    
+    return (
+      <div className="bg-gray-50 dark:bg-gray-900/20 p-3 rounded-lg mb-4">
+        <div className="flex items-center gap-2 text-sm">
+          <Wallet className="h-4 w-4" />
+          <span>Available Balance:</span>
+          <span className="font-medium text-green-600 dark:text-green-500">
+            {formatCryptoAmount(balanceAmount)} {fromCurrency}
+            {fromCurrency !== 'NGN' && ngnEquivalent > 0 && (
+              <span className="ml-1 text-gray-500">
+                (≈ {formatNairaAmount(ngnEquivalent)})
+              </span>
+            )}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <>
       <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -389,105 +516,104 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
             </DialogDescription>
           </DialogHeader>
 
-          {isAuthenticated && userBalance && (
-            <div className="bg-gray-50 dark:bg-gray-900/20 p-3 rounded-lg mb-4">
-              <div className="flex items-center gap-2 text-sm">
-                <Wallet className="h-4 w-4" />
-                <span>Available Balance:</span>
-                <span className="font-medium text-green-600 dark:text-green-500">
-                  {isNairaInput 
-                    ? `₦${formatNairaAmount(userBalance.find((b: any) => b.currency === 'NGN')?.balance || 0)}`
-                    : `${formatCryptoAmount(userBalance.find((b: any) => b.currency === fromCurrency)?.balance || 0)} ${fromCurrency}`
-                  }
-                </span>
-              </div>
-            </div>
-          )}
+          {renderAvailableBalance()}
 
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="fromCurrency">From</Label>
+          <div className="space-y-6">
+            {/* From Currency */}
+            <div className="space-y-2">
+              <Label>From</Label>
               <Select value={fromCurrency} onValueChange={setFromCurrency}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
                 <SelectContent>
-                  {CURRENCY_PAIRS.map((pair) => (
-                    <SelectItem key={pair.value} value={pair.value}>
-                      <span className="flex items-center gap-2">
-                        <span>{pair.icon}</span>
-                        {pair.label}
-                      </span>
-                    </SelectItem>
-                  ))}
+                  {(fromCurrencyOptions as string[]).map((currency) => {
+                    const pair = CURRENCY_PAIRS.find(p => p.value === currency);
+                    if (!pair) return null;
+                    return (
+                      <SelectItem key={`source-${currency}`} value={currency}>
+                        <span className="flex items-center gap-2">
+                          <span>{pair.icon}</span>
+                          {pair.label}
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="grid gap-2">
+            {/* Amount with NGN equivalent */}
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label htmlFor="amount">Amount</Label>
-                <div className="flex items-center gap-2">
-                  {isAuthenticated && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleMaxAmount}
-                      className="h-6 text-xs"
-                    >
-                      Max
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={toggleInputCurrency}
-                    className="h-6 text-xs"
-                  >
-                    <Repeat className="h-3 w-3 mr-1" />
-                    Switch to {isNairaInput ? 'Crypto' : 'NGN'}
-                  </Button>
-                </div>
+                <Label>Amount</Label>
+                <Select value={inputCurrency} onValueChange={(value: any) => setInputCurrency(value)}>
+                  <SelectTrigger className="w-[110px]">
+                    <SelectValue placeholder="Currency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CRYPTO">{fromCurrency}</SelectItem>
+                    <SelectItem value="NGN">NGN</SelectItem>
+                    <SelectItem value="USD">USD</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <Input
-                id="amount"
-                type="number"
-                value={amount}
-                onChange={(e) => handleAmountChange(e.target.value)}
-                placeholder={isNairaInput ? '₦0.00' : '0.00'}
-              />
-              {amount && (
-                <div className="text-xs text-muted-foreground">
-                  ≈ {isNairaInput 
-                    ? `${formatCryptoAmount(convertAmount(amount, true))} ${fromCurrency}` 
-                    : `₦${formatNairaAmount(convertAmount(amount, false))}`
+              <div className="relative">
+                <Input
+                  type="number"
+                  value={amount}
+                  onChange={(e) => handleAmountChange(e.target.value)}
+                  placeholder={
+                    inputCurrency === 'NGN' ? '₦0.00' :
+                    inputCurrency === 'USD' ? '$0.00' :
+                    '0.00'
                   }
-                </div>
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-xs"
+                  onClick={handleMaxAmount}
+                >
+                  MAX
+                </Button>
+              </div>
+              {amount && (
+                <p className="text-sm text-green-600">
+                  ≈ ₦{formatNairaAmount(calculateNGNEquivalent(amount, fromCurrency))}
+                </p>
               )}
             </div>
 
-            <Button
-              variant="ghost"
-              size="icon"
-              className="mx-auto"
-              onClick={() => {
-                const temp = fromCurrency;
-                setFromCurrency(toCurrency);
-                setToCurrency(temp);
-              }}
-            >
-              <ArrowDownUp className="h-4 w-4" />
-            </Button>
-
-            <div className="grid gap-2">
-              <Label htmlFor="toCurrency">To</Label>
+            {/* To Currency with search */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>To</Label>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAllCurrencies(!showAllCurrencies)}
+                  className="text-xs"
+                >
+                  {showAllCurrencies ? 'Show Less' : 'Show More'}
+                </Button>
+              </div>
+              {showAllCurrencies && (
+                <Input
+                  type="text"
+                  placeholder="Search currencies..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="mb-2"
+                />
+              )}
               <Select value={toCurrency} onValueChange={setToCurrency}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
                 <SelectContent>
-                  {CURRENCY_PAIRS.map((pair) => (
-                    <SelectItem key={pair.value} value={pair.value}>
+                  {toCurrencyOptions.map((pair) => (
+                    <SelectItem key={`target-${pair.value}`} value={pair.value}>
                       <span className="flex items-center gap-2">
                         <span>{pair.icon}</span>
                         {pair.label}
@@ -497,12 +623,27 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Rate Info */}
+            {fromCurrency && toCurrency && quote?.rate && (
+              <Alert>
+                <Icons.info className="h-4 w-4" />
+                <AlertDescription>
+                  1 {fromCurrency} ≈ {formatNairaAmount(quote.rate)} {toCurrency}
+                  {amount && (
+                    <div className="mt-1 text-sm text-muted-foreground">
+                      ≈ ₦{formatNairaAmount(calculateNGNEquivalent(amount, fromCurrency))}
+                    </div>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
           </div>
 
           <div className="flex flex-col gap-2">
             <Button 
               onClick={handleGetQuote} 
-              disabled={loading || !amount}
+              disabled={loading || !amount || !fromCurrency || !toCurrency}
               className="bg-green-600 hover:bg-green-700"
             >
               {loading ? (
@@ -532,15 +673,15 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
             type: 'swap',
             amount: amount,
             currency: fromCurrency,
-            rate: quote.rate,
+            rate: quote.rate || 1,
             fees: {
-              service: quote.fee * quote.rate * 0.03,
+              service: quote.fee * (quote.rate || 1) * 0.03,
               platform: quote.network_fee || 0,
-              total: (quote.fee * quote.rate * 0.03) + (quote.network_fee || 0),
+              total: (quote.fee * (quote.rate || 1) * 0.03) + (quote.network_fee || 0),
             },
-            total: quote.total * quote.rate,
+            total: quote.total * (quote.rate || 1),
             quote_amount: quote.quote_amount,
-            ngn_equivalent: Number(amount) * quote.rate,
+            ngn_equivalent: calculateNGNEquivalent(amount, fromCurrency),
           }}
           countdown={countdown}
         />

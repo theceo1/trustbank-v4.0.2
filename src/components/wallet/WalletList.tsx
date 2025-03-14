@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { WalletCard } from '@/components/wallet/WalletCard';
 import { DepositModal } from '@/components/wallet/DepositModal';
+import { WithdrawModal } from '@/components/wallet/WithdrawModal';
+import { InstantSwapModal } from '@/components/InstantSwapModal';
 import { Button } from '@/components/ui/button';
 import { Icons } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
@@ -23,12 +25,12 @@ interface WalletListProps {
   wallets: Wallet[];
   marketData: MarketData[];
   isLoading: boolean;
-  onDeposit: (wallet: Wallet) => void;
-  onWithdraw: (wallet: Wallet) => void;
-  onSwap: (wallet: Wallet) => void;
   searchQuery: string;
   onSearch: (query: string) => void;
   userId: string;
+  onDeposit?: (wallet: Wallet) => void;
+  onWithdraw?: (wallet: Wallet) => void;
+  onSwap?: (wallet: Wallet) => void;
 }
 
 const CORE_CURRENCIES = ['NGN', 'BTC', 'ETH', 'USDT', 'TRUMP', 'XRP'];
@@ -55,20 +57,16 @@ export function WalletList({
   wallets,
   marketData,
   isLoading,
-  onDeposit,
-  onWithdraw,
-  onSwap,
   searchQuery,
   onSearch,
   userId,
+  onDeposit,
+  onWithdraw,
+  onSwap,
 }: WalletListProps) {
   const { toast } = useToast();
   const [showAllWallets, setShowAllWallets] = useState(false);
   const [view, setView] = useState<'grid' | 'list'>('grid');
-  const [selectedWallet, setSelectedWallet] = useState<Wallet | null>(null);
-  const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
-  const [isLoadingAddress, setIsLoadingAddress] = useState(false);
-  const [walletAddress, setWalletAddress] = useState<string | undefined>();
 
   // Filter wallets based on core/all toggle and search query
   const filteredWallets = wallets
@@ -78,34 +76,6 @@ export function WalletList({
     .filter(wallet =>
       wallet.currency.toLowerCase().includes(searchQuery.toLowerCase())
     );
-
-  const handleDeposit = async (wallet: Wallet) => {
-    setSelectedWallet(wallet);
-    setIsDepositModalOpen(true);
-    setIsLoadingAddress(true);
-
-    try {
-      const address = await quidaxService.getWalletAddress(userId, wallet.currency.toLowerCase());
-      setWalletAddress(address);
-    } catch (error) {
-      console.error('Error fetching wallet address:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch wallet address. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoadingAddress(false);
-    }
-  };
-
-  const handleWithdraw = (wallet: Wallet) => {
-    onWithdraw(wallet);
-  };
-
-  const handleSwap = (wallet: Wallet) => {
-    onSwap(wallet);
-  };
 
   const getMarketPrice = (currency: string) => {
     // For NGN, return 1 as it's the base currency
@@ -198,40 +168,20 @@ export function WalletList({
                 .map((_, i) => <WalletSkeleton key={i} />)
             : filteredWallets.map((wallet) => {
                 const price = getMarketPrice(wallet.currency);
-                console.log(`Market price for ${wallet.currency}:`, price);
-                
                 return (
                   <WalletCard
                     key={wallet.id}
                     currency={wallet.currency}
                     balance={wallet.balance}
                     price={price}
-                    onDeposit={() => handleDeposit(wallet)}
-                    onWithdraw={() => handleWithdraw(wallet)}
-                    onSwap={
-                      wallet.currency.toUpperCase() !== 'NGN'
-                        ? () => handleSwap(wallet)
-                        : undefined
-                    }
+                    onDeposit={onDeposit ? () => onDeposit(wallet) : undefined}
+                    onWithdraw={onWithdraw ? () => onWithdraw(wallet) : undefined}
+                    onSwap={onSwap ? () => onSwap(wallet) : undefined}
                   />
                 );
               })}
         </div>
       </ScrollArea>
-
-      {selectedWallet && (
-        <DepositModal
-          isOpen={isDepositModalOpen}
-          onClose={() => {
-            setIsDepositModalOpen(false);
-            setSelectedWallet(null);
-            setWalletAddress(undefined);
-          }}
-          currency={selectedWallet.currency}
-          walletAddress={walletAddress}
-          isLoading={isLoadingAddress}
-        />
-      )}
     </div>
   );
 } 
