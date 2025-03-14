@@ -17,7 +17,8 @@ import {
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 
-const MotionLink = motion(Link);
+const MotionLink = motion.create(Link);
+const MotionDiv = motion.create('div');
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -89,7 +90,7 @@ export default function TradeLayout({
     <div className="min-h-screen bg-gradient-to-br from-green-50/50 to-blue-50/50 dark:from-green-950/50 dark:to-blue-950/50">
       <div className="container mx-auto px-4 py-8">
         {/* Featured Banner */}
-        <motion.div 
+        <MotionDiv 
           className="mb-8"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -124,7 +125,7 @@ export default function TradeLayout({
               </div>
             </div>
           </div>
-        </motion.div>
+        </MotionDiv>
 
         {/* Trading Options */}
         <motion.div 

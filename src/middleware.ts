@@ -8,7 +8,7 @@ export async function middleware(request: NextRequest) {
   const { data: { session } } = await supabase.auth.getSession()
 
   // Define public routes that don't need auth
-  const publicRoutes = ['/', '/market', '/calculator', '/about', '/legal', '/auth']
+  const publicRoutes = ['/', '/market', '/calculator', '/about', '/legal', '/auth', '/learn']
   const publicApiRoutes = ['/api/auth/login']
   
   const isPublicRoute = publicRoutes.some(route => 
@@ -23,25 +23,30 @@ export async function middleware(request: NextRequest) {
 
   // If it's a public route or public API route, allow access
   if (isPublicRoute || isPublicApiRoute) {
-    // If user is signed in and tries to access auth pages, redirect to dashboard
+    // If user is signed in and tries to access auth pages, redirect to trade
     if (session && request.nextUrl.pathname.startsWith('/auth')) {
-      return NextResponse.redirect(new URL('/app/dashboard', request.url))
+      return NextResponse.redirect(new URL('/trade', request.url))
     }
     return res
   }
 
-  // For API routes, check Authorization header
+  // For API routes, check Authorization header or session
   if (isApiRoute) {
     const authHeader = request.headers.get('Authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1]
+      const { data: { user }, error } = await supabase.auth.getUser(token)
+      if (!error && user) {
+        return res
+      }
     }
-    const token = authHeader.split(' ')[1]
-    const { data: { user }, error } = await supabase.auth.getUser(token)
-    if (error || !user) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+    
+    // If no valid token in header, check for session
+    if (session) {
+      return res
     }
-    return res
+    
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   // For all other routes (protected routes), check session
@@ -51,11 +56,23 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl)
   }
 
+  // Check if user has a profile
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('*')
+    .eq('user_id', session.user.id)
+    .single()
+
+  // If no profile exists and not already on onboarding page, redirect to onboarding
+  if (!profile && !request.nextUrl.pathname.startsWith('/onboarding')) {
+    return NextResponse.redirect(new URL('/onboarding', request.url))
+  }
+
   // Special handling for admin routes
   if (request.nextUrl.pathname.startsWith('/admin')) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user?.role || user.role !== 'admin') {
-      return NextResponse.redirect(new URL('/app/dashboard', request.url))
+      return NextResponse.redirect(new URL('/trade', request.url))
     }
   }
 

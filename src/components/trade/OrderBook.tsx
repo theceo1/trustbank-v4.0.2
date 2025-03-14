@@ -5,6 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Info } from 'lucide-react';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 interface Order {
   price: string;
@@ -31,7 +34,17 @@ export default function OrderBook({ market }: OrderBookProps) {
 
   const fetchOrderBook = async () => {
     try {
-      const response = await fetch(`/api/markets/${market}/order-book`);
+      const { data: { session } } = await createClientComponentClient().auth.getSession();
+      
+      if (!session?.access_token) {
+        throw new Error('No session found');
+      }
+
+      const response = await fetch(`/api/markets/${market}/order-book`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
       if (!response.ok) {
         throw new Error('Failed to fetch order book');
       }

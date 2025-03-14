@@ -14,6 +14,9 @@ import OrderBook from '@/components/trade/OrderBook';
 import { useTheme } from 'next-themes';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 const MARKETS = [
   { value: 'usdtngn', label: 'USDT/NGN', base: 'USDT', quote: 'NGN' },
@@ -23,51 +26,112 @@ const MARKETS = [
   { value: 'ethusdt', label: 'ETH/USDT', base: 'ETH', quote: 'USDT' },
 ];
 
+// Create motion components at the top level
+const MotionDiv = motion.create('div');
+
 export default function SpotTradingPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const { profile, loading: profileLoading } = useProfile();
-  const [selectedMarket, setSelectedMarket] = useState(MARKETS[0]);
-  const [lastPrice, setLastPrice] = useState('0');
-  const [priceChange24h, setPriceChange24h] = useState<number>(0);
-  const [volume24h, setVolume24h] = useState('0');
+  const [selectedMarket, setSelectedMarket] = useState('btcusdt');
+  const [lastPrice, setLastPrice] = useState<string | null>(null);
+  const [priceChange24h, setPriceChange24h] = useState<string | null>(null);
+  const [volume24h, setVolume24h] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Add state for market data loading
+  const [marketDataLoading, setMarketDataLoading] = useState(false);
+
+  const markets = [
+    { value: 'btcusdt', label: 'BTC/USDT', base: 'BTC', quote: 'USDT' },
+    { value: 'ethusdt', label: 'ETH/USDT', base: 'ETH', quote: 'USDT' },
+  ];
+
   useTheme();
 
   useEffect(() => {
-    if (!user && !authLoading && !profileLoading) {
-      router.push('/auth/login');
+    console.log('Auth state:', { user, authLoading, profile, profileLoading });
+
+    // Only show loading state while auth and profile are loading
+    if (authLoading || profileLoading) {
+      setLoading(true);
+      return;
     }
-  }, [user, authLoading, profileLoading, router]);
+
+    // Check authentication and KYC status
+    if (!user) {
+      router.push('/auth/login?redirect=/trade/spot');
+      return;
+    }
+
+    setLoading(false);
+
+    // Show KYC verification alert if needed
+    if (!profile?.kyc_verified) {
+      setError('Please complete KYC verification to trade.');
+      return;
+    }
+
+    // Clear any previous errors
+    setError(null);
+
+    // Start fetching market data
+    fetchMarketData();
+  }, [user, authLoading, profile, profileLoading, router]);
 
   useEffect(() => {
-    fetchMarketData();
-    const interval = setInterval(fetchMarketData, 30000); // Update every 30 seconds
-    return () => clearInterval(interval);
-  }, [selectedMarket.value]);
+    let intervalId: NodeJS.Timeout;
+
+    const startFetching = () => {
+      // Only fetch if user is authenticated and KYC verified
+      if (!user || !profile?.kyc_verified) {
+        return;
+      }
+
+      // Initial fetch
+      fetchMarketData();
+
+      // Set up interval for subsequent fetches
+      intervalId = setInterval(fetchMarketData, 5000);
+    };
+
+    startFetching();
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [selectedMarket, user, profile]);
 
   const fetchMarketData = async () => {
     try {
-      setLoading(true);
-      const response = await fetch(`/api/markets/${selectedMarket.value}/ticker`);
+      setMarketDataLoading(true);
+      console.log('Fetching market data for:', selectedMarket);
+
+      const response = await fetch(`/api/markets/${selectedMarket}/ticker`);
       const data = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(data.error || 'Failed to fetch market data');
       }
-      
-      if (data.ticker) {
-        setLastPrice(data.ticker.last);
-        setPriceChange24h(parseFloat(data.ticker.price_change_percent));
-        setVolume24h(data.ticker.volume);
+
+      console.log('Market data received:', data);
+
+      if (data.status === 'success' && data.data) {
+        setLastPrice(data.data.price);
+        setPriceChange24h(data.data.priceChangePercent);
+        setVolume24h(data.data.volume);
+        setError(null);
+      } else {
+        throw new Error('Invalid market data format');
       }
     } catch (error) {
-      console.error('Failed to fetch market data:', error);
-      setLastPrice('0');
-      setPriceChange24h(0);
-      setVolume24h('0');
+      console.error('Error fetching market data:', error);
+      setError('Failed to fetch market data. Please try again.');
     } finally {
-      setLoading(false);
+      setMarketDataLoading(false);
     }
   };
 
@@ -79,141 +143,119 @@ export default function SpotTradingPage() {
     });
   };
 
-  if (authLoading || profileLoading) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-green-600" />
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-green-600 mx-auto mb-4" />
+          <p className="text-sm text-muted-foreground">Loading your account...</p>
+        </div>
       </div>
     );
   }
 
-  if (!user && !authLoading) {
+  if (!user) {
     return (
-      <div className="container mx-auto p-6">
-        <Alert variant="destructive">
-          <Info className="h-4 w-4" />
-          <AlertTitle>Authentication Required</AlertTitle>
-          <AlertDescription>
-            Please <Link href="/auth/login" className="text-green-600 hover:text-green-700 underline">log in</Link> to access trading features.
-          </AlertDescription>
-        </Alert>
-      </div>
+      <Alert variant="destructive" className="mb-4">
+        <Info className="h-4 w-4" />
+        <AlertTitle>Authentication Required</AlertTitle>
+        <AlertDescription>Please log in to access the trading features.</AlertDescription>
+      </Alert>
     );
   }
 
   if (!profile?.kyc_verified) {
     return (
-      <div className="container mx-auto p-6">
-        <Alert variant="default" className="border-green-600/20 bg-green-50 dark:bg-green-900/10">
-          <Info className="h-4 w-4 text-green-600" />
-          <AlertTitle className="text-green-700 dark:text-green-300">Verification Required</AlertTitle>
-          <AlertDescription className="text-green-600 dark:text-green-400">
-            Please complete your KYC verification to start trading. <Link href="/profile/verification" className="underline">Click here to verify</Link>
-          </AlertDescription>
-        </Alert>
-      </div>
+      <Alert variant="default" className="mb-4 border-yellow-600/20 bg-yellow-50 dark:bg-yellow-900/10">
+        <Info className="h-4 w-4" />
+        <AlertTitle>KYC Verification Required</AlertTitle>
+        <AlertDescription>
+          Please complete your KYC verification to start trading.
+          <Button variant="link" asChild className="p-0 h-auto font-normal">
+            <Link href="/settings/kyc">Complete KYC</Link>
+          </Button>
+        </AlertDescription>
+      </Alert>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-6">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="space-y-6"
-      >
-        {/* Market Selection and Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="col-span-1 md:col-span-2">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <Select
-                  value={selectedMarket.value}
-                  onValueChange={(value) => {
-                    const market = MARKETS.find(m => m.value === value);
-                    if (market) setSelectedMarket(market);
-                  }}
-                >
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {MARKETS.map((market) => (
-                      <SelectItem key={market.value} value={market.value}>
-                        <div className="flex items-center">
-                          <ArrowLeftRight className="w-4 h-4 mr-2 text-muted-foreground" />
-                          {market.label}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+    <MotionDiv
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="space-y-6"
+    >
+      {error && (
+        <Alert variant="destructive" className="mb-4">
+          <Info className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
-                <div className="text-right">
-                  <div className="text-2xl font-bold">
-                    {formatNumber(lastPrice, 2)} {selectedMarket.quote}
-                  </div>
-                  <div className={cn(
-                    "text-sm font-medium",
-                    priceChange24h >= 0 ? "text-green-600" : "text-red-600"
-                  )}>
-                    {priceChange24h >= 0 ? "+" : ""}{priceChange24h.toFixed(2)}%
-                  </div>
-                </div>
+      <div className="flex items-center space-x-4">
+        <Select
+          value={selectedMarket}
+          onValueChange={setSelectedMarket}
+        >
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Select market" />
+          </SelectTrigger>
+          <SelectContent>
+            {markets.map((market) => (
+              <SelectItem key={market.value} value={market.value}>
+                {market.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {marketDataLoading ? (
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+        ) : (
+          <>
+            {lastPrice && (
+              <div className="flex items-center space-x-2">
+                <span className="font-semibold">{lastPrice}</span>
+                {priceChange24h && (
+                  <Badge variant={parseFloat(priceChange24h) >= 0 ? "default" : "destructive"} className={parseFloat(priceChange24h) >= 0 ? "bg-green-500 hover:bg-green-600" : ""}>
+                    {parseFloat(priceChange24h) >= 0 ? '+' : ''}{priceChange24h}%
+                  </Badge>
+                )}
               </div>
-            </CardContent>
-          </Card>
+            )}
+          </>
+        )}
+      </div>
 
-          <Card>
-            <CardContent className="pt-6">
-              <div className="space-y-1">
-                <div className="text-sm text-muted-foreground">24h Volume</div>
-                <div className="text-lg font-medium">
-                  {formatNumber(volume24h, 2)} {selectedMarket.base}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+      {/* Add your trading interface components here */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Order form */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Place Order</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <SpotOrderForm
+              market={selectedMarket}
+              baseAsset={MARKETS.find(m => m.value === selectedMarket)?.base || ''}
+              quoteAsset={MARKETS.find(m => m.value === selectedMarket)?.quote || ''}
+              lastPrice={lastPrice || '0'}
+            />
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardContent className="pt-6">
-              <div className="space-y-1">
-                <div className="text-sm text-muted-foreground">Market Status</div>
-                <div className="flex items-center space-x-2">
-                  <div className="h-2 w-2 rounded-full bg-green-500"></div>
-                  <span className="text-lg font-medium">Active</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Trading Interface */}
-        <div className="grid grid-cols-12 gap-6">
-          {/* Order Form */}
-          <div className="col-span-12 lg:col-span-6">
-            <Card className="border-none shadow-lg bg-white dark:bg-gray-800/50 backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle>Place Order</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <SpotOrderForm
-                  market={selectedMarket.value}
-                  baseAsset={selectedMarket.base}
-                  quoteAsset={selectedMarket.quote}
-                  lastPrice={lastPrice}
-                />
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Order Book */}
-          <div className="col-span-12 lg:col-span-6">
-            <OrderBook market={selectedMarket.value} />
-          </div>
-        </div>
-      </motion.div>
-    </div>
+        {/* Order book */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Order Book</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <OrderBook market={selectedMarket} />
+          </CardContent>
+        </Card>
+      </div>
+    </MotionDiv>
   );
 } 
