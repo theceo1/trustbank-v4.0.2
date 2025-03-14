@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Session } from '@supabase/auth-helpers-nextjs';
 import { toast } from 'sonner';
 import { formatCurrency, formatNumber } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 
 interface MarketData {
   pair: string;
@@ -136,6 +137,18 @@ export function MarketClient({ session }: MarketClientProps) {
     }
   }, [shouldFetchData]);
 
+  const handleCurrencyChange = useCallback(async (value: string) => {
+    setSelectedCurrency(value);
+    setLoading(true);
+    const pair = getCurrencyPair(value);
+    const data = await fetchPriceData(pair);
+    if (data) {
+      setPriceData(data);
+      setLastFetchTimes(prev => ({ ...prev, price: Date.now() }));
+    }
+    setLoading(false);
+  }, [fetchPriceData, getCurrencyPair]);
+
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -221,13 +234,17 @@ export function MarketClient({ session }: MarketClientProps) {
           <Card className="bg-card/50 backdrop-blur-sm border-none shadow-sm">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
-                <div>
+                <div className="space-y-2">
                   <p className="text-base font-semibold text-muted-foreground">Total Market Cap</p>
-                  <h3 className="text-2xl font-bold mt-2">
+                  <h3 className="text-2xl font-bold">
                     {loading ? (
                       <Loader2 className="h-6 w-6 animate-spin" />
                     ) : (
-                      formatMarketCap(overviewData?.totalMarketCap || '0')
+                      `$${formatNumber(overviewData?.totalMarketCap || '0', {
+                        maximumFractionDigits: 2,
+                        notation: "compact",
+                        compactDisplay: "short"
+                      })}`
                     )}
                   </h3>
                 </div>
@@ -289,10 +306,10 @@ export function MarketClient({ session }: MarketClientProps) {
         <p className="text-sm text-muted-foreground mb-6">Monitor real-time cryptocurrency prices in NGN</p>
 
         <div className="space-y-6">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center justify-center gap-4">
             <Select
               value={selectedCurrency}
-              onValueChange={setSelectedCurrency}
+              onValueChange={handleCurrencyChange}
             >
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="Select currency" />
@@ -307,32 +324,37 @@ export function MarketClient({ session }: MarketClientProps) {
           </div>
 
           <div className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-900/50 dark:to-gray-800/50 rounded-lg p-8">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">{getCurrencyPair(selectedCurrency)}</h3>
-              <Badge variant="outline" className="text-xs">Live</Badge>
-            </div>
-            
-            <div className="space-y-4">
-              <div className="flex items-baseline gap-4">
-                <span className="text-4xl font-bold">
-                  {loading ? (
-                    <Loader2 className="h-8 w-8 animate-spin" />
-                  ) : (
-                    formatCurrency(priceData?.price || '0', 'NGN')
-                  )}
-                </span>
-                {priceData?.priceChangePercent && (
-                  <Badge 
-                    variant={parseFloat(priceData.priceChangePercent) >= 0 ? "default" : "destructive"}
-                    className={parseFloat(priceData.priceChangePercent) >= 0 ? "bg-green-500 hover:bg-green-600" : ""}
-                  >
-                    {parseFloat(priceData.priceChangePercent) >= 0 ? '+' : ''}{priceData.priceChangePercent}%
-                  </Badge>
-                )}
+            <div className="flex flex-col items-center text-center space-y-6">
+              <div className="flex items-center justify-between w-full">
+                <h3 className="text-lg font-semibold">{getCurrencyPair(selectedCurrency).toUpperCase()}</h3>
+                <Badge variant="outline" className="text-xs">Live</Badge>
               </div>
               
-              <div className="text-sm text-muted-foreground">
-                Vol: {formatVolume(priceData?.volume || '0')} {selectedCurrency}
+              <div className="space-y-4">
+                <div className="flex flex-col items-center gap-2">
+                  <span className="text-5xl font-bold tracking-tight">
+                    {loading ? (
+                      <Loader2 className="h-10 w-10 animate-spin" />
+                    ) : (
+                      formatCurrency(priceData?.price || '0', 'NGN')
+                    )}
+                  </span>
+                  {priceData?.priceChangePercent && (
+                    <Badge 
+                      variant={parseFloat(priceData.priceChangePercent) >= 0 ? "default" : "destructive"}
+                      className={cn(
+                        "text-sm px-3 py-1",
+                        parseFloat(priceData.priceChangePercent) >= 0 ? "bg-green-500 hover:bg-green-600" : ""
+                      )}
+                    >
+                      {parseFloat(priceData.priceChangePercent) >= 0 ? '+' : ''}{priceData.priceChangePercent}%
+                    </Badge>
+                  )}
+                </div>
+                
+                <div className="text-sm text-muted-foreground">
+                  Vol: {formatVolume(priceData?.volume || '0')} {selectedCurrency.split(' ')[0]}
+                </div>
               </div>
             </div>
           </div>

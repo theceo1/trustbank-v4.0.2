@@ -11,7 +11,7 @@ export function formatNumber(value: number | string, options: Intl.NumberFormatO
   
   return new Intl.NumberFormat('en-US', {
     minimumFractionDigits: 0,
-    maximumFractionDigits: 8,
+    maximumFractionDigits: 2,
     ...options
   }).format(num);
 }
@@ -41,7 +41,7 @@ export function formatCurrency(amount: number | string, currency: string = 'NGN'
   
   // For NGN, replace NGN with ₦ and ensure space after symbol
   if (currency === 'NGN') {
-    return formatted.replace('NGN', '₦ ').trim();
+    return formatted.replace('NGN', '₦').trim();
   }
   
   return formatted;
@@ -51,9 +51,23 @@ export function formatCompactNumber(num: number | string): string {
   const n = typeof num === 'string' ? parseFloat(num) : num;
   if (isNaN(n)) return '0';
 
-  if (n >= 1e12) return `${(n / 1e12).toFixed(2)}T`;
-  if (n >= 1e9) return `${(n / 1e9).toFixed(2)}B`;
-  if (n >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
-  if (n >= 1e3) return `${(n / 1e3).toFixed(2)}K`;
-  return n.toFixed(2);
+  return new Intl.NumberFormat('en-US', {
+    notation: "compact",
+    compactDisplay: "short",
+    maximumFractionDigits: 2
+  }).format(n);
+}
+
+export function formatMarketCap(value: number | string): string {
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(num)) return '$0';
+
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    notation: "compact",
+    compactDisplay: "short",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(num);
 }
