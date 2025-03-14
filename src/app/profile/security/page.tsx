@@ -1,61 +1,50 @@
-'use client';
-
-import { useEffect, useState } from 'react';
-import { useAuth } from '@/app/contexts/AuthContext';
-import { useProfile } from '@/app/hooks/useProfile';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Info, Loader2 } from 'lucide-react';
-import Link from 'next/link';
+import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 import SecuritySettings from '@/components/profile/SecuritySettings';
+import ClientSecurityPage from './ClientSecurityPage';
 
-export default function SecurityPage() {
-  const { user, loading: authLoading } = useAuth();
-  const { profile, loading: profileLoading } = useProfile();
-  const [is2FAEnabled, setIs2FAEnabled] = useState(false);
-  const [hasAuthenticator, setHasAuthenticator] = useState(false);
-  const [activeSessions, setActiveSessions] = useState([
-    {
-      id: '1',
-      device: 'Chrome on MacOS',
-      location: 'Lagos, Nigeria',
-      lastActive: 'Just now',
-      isCurrent: true,
-    },
-    {
-      id: '2',
-      device: 'Safari on iPhone',
-      location: 'Lagos, Nigeria',
-      lastActive: '2 hours ago',
-      isCurrent: false,
-    },
-  ]);
-
-  if (authLoading || profileLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-green-600" />
-      </div>
-    );
+export default async function SecurityPage() {
+  const supabase = createServerComponentClient({ cookies });
+  
+  // Get session server-side
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  
+  if (!session) {
+    redirect('/auth/login?redirect=/profile/security');
   }
 
-  if (!user) {
-    return (
-      <Alert variant="destructive">
-        <Info className="h-4 w-4" />
-        <AlertDescription>
-          Please <Link href="/login" className="underline">log in</Link> to access security settings.
-        </AlertDescription>
-      </Alert>
-    );
+  // Get user profile
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('*')
+    .eq('user_id', session.user.id)
+    .single();
+
+  if (!profile) {
+    redirect('/onboarding');
   }
+
+  // Get 2FA status
+  const { data: twoFactorData } = await supabase
+    .from('two_factor_auth')
+    .select('*')
+    .eq('user_id', session.user.id)
+    .single();
+
+  // Get active sessions
+  const { data: activeSessions } = await supabase
+    .from('active_sessions')
+    .select('*')
+    .eq('user_id', session.user.id)
+    .order('last_active', { ascending: false });
 
   return (
-    <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
-      <SecuritySettings
-        is2FAEnabled={is2FAEnabled}
-        hasAuthenticator={hasAuthenticator}
-        activeSessions={activeSessions}
-      />
-    </div>
+    <ClientSecurityPage
+      session={session}
+      profile={profile}
+      twoFactorData={twoFactorData}
+      activeSessions={activeSessions || []}
+    />
   );
 } 

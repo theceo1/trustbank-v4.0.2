@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
@@ -26,13 +26,7 @@ export default function OrderBook({ market }: OrderBookProps) {
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<'both' | 'buy' | 'sell'>('both');
 
-  useEffect(() => {
-    fetchOrderBook();
-    const interval = setInterval(fetchOrderBook, 5000); // Update every 5 seconds
-    return () => clearInterval(interval);
-  }, [market]);
-
-  const fetchOrderBook = async () => {
+  const fetchOrderBook = useCallback(async () => {
     try {
       const { data: { session } } = await createClientComponentClient().auth.getSession();
       
@@ -48,34 +42,28 @@ export default function OrderBook({ market }: OrderBookProps) {
       if (!response.ok) {
         throw new Error('Failed to fetch order book');
       }
+
       const data = await response.json();
-
-      if (data.asks && data.bids) {
-        // Process asks (sell orders)
-        const processedAsks = data.asks.map((ask: [string, string]) => ({
-          price: ask[0],
-          amount: ask[1],
-          total: (parseFloat(ask[0]) * parseFloat(ask[1])).toString()
-        })).slice(0, 10); // Show top 10 asks
-
-        // Process bids (buy orders)
-        const processedBids = data.bids.map((bid: [string, string]) => ({
-          price: bid[0],
-          amount: bid[1],
-          total: (parseFloat(bid[0]) * parseFloat(bid[1])).toString()
-        })).slice(0, 10); // Show top 10 bids
-
-        setAsks(processedAsks);
-        setBids(processedBids);
-        setError(null);
+      if (data.error) {
+        throw new Error(data.error);
       }
-    } catch (err) {
-      console.error('Error fetching order book:', err);
-      setError('Failed to load order book');
+
+      setAsks(data.asks || []);
+      setBids(data.bids || []);
+      setError(null);
+    } catch (error) {
+      console.error('Error fetching order book:', error);
+      setError(error instanceof Error ? error.message : 'Failed to fetch order book');
     } finally {
       setLoading(false);
     }
-  };
+  }, [market]);
+
+  useEffect(() => {
+    fetchOrderBook();
+    const interval = setInterval(fetchOrderBook, 5000); // Update every 5 seconds
+    return () => clearInterval(interval);
+  }, [fetchOrderBook]);
 
   const formatNumber = (value: string | number, decimals: number = 8) => {
     const num = typeof value === 'string' ? parseFloat(value) : value;

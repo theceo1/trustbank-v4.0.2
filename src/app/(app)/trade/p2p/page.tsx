@@ -126,7 +126,7 @@ export default function P2PTradingPage() {
           <Info className="h-4 w-4 text-green-600" />
           <AlertTitle className="text-green-700 dark:text-green-300">Verification Required</AlertTitle>
           <AlertDescription className="text-green-600 dark:text-green-400">
-            Please complete your KYC verification to start trading. <Link href="/profile/verification" className="underline">Click here to verify</Link>
+            Please complete your KYC verification to start trading. <Link href="/kyc" className="underline">Click here to verify</Link>
           </AlertDescription>
         </Alert>
       </div>

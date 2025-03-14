@@ -142,7 +142,7 @@ export function MobileMenu({
                 My Profile
               </Link>
               <Link
-                href="/profile/verification"
+                href="/kyc"
                 className="text-lg font-medium"
                 onClick={onClose}
               >
@@ -186,7 +186,7 @@ export function MobileMenu({
                 </Link>
               </Button>
               <Button asChild className="w-full justify-start bg-green-600 hover:bg-green-700">
-                <Link href="/auth/register" onClick={onClose}>
+                <Link href="/auth/signup" onClick={onClose}>
                   Get Started
                 </Link>
               </Button>

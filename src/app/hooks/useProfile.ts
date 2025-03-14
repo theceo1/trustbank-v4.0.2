@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useAuth } from '@/app/contexts/AuthContext';
-import { Database } from '@/lib/database.types';
+import type { Database } from '@/types/database';
 
 interface Profile {
   id: string;
@@ -12,6 +12,12 @@ interface Profile {
   kyc_verified: boolean;
   created_at: string;
   updated_at: string;
+  two_factor_enabled: boolean;
+  total_referrals: number;
+  active_referrals: number;
+  referral_earnings: number;
+  pending_earnings: number;
+  referral_code: string;
 }
 
 export function useProfile() {
@@ -22,13 +28,22 @@ export function useProfile() {
   const supabase = createClientComponentClient<Database>();
 
   useEffect(() => {
+    let mounted = true;
+
     async function loadProfile() {
       try {
-        setLoading(true);
-        setError(null);
-
         if (!user) {
+          if (mounted) {
+            setProfile(null);
+            setLoading(false);
+          }
+          return;
+        }
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session && mounted) {
           setProfile(null);
+          setLoading(false);
           return;
         }
 
@@ -39,17 +54,41 @@ export function useProfile() {
           .single();
 
         if (error) throw error;
-        setProfile(data);
+        
+        if (mounted) {
+          setProfile(data);
+          setError(null);
+        }
       } catch (err: any) {
         console.error('Error loading profile:', err);
-        setError(err.message);
-        setProfile(null);
+        if (mounted) {
+          setError(err.message);
+          setProfile(null);
+        }
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     }
 
     loadProfile();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        loadProfile();
+      } else if (mounted) {
+        setProfile(null);
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, [user, supabase]);
 
   return { profile, loading, error };

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,30 +11,32 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { User, Mail, Phone, Globe, CheckCircle2, Clock } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
-interface ProfileInformationProps {
-  user: {
-    name: string;
-    email: string;
-    phone: string;
-    country: string;
-    avatar?: string;
-    verificationStatus: 'unverified' | 'pending' | 'verified';
-    joinedDate: string;
-    timezone: string;
-    language: string;
-  };
+interface UserData {
+  name: string;
+  email: string;
+  phone: string;
+  country: string;
+  avatar?: string;
+  verificationStatus: 'unverified' | 'pending' | 'verified';
+  joinedDate: string;
+  timezone: string;
+  language: string;
 }
 
-export default function ProfileInformation({ user }: ProfileInformationProps) {
-  const [name, setName] = useState(user.name);
-  const [email, setEmail] = useState(user.email);
-  const [phone, setPhone] = useState(user.phone);
-  const [country, setCountry] = useState(user.country);
-  const [language, setLanguage] = useState(user.language);
-  const [timezone, setTimezone] = useState(user.timezone);
+interface ProfileInformationProps {
+  userData: UserData;
+}
+
+export default function ProfileInformation({ userData }: ProfileInformationProps) {
+  const [name, setName] = useState(userData.name);
+  const [email, setEmail] = useState(userData.email);
+  const [phone, setPhone] = useState(userData.phone);
+  const [country, setCountry] = useState(userData.country);
+  const [language, setLanguage] = useState(userData.language);
+  const [timezone, setTimezone] = useState(userData.timezone);
 
   const getVerificationBadge = () => {
-    switch (user.verificationStatus) {
+    switch (userData.verificationStatus) {
       case 'verified':
         return (
           <Badge className="bg-green-50 text-green-700">
@@ -58,152 +61,106 @@ export default function ProfileInformation({ user }: ProfileInformationProps) {
   };
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <CardTitle>Profile Information</CardTitle>
-              <CardDescription>
-                Manage your personal information and preferences
-              </CardDescription>
-            </div>
-            <User className="h-6 w-6 text-primary" />
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-6">
-            <div className="flex items-center space-x-4">
-              <Avatar className="h-20 w-20">
-                <AvatarImage src={user.avatar} />
-                <AvatarFallback>{name.charAt(0)}</AvatarFallback>
-              </Avatar>
-              <div>
-                <Button variant="outline">Change Avatar</Button>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  JPG, GIF or PNG. Max size of 15MB.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
-                <Input
-                  id="name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="John Doe"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="john@example.com"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+1 (555) 000-0000"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="country">Country</Label>
-                <Select value={country} onValueChange={setCountry}>
-                  <SelectTrigger id="country">
-                    <SelectValue placeholder="Select country" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="us">United States</SelectItem>
-                    <SelectItem value="uk">United Kingdom</SelectItem>
-                    <SelectItem value="ca">Canada</SelectItem>
-                    <SelectItem value="au">Australia</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="language">Language</Label>
-                <Select value={language} onValueChange={setLanguage}>
-                  <SelectTrigger id="language">
-                    <SelectValue placeholder="Select language" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="en">English</SelectItem>
-                    <SelectItem value="es">Spanish</SelectItem>
-                    <SelectItem value="fr">French</SelectItem>
-                    <SelectItem value="de">German</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="timezone">Timezone</Label>
-                <Select value={timezone} onValueChange={setTimezone}>
-                  <SelectTrigger id="timezone">
-                    <SelectValue placeholder="Select timezone" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="utc">UTC</SelectItem>
-                    <SelectItem value="est">EST (UTC-5)</SelectItem>
-                    <SelectItem value="pst">PST (UTC-8)</SelectItem>
-                    <SelectItem value="gmt">GMT</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-4">
-              <Button variant="outline">Cancel</Button>
-              <Button>Save Changes</Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <CardTitle>Account Status</CardTitle>
-              <CardDescription>
-                Your account verification status and details
-              </CardDescription>
-            </div>
-            <div>{getVerificationBadge()}</div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="flex items-center space-x-2">
-                <Mail className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">Email verified</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Phone className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">Phone verified</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Globe className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">Member since {user.joinedDate}</span>
-              </div>
-            </div>
-            {user.verificationStatus === 'unverified' && (
-              <Button className="w-full">
-                Complete Verification
-              </Button>
+    <Card className="p-6">
+      <div className="space-y-6">
+        <div className="flex items-center space-x-4">
+          <div className="relative h-20 w-20 rounded-full bg-gray-200 dark:bg-gray-800 flex items-center justify-center overflow-hidden">
+            {userData.avatar ? (
+              <Image
+                src={userData.avatar}
+                alt={userData.name}
+                fill
+                className="object-cover"
+                sizes="80px"
+              />
+            ) : (
+              <span className="text-2xl">{userData.name.charAt(0)}</span>
             )}
           </div>
-        </CardContent>
-      </Card>
-    </div>
+          <div>
+            <h2 className="text-2xl font-bold">{userData.name}</h2>
+            <p className="text-gray-500 dark:text-gray-400">{userData.email}</p>
+          </div>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2">
+          <div>
+            <label className="text-sm font-medium">Email</label>
+            <div className="mt-1 flex items-center space-x-2">
+              <input
+                type="email"
+                value={userData.email}
+                disabled
+                className="w-full rounded-md border border-gray-300 bg-gray-100 px-3 py-2 text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+              />
+              <span className="text-xs text-green-500">Verified</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">Phone</label>
+            <div className="mt-1 flex items-center space-x-2">
+              <input
+                type="tel"
+                value={userData.phone || 'Not set'}
+                disabled
+                className="w-full rounded-md border border-gray-300 bg-gray-100 px-3 py-2 text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+              />
+              <span className="text-xs text-yellow-500">Unverified</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">Country</label>
+            <input
+              type="text"
+              value={userData.country}
+              disabled
+              className="mt-1 w-full rounded-md border border-gray-300 bg-gray-100 px-3 py-2 text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">Verification Status</label>
+            <input
+              type="text"
+              value={userData.verificationStatus.charAt(0).toUpperCase() + userData.verificationStatus.slice(1)}
+              disabled
+              className="mt-1 w-full rounded-md border border-gray-300 bg-gray-100 px-3 py-2 text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">Joined Date</label>
+            <input
+              type="text"
+              value={userData.joinedDate}
+              disabled
+              className="mt-1 w-full rounded-md border border-gray-300 bg-gray-100 px-3 py-2 text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">Timezone</label>
+            <input
+              type="text"
+              value={userData.timezone}
+              disabled
+              className="mt-1 w-full rounded-md border border-gray-300 bg-gray-100 px-3 py-2 text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">Language</label>
+            <input
+              type="text"
+              value={userData.language}
+              disabled
+              className="mt-1 w-full rounded-md border border-gray-300 bg-gray-100 px-3 py-2 text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+            />
+          </div>
+        </div>
+      </div>
+    </Card>
   );
 } 

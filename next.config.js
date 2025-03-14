@@ -77,18 +77,6 @@ const nextConfig = {
     }
     return config;
   },
-  
-  // Enable SWC minification
-  swcMinify: true,
-  
-  experimental: {
-    // Enable server components
-    serverComponents: true,
-    // Enable concurrent features
-    concurrentFeatures: true,
-    // Enable new App Router
-    appDir: true,
-  },
 }
 
 module.exports = nextConfig; 

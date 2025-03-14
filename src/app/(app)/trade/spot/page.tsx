@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/contexts/AuthContext';
 import { useProfile } from '@/app/hooks/useProfile';
@@ -50,6 +50,36 @@ export default function SpotTradingPage() {
 
   useTheme();
 
+  const fetchMarketData = useCallback(async () => {
+    try {
+      setMarketDataLoading(true);
+      console.log('Fetching market data for:', selectedMarket);
+
+      const response = await fetch(`/api/markets/${selectedMarket}/ticker`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch market data');
+      }
+
+      console.log('Market data received:', data);
+
+      if (data.status === 'success' && data.data) {
+        setLastPrice(data.data.price);
+        setPriceChange24h(data.data.priceChangePercent);
+        setVolume24h(data.data.volume);
+        setError(null);
+      } else {
+        throw new Error('Invalid market data format');
+      }
+    } catch (error) {
+      console.error('Error fetching market data:', error);
+      setError('Failed to fetch market data. Please try again.');
+    } finally {
+      setMarketDataLoading(false);
+    }
+  }, [selectedMarket]);
+
   useEffect(() => {
     console.log('Auth state:', { user, authLoading, profile, profileLoading });
 
@@ -78,7 +108,7 @@ export default function SpotTradingPage() {
 
     // Start fetching market data
     fetchMarketData();
-  }, [user, authLoading, profile, profileLoading, router]);
+  }, [user, authLoading, profile, profileLoading, router, fetchMarketData]);
 
   useEffect(() => {
     let intervalId: NodeJS.Timeout;
@@ -103,37 +133,7 @@ export default function SpotTradingPage() {
         clearInterval(intervalId);
       }
     };
-  }, [selectedMarket, user, profile]);
-
-  const fetchMarketData = async () => {
-    try {
-      setMarketDataLoading(true);
-      console.log('Fetching market data for:', selectedMarket);
-
-      const response = await fetch(`/api/markets/${selectedMarket}/ticker`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch market data');
-      }
-
-      console.log('Market data received:', data);
-
-      if (data.status === 'success' && data.data) {
-        setLastPrice(data.data.price);
-        setPriceChange24h(data.data.priceChangePercent);
-        setVolume24h(data.data.volume);
-        setError(null);
-      } else {
-        throw new Error('Invalid market data format');
-      }
-    } catch (error) {
-      console.error('Error fetching market data:', error);
-      setError('Failed to fetch market data. Please try again.');
-    } finally {
-      setMarketDataLoading(false);
-    }
-  };
+  }, [user, profile, fetchMarketData]);
 
   const formatNumber = (value: string | number, decimals: number = 8) => {
     const num = typeof value === 'string' ? parseFloat(value) : value;

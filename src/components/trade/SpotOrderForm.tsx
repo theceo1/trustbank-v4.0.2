@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/components/ui/use-toast';
 import { quidaxService } from '@/lib/quidax';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { Database } from '@/lib/database.types';
 import { formatNumber } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowDown, ArrowUp, Info } from 'lucide-react';
@@ -41,21 +40,9 @@ export default function SpotOrderForm({
   const [balances, setBalances] = useState<{ [key: string]: string }>({});
   const [sliderValue, setSliderValue] = useState([0]);
   const { toast } = useToast();
-  const supabase = createClientComponentClient<Database>();
+  const supabase = createClientComponentClient();
 
-  useEffect(() => {
-    fetchBalances();
-    const interval = setInterval(fetchBalances, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    if (lastPrice && orderType === 'limit') {
-      setPrice(lastPrice);
-    }
-  }, [lastPrice, orderType]);
-
-  const fetchBalances = async () => {
+  const fetchBalances = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -77,30 +64,27 @@ export default function SpotOrderForm({
     } catch (error) {
       console.error('Error fetching balances:', error);
     }
-  };
+  }, [supabase]);
 
-  const calculateTotal = (newAmount: string, newPrice: string = price) => {
+  useEffect(() => {
+    fetchBalances();
+    const interval = setInterval(fetchBalances, 30000);
+    return () => clearInterval(interval);
+  }, [fetchBalances]);
+
+  useEffect(() => {
+    if (lastPrice && orderType === 'limit') {
+      setPrice(lastPrice);
+    }
+  }, [lastPrice, orderType]);
+
+  const calculateTotal = useCallback((newAmount: string, newPrice: string = price) => {
     if (!newAmount || !newPrice) return '';
     const calculatedTotal = parseFloat(newAmount) * parseFloat(newPrice);
     return isNaN(calculatedTotal) ? '' : calculatedTotal.toString();
-  };
+  }, [price]);
 
-  const handleAmountChange = (value: string) => {
-    setAmount(value);
-    setTotal(calculateTotal(value));
-    updateSliderFromAmount(value);
-  };
-
-  const handleTotalChange = (value: string) => {
-    setTotal(value);
-    if (price && parseFloat(price) > 0) {
-      const newAmount = (parseFloat(value) / parseFloat(price)).toString();
-      setAmount(newAmount);
-      updateSliderFromAmount(newAmount);
-    }
-  };
-
-  const updateSliderFromAmount = (newAmount: string) => {
+  const updateSliderFromAmount = useCallback((newAmount: string) => {
     const maxBalance = orderSide === 'buy' 
       ? parseFloat(balances[quoteAsset] || '0') / parseFloat(price || '1')
       : parseFloat(balances[baseAsset] || '0');
@@ -109,9 +93,24 @@ export default function SpotOrderForm({
       const percentage = (parseFloat(newAmount) / maxBalance) * 100;
       setSliderValue([Math.min(percentage, 100)]);
     }
-  };
+  }, [orderSide, balances, quoteAsset, baseAsset, price]);
 
-  const handleSliderChange = (value: number[]) => {
+  const handleAmountChange = useCallback((value: string) => {
+    setAmount(value);
+    setTotal(calculateTotal(value));
+    updateSliderFromAmount(value);
+  }, [calculateTotal, updateSliderFromAmount]);
+
+  const handleTotalChange = useCallback((value: string) => {
+    setTotal(value);
+    if (price && parseFloat(price) > 0) {
+      const newAmount = (parseFloat(value) / parseFloat(price)).toString();
+      setAmount(newAmount);
+      updateSliderFromAmount(newAmount);
+    }
+  }, [price, updateSliderFromAmount]);
+
+  const handleSliderChange = useCallback((value: number[]) => {
     setSliderValue(value);
     const maxBalance = orderSide === 'buy'
       ? parseFloat(balances[quoteAsset] || '0') / parseFloat(price || '1')
@@ -120,7 +119,7 @@ export default function SpotOrderForm({
     const newAmount = ((value[0] / 100) * maxBalance).toString();
     setAmount(newAmount);
     setTotal(calculateTotal(newAmount));
-  };
+  }, [orderSide, balances, quoteAsset, baseAsset, price, calculateTotal]);
 
   const handleSubmit = async () => {
     if (!amount || (orderType === 'limit' && !price)) {

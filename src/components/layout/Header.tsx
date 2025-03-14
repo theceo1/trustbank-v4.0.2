@@ -167,10 +167,10 @@ export function Header() {
                       <Link href="/profile">My Profile</Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <Link href="/profile/verification">KYC Verification</Link>
+                      <Link href="/kyc">KYC Verification</Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <Link href="/wallet">Wallet</Link>
+                      <Link href="/profile/wallet">Wallet</Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
                       <Link href="/profile/security">Security</Link>
@@ -194,7 +194,7 @@ export function Header() {
                     <Link href="/auth/login">Sign In</Link>
                   </Button>
                   <Button asChild className="bg-green-600 hover:bg-green-700">
-                    <Link href="/auth/register">Get Started</Link>
+                    <Link href="/auth/signup">Get Started</Link>
                   </Button>
                 </div>
               )}

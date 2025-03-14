@@ -209,7 +209,7 @@ export default function FeaturesPage() {
       'instant-trades': '/trade',
       'limit-orders': '/trade/spot',
       'p2p-trading': '/trade/p2p',
-      'fiat-gateway': '/wallet',
+      'fiat-gateway': '/profile/wallet',
       'referral-program': '/profile/referrals',
       'mobile-app': '/download'
     };

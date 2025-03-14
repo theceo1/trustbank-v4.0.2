@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Icons } from '@/components/ui/icons';
 import Link from 'next/link';
@@ -25,11 +25,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const supabase = createClientComponentClient();
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
-
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -65,7 +61,11 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router, supabase.auth]);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
 
   if (loading) {
     return <div className="flex items-center justify-center min-h-screen">
@@ -252,7 +252,7 @@ export default function DashboardPage() {
               <Icons.chevronRight className="h-4 w-4 text-gray-400 dark:text-gray-500" />
             </Button>
 
-            <Link href="/wallet" className="flex items-center justify-between p-2.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50">
+            <Link href="/profile/wallet" className="flex items-center justify-between p-2.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50">
               <div className="flex items-center gap-3">
                 <div className="bg-emerald-50 dark:bg-emerald-900/20 p-2 rounded-lg">
                   <Icons.wallet className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />

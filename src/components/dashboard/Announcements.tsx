@@ -22,7 +22,7 @@ export default function Announcements({ isVerified }: AnnouncementsProps) {
       icon: isVerified ? <Gift className="h-5 w-5" /> : <Shield className="h-5 w-5" />,
       action: isVerified
         ? { text: "Start Trading", href: "/trade" }
-        : { text: "Verify Now", href: "/profile/verification" },
+        : { text: "Verify Now", href: "/kyc" },
       type: isVerified ? "success" : "warning",
       priority: isVerified ? "low" : "high"
     },
