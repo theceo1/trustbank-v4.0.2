@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     template: "%s | trustBank",
   },
   description:
-    "A secure and user-friendly cryptocurrency exchange platform for global emerging markets.",
+    "A simple and secure cryptocurrency ecosystem for emerging markets.",
   keywords: [
     "cryptocurrency",
     "exchange",
