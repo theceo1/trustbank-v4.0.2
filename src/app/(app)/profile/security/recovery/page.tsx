@@ -109,7 +109,7 @@ export default function AccountRecoveryPage() {
     const element = document.createElement('a');
     const file = new Blob([recoveryCodes.join('\n')], { type: 'text/plain' });
     element.href = URL.createObjectURL(file);
-    element.download = 'trustbank-recovery-codes.txt';
+    element.download = 'trustBank-recovery-codes.txt';
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);

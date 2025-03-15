@@ -96,7 +96,7 @@ export function SignUpForm() {
       }
 
       toast({
-        title: 'Welcome to TrustBank!',
+        title: 'Welcome to trustBank!',
         description: 'Your account has been created successfully.',
       });
 
@@ -228,7 +228,7 @@ export function SignUpForm() {
                 required
               />
               <label htmlFor="terms" className="text-sm text-muted-foreground">
-                I agree to TrustBank's{" "}
+                I agree to trustBank's{" "}
                 <Link href="/legal/privacy" className="text-green-600 hover:text-green-700">
                   Privacy Policy
                 </Link>{" "}

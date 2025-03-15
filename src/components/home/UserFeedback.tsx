@@ -8,7 +8,7 @@ const testimonials = [
     name: "Ijeoma Ogugua",
     role: "Crypto Trader",
     avatar: "/images/placeholder-user.jpg",
-    content: "TrustBank has made my crypto trading experience smooth and secure. I couldn't ask for a better platform.",
+    content: "trustBank has made my crypto trading experience smooth and secure. I couldn't ask for a better platform.",
     rating: 4
   },
   {
@@ -22,7 +22,7 @@ const testimonials = [
     name: "Vivian Vincent",
     role: "Business Owner",
     avatar: "/images/placeholder-user.jpg",
-    content: "TrustBank's security features give me peace of mind. I can trade confidently knowing my assets are protected.",
+    content: "trustBank's security features give me peace of mind. I can trade confidently knowing my assets are protected.",
     rating: 4
   },
   {
@@ -43,7 +43,7 @@ const testimonials = [
     name: "Aminu Sanni",
     role: "Entrepreneur",
     avatar: "/images/placeholder-user.jpg",
-    content: "TrustBank has been a game-changer for me. The platform's features and the community support have made a significant difference in my trading success.",
+    content: "trustBank has been a game-changer for me. The platform's features and the community support have made a significant difference in my trading success.",
     rating: 3
   }
 ];

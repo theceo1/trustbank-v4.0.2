@@ -22,8 +22,8 @@ const contactInfo = [
   },
   { 
     icon: <Globe className="h-5 w-5" />, 
-    text: "@trustbanktech",
-    link: "https://twitter.com/trustbanktech"
+    text: "@trustBanktech",
+    link: "https://twitter.com/trustBanktech"
   },
   { 
     icon: <MapPin className="h-5 w-5" />, 
@@ -35,17 +35,17 @@ const contactInfo = [
 const socialLinks = [
   { 
     icon: <Twitter className="h-5 w-5" />, 
-    href: "https://twitter.com/trustbanktech",
+    href: "https://twitter.com/trustBanktech",
     color: "hover:text-blue-400"
   },
   { 
     icon: <Instagram className="h-5 w-5" />, 
-    href: "https://instagram.com/trustbanktech",
+    href: "https://instagram.com/trustBanktech",
     color: "hover:text-pink-500"
   },
   { 
     icon: <Facebook className="h-5 w-5" />, 
-    href: "https://facebook.com/trustbanktech",
+    href: "https://facebook.com/trustBanktech",
     color: "hover:text-blue-600"
   }
 ];

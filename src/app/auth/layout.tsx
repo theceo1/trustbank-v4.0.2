@@ -1,8 +1,8 @@
 import { Metadata } from "next"
 
 export const metadata: Metadata = {
-  title: "Authentication - TrustBank",
-  description: "Authentication pages for TrustBank",
+  title: "Authentication - trustBank",
+  description: "Authentication pages for trustBank",
 }
 
 export default function AuthLayout({

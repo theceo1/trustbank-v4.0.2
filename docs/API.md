@@ -1,8 +1,8 @@
-# TrustBank API Documentation
+# trustBank API Documentation
 
 ## Base URL
 
-Production: `https://api.trustbank.com`
+Production: `https://api.trustBank.com`
 Development: `http://localhost:3000/api`
 
 ## Authentication

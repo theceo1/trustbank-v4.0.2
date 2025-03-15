@@ -48,37 +48,37 @@ interface SocialLink {
 const socialLinks: SocialLink[] = [
   {
     name: "Meta",
-    href: "https://facebook.com/trustbanktech",
+    href: "https://facebook.com/trustBanktech",
     icon: MetaLogo,
   },
   {
     name: "Instagram",
-    href: "https://instagram.com/trustbanktech",
+    href: "https://instagram.com/trustBanktech",
     icon: InstagramLogo,
   },
   {
     name: "Twitter",
-    href: "https://twitter.com/trustbanktech",
+    href: "https://twitter.com/trustBanktech",
     icon: TwitterLogo,
   },
   {
     name: "Telegram",
-    href: "https://t.me/trustbanktech",
+    href: "https://t.me/trustBanktech",
     icon: TelegramLogo,
   },
   {
     name: "Threads",
-    href: "https://threads.net/@trustbanktech",
+    href: "https://threads.net/@trustBanktech",
     icon: ThreadsLogo,
   },
   {
     name: "TikTok",
-    href: "https://tiktok.com/@trustbanktech",
+    href: "https://tiktok.com/@trustBanktech",
     icon: TikTokLogo,
   },
   {
     name: "Snapchat",
-    href: "https://snapchat.com/add/trustbanktech",
+    href: "https://snapchat.com/add/trustBanktech",
     icon: SnapchatLogo,
   },
 ];

@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import ClientKYCPage from './ClientKYCPage';
 
 export const metadata: Metadata = {
-  title: 'KYC Verification - TrustBank',
+  title: 'KYC Verification - trustBank',
   description: 'Complete your KYC verification to unlock full account features',
   other: {
     'permissions-policy': 'camera=(self), microphone=(self)',

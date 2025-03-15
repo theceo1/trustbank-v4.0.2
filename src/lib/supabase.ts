@@ -110,7 +110,7 @@ export const supabase = createClientComponentClient<Database>({
   options: {
     global: {
       headers: {
-        'x-my-custom-header': 'trustbank'
+        'x-my-custom-header': 'trustBank'
       }
     }
   }

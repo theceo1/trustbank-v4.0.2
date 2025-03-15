@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server';
 import { quidaxService } from '@/lib/quidax';
 
+// Approximate circulating supplies as of 2024
+const CIRCULATING_SUPPLIES = {
+  BTC: 19_600_000, // ~19.6M BTC in circulation
+  ETH: 120_000_000, // ~120M ETH in circulation
+};
+
 export async function GET() {
   try {
     const tickers = await quidaxService.getMarketTickers();
@@ -23,18 +29,20 @@ export async function GET() {
       
       // Only process NGN pairs for now
       if (pair.endsWith('ngn')) {
+        // Calculate trading volume in USD
         const volumeInNGN = price * volume;
         const volumeInUSD = volumeInNGN / usdtNgnPrice;
-
-        // Add to trading volume
         tradingVolume24h += volumeInUSD;
 
-        // Calculate market cap for each asset
+        // Calculate market caps using circulating supply
         if (pair === 'btcngn') {
-          btcMarketCap = volumeInUSD;
-          totalMarketCap += volumeInUSD;
+          const priceInUSD = price / usdtNgnPrice;
+          btcMarketCap = priceInUSD * CIRCULATING_SUPPLIES.BTC;
+          totalMarketCap += btcMarketCap;
         } else if (pair === 'ethngn') {
-          totalMarketCap += volumeInUSD;
+          const priceInUSD = price / usdtNgnPrice;
+          const ethMarketCap = priceInUSD * CIRCULATING_SUPPLIES.ETH;
+          totalMarketCap += ethMarketCap;
         }
       }
     });

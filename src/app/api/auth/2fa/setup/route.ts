@@ -20,7 +20,7 @@ export async function POST() {
     const secret = authenticator.generateSecret();
     
     // Generate QR code URI
-    const appName = 'TrustBank';
+    const appName = 'trustBank';
     const accountName = user.email;
     const otpauth = authenticator.keyuri(accountName!, appName, secret);
 

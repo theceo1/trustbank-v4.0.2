@@ -6,8 +6,8 @@ import { cookies } from "next/headers";
 import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
 
 export const metadata = {
-  title: 'Support - TrustBank',
-  description: 'Get help and support for your TrustBank account. We\'re here to help you succeed in your crypto journey.',
+  title: 'Support - trustBank',
+  description: 'Get help and support for your trustBank account. We\'re here to help you succeed in your crypto journey.',
 };
 
 export default async function SupportPage() {

@@ -80,7 +80,10 @@ export default function CalculatorPage() {
       if (data.error) {
         throw new Error(data.error);
       }
-      return data;
+      if (data.status !== 'success' || !data.data) {
+        throw new Error('Invalid response from market data API');
+      }
+      return data.data;
     } catch (error: unknown) {
       if (error instanceof Error) {
         setError(error.message);
@@ -104,30 +107,48 @@ export default function CalculatorPage() {
         throw new Error('Please enter a valid amount');
       }
 
-      const pair = `${currency.toLowerCase()}ngn`;
-      const ticker = tickers[pair]?.ticker;
-      
-      if (!ticker) {
-        throw new Error(`No market data available for ${currency}/NGN`);
-      }
+      let calculatedRate: number;
 
-      const currentRate = parseFloat(ticker.last);
-      if (isNaN(currentRate)) {
-        throw new Error('Invalid rate from market data');
-      }
+      // Handle NGN to crypto conversion
+      if (currency === 'NGN') {
+        const targetPair = `btcngn`; // Default to BTC when converting from NGN
+        const ticker = tickers[targetPair]?.ticker;
+        
+        if (!ticker) {
+          throw new Error(`No market data available for BTC/NGN`);
+        }
 
-      const calculatedRate = currency === 'NGN' 
-        ? parsedAmount / currentRate 
-        : parsedAmount * currentRate;
+        const currentRate = parseFloat(ticker.last);
+        if (isNaN(currentRate)) {
+          throw new Error('Invalid rate from market data');
+        }
+
+        calculatedRate = parsedAmount / currentRate;
+      } 
+      // Handle crypto to NGN conversion
+      else {
+        const pair = `${currency.toLowerCase()}ngn`;
+        const ticker = tickers[pair]?.ticker;
+        
+        if (!ticker) {
+          throw new Error(`No market data available for ${currency}/NGN`);
+        }
+
+        const currentRate = parseFloat(ticker.last);
+        if (isNaN(currentRate)) {
+          throw new Error('Invalid rate from market data');
+        }
+
+        calculatedRate = parsedAmount * currentRate;
+      }
 
       setRate(calculatedRate);
 
-      // Add trustBank rate as the best rate with more realistic competitor differences
-      const trustBankRate = calculatedRate;
+      // Add trustBank rate as the best rate with competitor differences
       const competitorRates = [
         { 
           name: 'trustBank', 
-          rate: trustBankRate,
+          rate: calculatedRate,
           features: [
             'No hidden fees',
             'Instant transfers',

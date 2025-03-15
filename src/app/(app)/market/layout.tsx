@@ -4,7 +4,7 @@ import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { redirect } from 'next/navigation';
 
 export const metadata: Metadata = {
-  title: 'Market Overview | TrustBank',
+  title: 'Market Overview | trustBank',
   description: 'Real-time cryptocurrency market data and trading information',
 };
 

@@ -1,4 +1,4 @@
-# TrustBank - Cryptocurrency Exchange Platform
+# trustBank - Cryptocurrency Exchange Platform
 
 A secure and user-friendly cryptocurrency exchange platform targeting global emerging markets, built with Next.js 14, TypeScript, and Supabase.
 
@@ -54,8 +54,8 @@ UPSTASH_REDIS_REST_TOKEN=your_redis_token
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/trustbank.git
-   cd trustbank
+   git clone https://github.com/yourusername/trustBank.git
+   cd trustBank
    ```
 
 2. Install dependencies:
@@ -107,4 +107,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Support
 
-For support, email support@trustbank.com or join our Slack channel.
+For support, email support@trustBank.com or join our Slack channel.

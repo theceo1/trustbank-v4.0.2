@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 import SwapClient from './SwapClient';
 
 export const metadata: Metadata = {
-  title: 'Swap Trading | TrustBank',
+  title: 'Swap Trading | trustBank',
   description: 'Instantly swap between different cryptocurrencies at the best rates.',
 };
 

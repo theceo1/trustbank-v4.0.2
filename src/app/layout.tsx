@@ -32,11 +32,11 @@ export const metadata: Metadata = {
   ],
   authors: [
     {
-      name: "TrustBank",
+      name: "trustBank",
       url: "https://trustbank.tech",
     },
   ],
-  creator: "TrustBank",
+  creator: "trustBank",
 }
 
 export default async function RootLayout({

@@ -2,7 +2,7 @@
 
 ## Overview
 
-TrustBank is built using a modern, scalable architecture with the following key components:
+trustBank is built using a modern, scalable architecture with the following key components:
 
 ```mermaid
 graph TD

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The TrustBank platform implements a robust two-factor authentication system to enhance security for sensitive operations. This document outlines the implementation details, usage, and security considerations.
+The trustBank platform implements a robust two-factor authentication system to enhance security for sensitive operations. This document outlines the implementation details, usage, and security considerations.
 
 ## Features
 
