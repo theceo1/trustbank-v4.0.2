@@ -274,12 +274,12 @@ export default function WalletPage() {
       />
 
       <WithdrawModal
-        isOpen={isWithdrawOpen}
+        isOpen={isWithdrawOpen && selectedWallet !== null}
         onClose={() => {
           setIsWithdrawOpen(false);
           setSelectedWallet(null);
         }}
-        wallet={selectedWallet || undefined}
+        wallet={selectedWallet!}
         userId={userId}
       />
 

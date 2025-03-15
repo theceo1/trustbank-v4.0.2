@@ -50,17 +50,8 @@ export default function P2PTradingPage() {
   const [orderType, setOrderType] = useState<'buy' | 'sell'>('buy');
 
   useEffect(() => {
-    if (!user && !profileLoading) {
-      router.push('/auth/login');
-      return;
-    }
-
     const fetchOrders = async () => {
       try {
-        if (!user || profileLoading) {
-          return;
-        }
-
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.access_token) {
           return;
@@ -95,26 +86,12 @@ export default function P2PTradingPage() {
     };
 
     fetchOrders();
-  }, [selectedCurrency, orderType, user, profileLoading, supabase, router]);
+  }, [selectedCurrency, orderType, supabase]);
 
   if (profileLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Loader2 className="h-8 w-8 animate-spin text-green-600" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="container mx-auto p-6">
-        <Alert variant="destructive">
-          <Info className="h-4 w-4" />
-          <AlertTitle>Authentication Required</AlertTitle>
-          <AlertDescription>
-            Please <Link href="/auth/login" className="text-green-600 hover:text-green-700 underline">log in</Link> to access trading features.
-          </AlertDescription>
-        </Alert>
       </div>
     );
   }

@@ -2,8 +2,12 @@ import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 
-const QUIDAX_API_URL = 'https://www.quidax.com/api/v1';
+const QUIDAX_API_URL = process.env.QUIDAX_API_URL || 'https://www.quidax.com/api/v1';
 const QUIDAX_SECRET_KEY = process.env.QUIDAX_SECRET_KEY;
+
+// Debug log
+console.log('API URL:', QUIDAX_API_URL);
+console.log('Secret key loaded:', !!QUIDAX_SECRET_KEY);
 
 // Validate market parameter
 function isValidMarket(market: string): boolean {
@@ -23,7 +27,7 @@ export async function GET(
   { params }: { params: { market: string } }
 ) {
   try {
-    // Initialize Supabase client with cookies
+    // Initialize Supabase client
     const cookieStore = cookies();
     const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
 
@@ -38,68 +42,67 @@ export async function GET(
     }
 
     if (!QUIDAX_SECRET_KEY) {
-      console.error('QUIDAX_SECRET_KEY is not defined');
+      console.error('QUIDAX_SECRET_KEY is not configured');
       return NextResponse.json(
         { error: 'API configuration error' },
         { status: 500 }
       );
     }
 
-    // Get market parameter and convert to lowercase
-    const market = params.market.toLowerCase();
+    const marketLower = params.market.toLowerCase();
 
-    if (!isValidMarket(market)) {
+    if (!isValidMarket(marketLower)) {
       return NextResponse.json(
         { error: 'Invalid market' },
         { status: 400 }
       );
     }
 
-    // Use the correct endpoint format
-    const response = await fetch(`${QUIDAX_API_URL}/markets/${market}/ticker`, {
+    // Fetch market ticker from Quidax - using the tickers endpoint instead
+    const response = await fetch(`${QUIDAX_API_URL}/tickers/${marketLower}`, {
       headers: {
         'Authorization': `Bearer ${QUIDAX_SECRET_KEY}`,
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
-      cache: 'no-store'
+      cache: 'no-store'  // Disable caching to get real-time data
     });
 
     if (!response.ok) {
+      console.error(`Quidax API error: ${response.status} ${response.statusText}`);
       const errorText = await response.text();
-      console.error('Quidax API error:', {
-        status: response.status,
-        statusText: response.statusText,
-        body: errorText,
-      });
-      throw new Error(`HTTP error! status: ${response.status}`);
+      console.error('Error response:', errorText);
+      throw new Error(`Quidax API error: ${response.status}`);
     }
 
     const data = await response.json();
 
-    if (!data.data || !data.data.ticker) {
+    if (!data || !data.data || !data.data.ticker) {
+      console.error('Invalid response from Quidax API:', data);
       throw new Error('Invalid response format from Quidax API');
     }
 
-    // Calculate price change percentage
-    const last = parseFloat(data.data.ticker.last);
-    const open = parseFloat(data.data.ticker.open);
-    const priceChangePercent = ((last - open) / open) * 100;
+    const ticker = data.data.ticker;
+    const last = parseFloat(ticker.last || '0');
+    const open = parseFloat(ticker.open || '0');
+    const priceChangePercent = open === 0 ? 0 : ((last - open) / open) * 100;
 
     return NextResponse.json({
       status: 'success',
       data: {
-        pair: market.toUpperCase(),
-        price: data.data.ticker.last,
+        pair: marketLower.toUpperCase(),
+        price: ticker.last || '0',
         priceChangePercent: priceChangePercent.toFixed(2),
-        volume: data.data.ticker.vol,
-        lastUpdated: new Date().toLocaleTimeString()
+        volume: ticker.vol || '0',
+        high: ticker.high || '0',
+        low: ticker.low || '0',
+        lastUpdated: new Date().toISOString()
       }
     });
   } catch (error) {
-    console.error('Error fetching market data:', error);
+    console.error('Error fetching market ticker:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch market data' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch market data' },
       { status: 500 }
     );
   }

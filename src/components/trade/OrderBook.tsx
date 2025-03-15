@@ -1,146 +1,194 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { cn } from '@/lib/utils';
+import { useState, useEffect } from 'react';
+import { Card } from '@/components/ui/card';
+import { Alert } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
 import { motion } from 'framer-motion';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Info } from 'lucide-react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 interface Order {
   price: string;
-  amount: string;
-  total: string;
+  volume: string;
+  total?: string;
 }
 
-interface OrderBookProps {
-  market: string;
+interface OrderBookData {
+  asks: Order[];
+  bids: Order[];
+  timestamp: string;
 }
 
-export default function OrderBook({ market }: OrderBookProps) {
+const MAX_ORDERS_TO_DISPLAY = 10;
+
+export default function OrderBook({ market }: { market: string }) {
   const [asks, setAsks] = useState<Order[]>([]);
   const [bids, setBids] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<'both' | 'buy' | 'sell'>('both');
+  const [maxTotal, setMaxTotal] = useState(0);
+  const [activeTab, setActiveTab] = useState('both');
 
-  const fetchOrderBook = useCallback(async () => {
+  const fetchOrderBook = async () => {
     try {
-      const { data: { session } } = await createClientComponentClient().auth.getSession();
+      const response = await fetch(`/api/markets/${market}/order-book`);
       
-      if (!session?.access_token) {
-        throw new Error('No session found');
-      }
-
-      const response = await fetch(`/api/markets/${market}/order-book`, {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        }
-      });
       if (!response.ok) {
-        throw new Error('Failed to fetch order book');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch order book');
       }
 
-      const data = await response.json();
-      if (data.error) {
-        throw new Error(data.error);
-      }
+      const data: OrderBookData = await response.json();
 
-      setAsks(data.asks || []);
-      setBids(data.bids || []);
+      // Process asks and bids to calculate running totals
+      const processedAsks = data.asks.map((ask, index, array) => {
+        const volume = parseFloat(ask.volume);
+        const total = array
+          .slice(0, index + 1)
+          .reduce((sum, curr) => sum + parseFloat(curr.volume), 0)
+          .toString();
+        return { ...ask, total };
+      });
+
+      const processedBids = data.bids.map((bid, index, array) => {
+        const volume = parseFloat(bid.volume);
+        const total = array
+          .slice(0, index + 1)
+          .reduce((sum, curr) => sum + parseFloat(curr.volume), 0)
+          .toString();
+        return { ...bid, total };
+      });
+
+      // Calculate max total for visualization
+      const maxAskTotal = processedAsks.length > 0 
+        ? Math.max(...processedAsks.map(ask => parseFloat(ask.total || '0')))
+        : 0;
+      const maxBidTotal = processedBids.length > 0
+        ? Math.max(...processedBids.map(bid => parseFloat(bid.total || '0')))
+        : 0;
+      setMaxTotal(Math.max(maxAskTotal, maxBidTotal));
+
+      setAsks(processedAsks);
+      setBids(processedBids);
       setError(null);
-    } catch (error) {
-      console.error('Error fetching order book:', error);
-      setError(error instanceof Error ? error.message : 'Failed to fetch order book');
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      console.error('Error fetching order book:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch order book');
     }
-  }, [market]);
+    setLoading(false);
+  };
 
   useEffect(() => {
     fetchOrderBook();
-    const interval = setInterval(fetchOrderBook, 5000); // Update every 5 seconds
+    const interval = setInterval(fetchOrderBook, 5000);
     return () => clearInterval(interval);
-  }, [fetchOrderBook]);
+  }, [market]);
 
-  const formatNumber = (value: string | number, decimals: number = 8) => {
-    const num = typeof value === 'string' ? parseFloat(value) : value;
-    return num.toLocaleString('en-US', {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals
-    });
+  if (loading) {
+    return (
+      <Card className="p-4">
+        <div className="space-y-2">
+          {[...Array(5)].map((_, i) => (
+            <Skeleton key={i} className="h-6 w-full" />
+          ))}
+        </div>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="p-4">
+        <Alert variant="destructive">
+          {error}
+        </Alert>
+      </Card>
+    );
+  }
+
+  const OrderRow = ({ order, side }: { order: Order; side: 'ask' | 'bid' }) => {
+    const total = parseFloat(order.total || '0');
+    const percentage = maxTotal > 0 ? (total / maxTotal) * 100 : 0;
+    
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="relative grid grid-cols-3 gap-2 py-0.5 text-sm"
+      >
+        <div
+          className={`absolute inset-0 ${
+            side === 'ask' ? 'bg-red-500/10' : 'bg-green-500/10'
+          }`}
+          style={{ width: `${percentage}%` }}
+        />
+        <span className={side === 'ask' ? 'text-red-500' : 'text-green-500'}>
+          {parseFloat(order.price).toFixed(2)}
+        </span>
+        <span>{parseFloat(order.volume).toFixed(4)}</span>
+        <span>{total.toFixed(4)}</span>
+      </motion.div>
+    );
   };
 
-  const OrderRow = ({ order, type }: { order: Order; type: 'ask' | 'bid' }) => (
-    <motion.div
-      initial={{ opacity: 0, x: type === 'ask' ? -20 : 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      className={cn(
-        'grid grid-cols-3 text-sm py-1 px-2 rounded cursor-pointer transition-colors',
-        type === 'ask' 
-          ? 'text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20' 
-          : 'text-green-600 hover:bg-green-50 dark:hover:bg-green-950/20'
-      )}
-    >
-      <span>{formatNumber(order.price, 2)}</span>
-      <span className="text-center">{formatNumber(order.amount, 4)}</span>
-      <span className="text-right">{formatNumber(order.total, 2)}</span>
-    </motion.div>
-  );
+  const limitedAsks = asks.slice(0, MAX_ORDERS_TO_DISPLAY);
+  const limitedBids = bids.slice(0, MAX_ORDERS_TO_DISPLAY);
 
   return (
-    <Card className="border-none shadow-lg bg-white dark:bg-gray-800/50 backdrop-blur-sm">
-      <CardHeader>
-        <CardTitle>Order Book</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <Tabs value={view} onValueChange={(v) => setView(v as 'both' | 'buy' | 'sell')}>
-          <TabsList className="grid w-full grid-cols-3 mb-4">
-            <TabsTrigger value="both">Both</TabsTrigger>
-            <TabsTrigger value="buy">Buy Orders</TabsTrigger>
-            <TabsTrigger value="sell">Sell Orders</TabsTrigger>
-          </TabsList>
+    <Card className="p-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="buy">Buy</TabsTrigger>
+          <TabsTrigger value="sell">Sell</TabsTrigger>
+          <TabsTrigger value="both">Both</TabsTrigger>
+        </TabsList>
 
-          <div className="space-y-4">
-            {/* Column Headers */}
-            <div className="grid grid-cols-3 text-xs text-muted-foreground font-medium">
-              <span>Price</span>
-              <span className="text-center">Amount</span>
-              <span className="text-right">Total</span>
-            </div>
+        <div className="grid grid-cols-3 gap-2 text-xs font-medium text-gray-500 mb-2">
+          <span>Price</span>
+          <span>Amount</span>
+          <span>Total</span>
+        </div>
 
-            {error ? (
-              <div className="text-center text-sm text-red-500 py-4">{error}</div>
-            ) : loading ? (
-              <div className="text-center text-sm text-muted-foreground py-4">Loading...</div>
-            ) : (
-              <>
-                {(view === 'both' || view === 'sell') && (
-                  <div className="space-y-1">
-                    {asks.map((ask, index) => (
-                      <OrderRow key={`ask-${index}`} order={ask} type="ask" />
-                    ))}
-                  </div>
-                )}
+        <TabsContent value="sell" className="space-y-1">
+          {limitedAsks.length > 0 ? (
+            limitedAsks.map((ask, i) => (
+              <OrderRow key={`ask-${i}`} order={ask} side="ask" />
+            ))
+          ) : (
+            <div className="text-center text-gray-500 text-sm">No sell orders</div>
+          )}
+        </TabsContent>
 
-                {view === 'both' && (
-                  <div className="border-t border-dashed dark:border-gray-700 my-2" />
-                )}
+        <TabsContent value="buy" className="space-y-1">
+          {limitedBids.length > 0 ? (
+            limitedBids.map((bid, i) => (
+              <OrderRow key={`bid-${i}`} order={bid} side="bid" />
+            ))
+          ) : (
+            <div className="text-center text-gray-500 text-sm">No buy orders</div>
+          )}
+        </TabsContent>
 
-                {(view === 'both' || view === 'buy') && (
-                  <div className="space-y-1">
-                    {bids.map((bid, index) => (
-                      <OrderRow key={`bid-${index}`} order={bid} type="bid" />
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </Tabs>
-      </CardContent>
+        <TabsContent value="both" className="space-y-1">
+          {limitedAsks.length > 0 ? (
+            limitedAsks.map((ask, i) => (
+              <OrderRow key={`ask-${i}`} order={ask} side="ask" />
+            ))
+          ) : (
+            <div className="text-center text-gray-500 text-sm">No sell orders</div>
+          )}
+
+          <div className="border-t border-gray-200 dark:border-gray-800 my-2" />
+
+          {limitedBids.length > 0 ? (
+            limitedBids.map((bid, i) => (
+              <OrderRow key={`bid-${i}`} order={bid} side="bid" />
+            ))
+          ) : (
+            <div className="text-center text-gray-500 text-sm">No buy orders</div>
+          )}
+        </TabsContent>
+      </Tabs>
     </Card>
   );
 } 

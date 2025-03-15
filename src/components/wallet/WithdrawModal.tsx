@@ -14,6 +14,7 @@ import { quidaxService } from "@/lib/quidax";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import type { Database } from "@/types/database.types";
 import { WithdrawPreview } from './WithdrawPreview';
+import { useRouter } from "next/navigation";
 
 interface WithdrawModalProps {
   isOpen: boolean;
@@ -62,6 +63,7 @@ type InputCurrency = 'CRYPTO' | 'NGN' | 'USD';
 export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModalProps) {
   const { toast } = useToast();
   const supabase = createClientComponentClient<Database>();
+  const router = useRouter();
   
   // All state hooks at the top
   const [amount, setAmount] = useState("");
@@ -81,31 +83,31 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
   const [isConfirming, setIsConfirming] = useState(false);
   const [expiryTime] = useState(Date.now() + 14000);
   const [walletData, setWalletData] = useState<any>(null);
-  const [currency, setCurrency] = useState(wallet?.currency || '');
+  const [currency, setCurrency] = useState(wallet?.currency?.toUpperCase() || 'NGN');
   const [reference, setReference] = useState("");
+  const [network, setNetwork] = useState<NetworkType | ''>('');
+  const [currentRate, setCurrentRate] = useState(0);
+  const [bankCode, setBankCode] = useState('');
+  const [bankName, setBankName] = useState('');
 
-  // Effect to reset state when modal opens
+  // Ensure we have valid currency codes
+  const balance = parseFloat(wallet?.balance || '0');
+  const balanceInNGN = currentRate > 0 ? balance * currentRate : 0;
+
+  // Reset form when modal opens/closes
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) {
       setAmount("");
-      setAmountInCrypto(0);
+      setNetwork("");
       setAddress("");
-      setIsLoading(false);
-      setRate(0);
-      setSelectedNetwork("");
-      setSelectedBank("");
+      setCurrentRate(0);
+      setIsConfirming(false);
       setAccountNumber("");
       setAccountName("");
-      setIsValidatingAccount(false);
-      setAccountValidated(false);
-      setShowPreview(false);
-      setInputCurrency(wallet?.currency?.toLowerCase() === 'ngn' ? 'NGN' : 'CRYPTO');
-      setError(null);
-      setIsConfirming(false);
-      setCurrency(wallet?.currency || '');
-      setReference("");
+      setBankCode("");
+      setBankName("");
     }
-  }, [isOpen, wallet?.currency]);
+  }, [isOpen]);
 
   // Effect to fetch market rate
   useEffect(() => {
@@ -210,10 +212,6 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
       return 0;
     }
   };
-
-  const balance = getCurrentWallet()?.balance ? parseFloat(getCurrentWallet().balance) : 0;
-  const currentRate = rate || 0;
-  const balanceInNGN = balance * currentRate;
 
   const handleMaxAmount = () => {
     if (inputCurrency === 'CRYPTO') {
@@ -587,7 +585,7 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
           <DialogDescription className="flex items-center justify-between">
             <span>
               Available balance: {formatCurrency(balance, currency)}
-              {currency !== 'NGN' && currentRate > 0 && (
+              {currency !== 'NGN' && rate > 0 && (
                 <span className="text-green-600">
                   {' '}(≈ {formatCurrency(balanceInNGN, 'NGN')})
                 </span>

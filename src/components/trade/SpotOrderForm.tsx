@@ -44,27 +44,18 @@ export default function SpotOrderForm({
 
   const fetchBalances = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('quidax_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile?.quidax_id) return;
-
-      const wallets = await quidaxService.getUserWallets(profile.quidax_id);
+      const response = await fetch('/api/user/wallets');
+      const { data: wallets } = await response.json();
+      
       const balanceMap: { [key: string]: string } = {};
-      wallets.forEach((wallet) => {
+      wallets.forEach((wallet: { currency: string; balance: string }) => {
         balanceMap[wallet.currency.toUpperCase()] = wallet.balance;
       });
       setBalances(balanceMap);
     } catch (error) {
       console.error('Error fetching balances:', error);
     }
-  }, [supabase]);
+  }, []);
 
   useEffect(() => {
     fetchBalances();

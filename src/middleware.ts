@@ -42,7 +42,8 @@ export async function middleware(request: NextRequest) {
       '/market',
       '/learn',
       '/status',
-      '/support'
+      '/support',
+      '/features',
     ]
     
     const publicApiRoutes = [

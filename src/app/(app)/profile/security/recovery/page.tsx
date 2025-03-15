@@ -1,14 +1,13 @@
 "use client";
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Shield, Copy } from 'lucide-react';
-import { useAuth } from '@/app/contexts/AuthContext';
+import { Loader2, KeyRound, Download, Copy, Shield } from 'lucide-react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Form,
   FormControl,
@@ -20,85 +19,68 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
 
-const securityQuestionSchema = z.object({
+const securityQuestionsSchema = z.object({
   question1: z.string().min(1, "Please select a security question"),
-  answer1: z.string().min(3, "Answer must be at least 3 characters"),
+  answer1: z.string().min(1, "Please provide an answer"),
   question2: z.string().min(1, "Please select a security question"),
-  answer2: z.string().min(3, "Answer must be at least 3 characters"),
+  answer2: z.string().min(1, "Please provide an answer"),
   question3: z.string().min(1, "Please select a security question"),
-  answer3: z.string().min(3, "Answer must be at least 3 characters"),
+  answer3: z.string().min(1, "Please provide an answer"),
 });
 
-type SecurityQuestionFormValues = z.infer<typeof securityQuestionSchema>;
+type SecurityQuestionsFormValues = z.infer<typeof securityQuestionsSchema>;
 
 const SECURITY_QUESTIONS = [
   "What was the name of your first pet?",
-  "In what city were you born?",
-  "What is your mother's maiden name?",
+  "In which city were you born?",
+  "What was your mother's maiden name?",
+  "What was the name of your first school?",
   "What was your childhood nickname?",
+  "What is your favorite book?",
   "What was the make of your first car?",
-  "What elementary school did you attend?",
-  "What is the name of your favorite childhood friend?",
-  "What street did you grow up on?",
-  "What was your favorite food as a child?",
-  "What was the first concert you attended?",
+  "What is your favorite movie?",
+  "What is the name of the street you grew up on?",
+  "What is your favorite sports team?"
 ];
 
-export default function RecoveryMethodPage() {
+export default function AccountRecoveryPage() {
   const [isLoading, setIsLoading] = useState(false);
-  const [recoveryMethod, setRecoveryMethod] = useState<'backupCodes' | 'securityQuestions'>('backupCodes');
-  const [backupCodes, setBackupCodes] = useState<string[]>([]);
-  const { user } = useAuth();
-  const router = useRouter();
+  const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const { toast } = useToast();
+  const supabase = createClientComponentClient();
 
-  const form = useForm<SecurityQuestionFormValues>({
-    resolver: zodResolver(securityQuestionSchema),
+  const form = useForm<SecurityQuestionsFormValues>({
+    resolver: zodResolver(securityQuestionsSchema),
   });
 
-  const generateBackupCodes = async () => {
+  const generateRecoveryCodes = async () => {
     setIsLoading(true);
     try {
-      // Generate random backup codes
-      const codes = Array.from({ length: 8 }, () => 
-        Math.random().toString(36).substring(2, 8).toUpperCase()
-      );
-      setBackupCodes(codes);
-
-      const supabase = createClientComponentClient();
+      const { data: factorsData } = await supabase.auth.mfa.listFactors();
       
-      // Store hashed backup codes in the profile
-      const { error: updateError } = await supabase
-        .from('user_profiles')
-        .update({ 
-          has_recovery: true,
-          recovery_method: 'backup_codes',
-          backup_codes: codes, // In production, store hashed versions
-          updated_at: new Date().toISOString()
-        })
-        .eq('user_id', user?.id);
+      if (!factorsData?.totp.length) {
+        throw new Error("Please set up 2FA before generating recovery codes");
+      }
 
-      if (updateError) throw updateError;
+      const totpFactor = factorsData.totp[0];
+      
+      const { data, error } = await supabase.auth.mfa.generateRecoveryCodes({
+        factorId: totpFactor.id
+      });
 
+      if (error) throw error;
+
+      setRecoveryCodes(data.codes);
       toast({
         title: "Success",
-        description: "Backup codes generated successfully. Please save these codes in a secure location.",
+        description: "Recovery codes generated successfully.",
       });
     } catch (error) {
-      console.error('Error generating backup codes:', error);
+      console.error('Error generating recovery codes:', error);
       toast({
         title: "Error",
-        description: "Failed to generate backup codes. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to generate recovery codes",
         variant: "destructive",
       });
     } finally {
@@ -106,39 +88,59 @@ export default function RecoveryMethodPage() {
     }
   };
 
-  const onSecurityQuestionsSubmit = async (values: SecurityQuestionFormValues) => {
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(recoveryCodes.join('\n'));
+      toast({
+        title: "Copied",
+        description: "Recovery codes copied to clipboard",
+      });
+    } catch (error) {
+      console.error('Error copying to clipboard:', error);
+      toast({
+        title: "Error",
+        description: "Failed to copy codes to clipboard",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const downloadCodes = () => {
+    const element = document.createElement('a');
+    const file = new Blob([recoveryCodes.join('\n')], { type: 'text/plain' });
+    element.href = URL.createObjectURL(file);
+    element.download = 'trustbank-recovery-codes.txt';
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
+
+  const onSubmit = async (values: SecurityQuestionsFormValues) => {
     setIsLoading(true);
     try {
-      const supabase = createClientComponentClient();
-      
-      // Store security questions and hashed answers in the profile
-      const { error: updateError } = await supabase
-        .from('user_profiles')
-        .update({ 
-          has_recovery: true,
-          recovery_method: 'security_questions',
-          security_questions: {
-            q1: { question: values.question1, answer: values.answer1 },
-            q2: { question: values.question2, answer: values.answer2 },
-            q3: { question: values.question3, answer: values.answer3 },
-          },
+      const { error } = await supabase
+        .from('security_questions')
+        .upsert({
+          user_id: (await supabase.auth.getUser()).data.user?.id,
+          questions: [
+            { question: values.question1, answer: values.answer1 },
+            { question: values.question2, answer: values.answer2 },
+            { question: values.question3, answer: values.answer3 },
+          ],
           updated_at: new Date().toISOString()
-        })
-        .eq('user_id', user?.id);
+        });
 
-      if (updateError) throw updateError;
+      if (error) throw error;
 
       toast({
         title: "Success",
-        description: "Security questions saved successfully.",
+        description: "Security questions updated successfully.",
       });
-      
-      router.push('/profile/security/assessment');
     } catch (error) {
       console.error('Error saving security questions:', error);
       toast({
         title: "Error",
-        description: "Failed to save security questions. Please try again.",
+        description: "Failed to save security questions",
         variant: "destructive",
       });
     } finally {
@@ -146,187 +148,129 @@ export default function RecoveryMethodPage() {
     }
   };
 
-  const copyBackupCodes = () => {
-    navigator.clipboard.writeText(backupCodes.join('\n'));
-    toast({
-      title: "Copied",
-      description: "Backup codes copied to clipboard",
-    });
-  };
-
   return (
-    <div className="container max-w-2xl py-8">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5" />
-            Account Recovery Setup
-          </CardTitle>
-          <CardDescription>
-            Choose a method to recover your account in case you lose access
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-4">
-            <Label>Recovery Method</Label>
-            <RadioGroup
-              defaultValue="backupCodes"
-              onValueChange={(value) => setRecoveryMethod(value as 'backupCodes' | 'securityQuestions')}
-              className="grid grid-cols-2 gap-4"
-            >
-              <div>
-                <RadioGroupItem
-                  value="backupCodes"
-                  id="backupCodes"
-                  className="peer sr-only"
-                />
-                <Label
-                  htmlFor="backupCodes"
-                  className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-transparent p-4 hover:bg-muted peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
-                >
-                  <span className="font-semibold">Backup Codes</span>
-                  <span className="text-sm text-muted-foreground">
-                    Generate one-time use backup codes
-                  </span>
-                </Label>
-              </div>
-              <div>
-                <RadioGroupItem
-                  value="securityQuestions"
-                  id="securityQuestions"
-                  className="peer sr-only"
-                />
-                <Label
-                  htmlFor="securityQuestions"
-                  className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-transparent p-4 hover:bg-muted peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
-                >
-                  <span className="font-semibold">Security Questions</span>
-                  <span className="text-sm text-muted-foreground">
-                    Set up security questions and answers
-                  </span>
-                </Label>
-              </div>
-            </RadioGroup>
-          </div>
+    <div className="min-h-screen flex items-center justify-center py-8 px-4">
+      <div className="w-full max-w-2xl">
+        <Card className="border-none shadow-lg">
+          <CardHeader>
+            <CardTitle className="text-2xl flex items-center gap-2">
+              <Shield className="h-6 w-6 text-green-600" />
+              Account Recovery Options
+            </CardTitle>
+            <CardDescription>
+              Set up recovery options to regain access to your account if needed
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="codes" className="space-y-4">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="codes">Recovery Codes</TabsTrigger>
+                <TabsTrigger value="questions">Security Questions</TabsTrigger>
+              </TabsList>
 
-          {recoveryMethod === 'backupCodes' ? (
-            <div className="space-y-4">
-              {backupCodes.length === 0 ? (
-                <Button
-                  onClick={generateBackupCodes}
-                  disabled={isLoading}
-                  className="w-full"
-                >
-                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Generate Backup Codes
-                </Button>
-              ) : (
+              <TabsContent value="codes" className="space-y-4">
                 <div className="space-y-4">
-                  <div className="rounded-md bg-muted p-4">
-                    <div className="flex justify-between items-center mb-2">
-                      <h4 className="font-medium">Your Backup Codes</h4>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={copyBackupCodes}
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {backupCodes.map((code, index) => (
-                        <code key={index} className="text-sm">
-                          {code}
-                        </code>
-                      ))}
-                    </div>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Save these codes in a secure location. Each code can only be used once.
-                  </p>
-                  <Button
-                    onClick={() => router.push('/profile/security/assessment')}
-                    className="w-full"
-                  >
-                    I've Saved My Backup Codes
-                  </Button>
+                  {recoveryCodes.length > 0 ? (
+                    <>
+                      <div className="bg-muted p-4 rounded-lg space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          {recoveryCodes.map((code, index) => (
+                            <code key={index} className="font-mono text-sm">
+                              {code}
+                            </code>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={copyToClipboard}
+                          className="flex-1"
+                          variant="outline"
+                        >
+                          <Copy className="mr-2 h-4 w-4" />
+                          Copy Codes
+                        </Button>
+                        <Button
+                          onClick={downloadCodes}
+                          className="flex-1"
+                          variant="outline"
+                        >
+                          <Download className="mr-2 h-4 w-4" />
+                          Download Codes
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <Button
+                      onClick={generateRecoveryCodes}
+                      disabled={isLoading}
+                      className="w-full bg-green-600 hover:bg-green-500 text-white"
+                    >
+                      {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Generate Recovery Codes
+                    </Button>
+                  )}
                 </div>
-              )}
-            </div>
-          ) : (
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSecurityQuestionsSubmit)} className="space-y-4">
-                {[1, 2, 3].map((num) => (
-                  <div key={num} className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name={`question${num}` as keyof SecurityQuestionFormValues}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Security Question {num}</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            defaultValue={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select a security question" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {SECURITY_QUESTIONS.map((question) => (
-                                <SelectItem key={question} value={question}>
-                                  {question}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name={`answer${num}` as keyof SecurityQuestionFormValues}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Answer {num}</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="text"
-                              placeholder="Enter your answer"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                ))}
-                <Button
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full"
-                >
-                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Save Security Questions
-                </Button>
-              </form>
-            </Form>
-          )}
+              </TabsContent>
 
-          <div className="pt-4">
-            <Button
-              variant="outline"
-              onClick={() => router.back()}
-              className="w-full"
-            >
-              Go Back
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+              <TabsContent value="questions">
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    {[1, 2, 3].map((num) => (
+                      <div key={num} className="space-y-4">
+                        <FormField
+                          control={form.control}
+                          name={`question${num}` as keyof SecurityQuestionsFormValues}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Security Question {num}</FormLabel>
+                              <FormControl>
+                                <select
+                                  className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                                  {...field}
+                                >
+                                  <option value="">Select a question</option>
+                                  {SECURITY_QUESTIONS.map((question) => (
+                                    <option key={question} value={question}>
+                                      {question}
+                                    </option>
+                                  ))}
+                                </select>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`answer${num}` as keyof SecurityQuestionsFormValues}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Answer {num}</FormLabel>
+                              <FormControl>
+                                <Input {...field} type="text" placeholder="Enter your answer" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    ))}
+                    <Button
+                      type="submit"
+                      disabled={isLoading}
+                      className="w-full bg-green-600 hover:bg-green-500 text-white"
+                    >
+                      {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Save Security Questions
+                    </Button>
+                  </form>
+                </Form>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 } 
