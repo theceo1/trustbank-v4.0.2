@@ -1,13 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
+import { useAuth } from '@/app/contexts/AuthContext';
+import { Shield, Mail, Phone, KeyRound, Smartphone, AlertTriangle, Lock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Shield, Smartphone, Key, LogOut, AlertTriangle, Mail, LockKeyhole } from 'lucide-react';
-import { motion } from 'framer-motion';
 import Link from 'next/link';
 
 interface SecuritySettingsProps {
@@ -27,206 +26,182 @@ export default function SecuritySettings({
   hasAuthenticator,
   activeSessions,
 }: SecuritySettingsProps) {
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(is2FAEnabled);
-  const [loginNotifications, setLoginNotifications] = useState(true);
-  const [withdrawalConfirmation, setWithdrawalConfirmation] = useState(true);
+  const router = useRouter();
+  const { user } = useAuth();
 
   return (
     <div className="space-y-6">
-      <Card className="border-green-600/20 bg-green-50/50 dark:bg-green-900/10">
+      <Card className="border-none shadow-lg">
         <CardHeader>
-          <div className="flex items-center gap-2">
+          <CardTitle className="text-2xl font-bold flex items-center gap-2">
             <Shield className="h-6 w-6 text-green-600" />
-            <CardTitle className="text-2xl font-bold text-green-600">Security Settings</CardTitle>
-          </div>
+            Security Settings
+          </CardTitle>
+          <CardDescription>
+            Manage your account security and authentication methods
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2">
-            <Link href="/profile/security/password" className="block">
-              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                <Card className="hover:border-green-600/20 transition-colors duration-200">
-                  <CardContent className="p-4">
-                    <div className="flex items-start gap-4">
-                      <div className="p-2 rounded-lg bg-green-500/10">
-                        <Key className="h-5 w-5 text-green-600" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold">Password</h3>
-                        <p className="text-sm text-muted-foreground">Change your account password</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            </Link>
-
-            <Link href="/profile/security/2fa" className="block">
-              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                <Card className="hover:border-green-600/20 transition-colors duration-200">
-                  <CardContent className="p-4">
-                    <div className="flex items-start gap-4">
-                      <div className="p-2 rounded-lg bg-blue-500/10">
-                        <LockKeyhole className="h-5 w-5 text-blue-600" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold">Two-Factor Authentication</h3>
-                        <p className="text-sm text-muted-foreground">Add an extra layer of security</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            </Link>
-
-            <Link href="/profile/security/phone" className="block">
-              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                <Card className="hover:border-green-600/20 transition-colors duration-200">
-                  <CardContent className="p-4">
-                    <div className="flex items-start gap-4">
-                      <div className="p-2 rounded-lg bg-purple-500/10">
-                        <Smartphone className="h-5 w-5 text-purple-600" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold">Phone Number</h3>
-                        <p className="text-sm text-muted-foreground">Manage your phone verification</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            </Link>
-
-            <Link href="/profile/security/email" className="block">
-              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                <Card className="hover:border-green-600/20 transition-colors duration-200">
-                  <CardContent className="p-4">
-                    <div className="flex items-start gap-4">
-                      <div className="p-2 rounded-lg bg-orange-500/10">
-                        <Mail className="h-5 w-5 text-orange-600" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold">Email Settings</h3>
-                        <p className="text-sm text-muted-foreground">Update your email preferences</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <CardTitle>Security Preferences</CardTitle>
-              <CardDescription>
-                Manage your security notification preferences
-              </CardDescription>
-            </div>
-            <Key className="h-6 w-6 text-primary" />
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="login-notifications"
-                checked={loginNotifications}
-                onCheckedChange={setLoginNotifications}
-              />
-              <Label htmlFor="login-notifications">
-                Email notifications for new device logins
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="withdrawal-confirmation"
-                checked={withdrawalConfirmation}
-                onCheckedChange={setWithdrawalConfirmation}
-              />
-              <Label htmlFor="withdrawal-confirmation">
-                Require email confirmation for withdrawals
-              </Label>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <CardTitle>Active Sessions</CardTitle>
-              <CardDescription>
-                Manage your active sessions across devices
-              </CardDescription>
-            </div>
-            <Smartphone className="h-6 w-6 text-primary" />
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {activeSessions.map((session) => (
-              <div
-                key={session.id}
-                className="flex items-center justify-between border-b pb-4 last:border-0 last:pb-0"
-              >
-                <div className="space-y-1">
-                  <div className="flex items-center space-x-2">
-                    <span className="font-medium">{session.device}</span>
-                    {session.isCurrent && (
-                      <Badge variant="secondary" className="text-xs">
-                        Current
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {session.location} • Last active {session.lastActive}
-                  </div>
-                </div>
-                {!session.isCurrent && (
-                  <Button variant="destructive" size="sm">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    End Session
-                  </Button>
-                )}
+        <CardContent className="space-y-6">
+          {/* Password Security */}
+          <div className="flex items-center justify-between p-4 bg-card hover:bg-accent/50 transition-colors rounded-lg border">
+            <div className="flex items-center gap-4">
+              <Lock className="h-5 w-5 text-green-600" />
+              <div>
+                <h3 className="font-medium">Password Security</h3>
+                <p className="text-sm text-muted-foreground">Change your password and recovery options</p>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <CardTitle>Danger Zone</CardTitle>
-              <CardDescription>
-                Irreversible and destructive actions
-              </CardDescription>
             </div>
-            <AlertTriangle className="h-6 w-6 text-destructive" />
+            <Button asChild variant="outline" size="sm">
+              <Link href="/profile/security/password">Manage</Link>
+            </Button>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <h4 className="font-medium text-destructive dark:text-destructive">Delete Account</h4>
-                  <p className="text-sm text-destructive/80 dark:text-destructive/80">
-                    Permanently delete your account and all associated data
-                  </p>
-                </div>
-                <Button variant="destructive" className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
-                  Delete Account
+
+          {/* Email Verification */}
+          <div className="flex items-center justify-between p-4 bg-card hover:bg-accent/50 transition-colors rounded-lg border">
+            <div className="flex items-center gap-4">
+              <Mail className="h-5 w-5 text-green-600" />
+              <div>
+                <h3 className="font-medium">Email Verification</h3>
+                <p className="text-sm text-muted-foreground">{user?.email}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {user?.email_confirmed_at ? (
+                <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300">Verified</Badge>
+              ) : (
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/profile/security/email">Verify Email</Link>
                 </Button>
-              </div>
+              )}
             </div>
           </div>
+
+          {/* Phone Verification */}
+          <div className="flex items-center justify-between p-4 bg-card hover:bg-accent/50 transition-colors rounded-lg border">
+            <div className="flex items-center gap-4">
+              <Phone className="h-5 w-5 text-green-600" />
+              <div>
+                <h3 className="font-medium">Phone Verification</h3>
+                <p className="text-sm text-muted-foreground">
+                  {user?.phone || 'No phone number added'}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {user?.phone_confirmed_at ? (
+                <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300">Verified</Badge>
+              ) : (
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/profile/security/phone">
+                    {user?.phone ? 'Verify Phone' : 'Add Phone'}
+                  </Link>
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Two-Factor Authentication */}
+          <div className="flex items-center justify-between p-4 bg-card hover:bg-accent/50 transition-colors rounded-lg border">
+            <div className="flex items-center gap-4">
+              <KeyRound className="h-5 w-5 text-green-600" />
+              <div>
+                <h3 className="font-medium">Two-Factor Authentication</h3>
+                <p className="text-sm text-muted-foreground">
+                  {is2FAEnabled
+                    ? 'Enabled with authenticator app'
+                    : 'Not configured'}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {is2FAEnabled ? (
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/profile/security/2fa">Manage 2FA</Link>
+                </Button>
+              ) : (
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/profile/security/2fa">Enable 2FA</Link>
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Recovery Methods */}
+          <div className="flex items-center justify-between p-4 bg-card hover:bg-accent/50 transition-colors rounded-lg border">
+            <div className="flex items-center gap-4">
+              <Shield className="h-5 w-5 text-green-600" />
+              <div>
+                <h3 className="font-medium">Recovery Methods</h3>
+                <p className="text-sm text-muted-foreground">
+                  Set up backup codes and security questions
+                </p>
+              </div>
+            </div>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/profile/security/recovery">Manage</Link>
+            </Button>
+          </div>
+
+          {/* Active Sessions */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-medium flex items-center gap-2">
+                <Smartphone className="h-5 w-5 text-green-600" />
+                Active Sessions
+              </h3>
+            </div>
+            <div className="space-y-4">
+              {activeSessions.map((session) => (
+                <div
+                  key={session.id}
+                  className="flex items-center justify-between p-4 bg-card hover:bg-accent/50 transition-colors rounded-lg border"
+                >
+                  <div>
+                    <p className="font-medium">{session.device}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {session.location} • {session.lastActive}
+                    </p>
+                  </div>
+                  {session.isCurrent ? (
+                    <Badge variant="secondary">Current Session</Badge>
+                  ) : (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => {
+                        // Handle session termination
+                      }}
+                    >
+                      Terminate
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Security Recommendations */}
+          {(!user?.email_confirmed_at || !user?.phone_confirmed_at || !is2FAEnabled) && (
+            <div className="flex items-center gap-4 p-4 bg-yellow-50 dark:bg-yellow-900/10 border-yellow-200 dark:border-yellow-900/50 border rounded-lg">
+              <AlertTriangle className="h-5 w-5 text-yellow-600" />
+              <div>
+                <h3 className="font-medium text-yellow-800 dark:text-yellow-200">
+                  Security Recommendations
+                </h3>
+                <ul className="text-sm text-yellow-700 dark:text-yellow-300 list-disc list-inside">
+                  {!user?.email_confirmed_at && (
+                    <li>Verify your email address</li>
+                  )}
+                  {!user?.phone_confirmed_at && (
+                    <li>Add and verify your phone number</li>
+                  )}
+                  {!is2FAEnabled && (
+                    <li>Enable two-factor authentication</li>
+                  )}
+                </ul>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

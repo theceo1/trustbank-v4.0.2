@@ -119,8 +119,6 @@ export function Footer() {
   const supportLinks: LinkItem[] = [
     { name: "FAQ", href: "/about/faq", icon: <HelpCircle className="w-4 h-4" /> },
     { name: "Contact", href: "/about/contact", icon: <Mail className="w-4 h-4" /> },
-    { name: "Privacy", href: "/privacy-policy", icon: <Shield className="w-4 h-4" /> },
-    { name: "Terms", href: "/terms-of-service", icon: <FileText className="w-4 h-4" /> },
     { name: "Academy", href: "/learn", icon: <GraduationCap className="w-4 h-4" /> },
     { name: "Support 24/7", href: "/support", icon: <Headphones className="w-4 h-4" /> },
     { name: "Status", href: "/status", icon: <AlertCircle className="w-4 h-4" /> },

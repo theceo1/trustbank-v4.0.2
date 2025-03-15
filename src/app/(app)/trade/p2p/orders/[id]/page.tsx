@@ -14,4 +14,4 @@ export default async function P2POrderDetailsPage({
 }) {
   // Return the wrapper component
   return <P2POrderDetailsWrapper orderId={params.id} />;
-}
+} 

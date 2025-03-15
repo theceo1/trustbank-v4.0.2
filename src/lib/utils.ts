@@ -71,3 +71,7 @@ export function formatMarketCap(value: number | string): string {
     maximumFractionDigits: 2
   }).format(num);
 }
+
+export function formatNairaAmount(amount: number | string): string {
+  return formatCurrency(amount, 'NGN');
+}

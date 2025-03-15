@@ -40,11 +40,15 @@ export default async function SecurityPage() {
     .order('last_active', { ascending: false });
 
   return (
-    <ClientSecurityPage
-      session={session}
-      profile={profile}
-      twoFactorData={twoFactorData}
-      activeSessions={activeSessions || []}
-    />
+    <div className="min-h-screen py-8 px-4">
+      <div className="max-w-4xl mx-auto">
+        <ClientSecurityPage
+          session={session}
+          profile={profile}
+          twoFactorData={twoFactorData}
+          activeSessions={activeSessions || []}
+        />
+      </div>
+    </div>
   );
 } 

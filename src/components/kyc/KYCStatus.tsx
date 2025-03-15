@@ -60,14 +60,14 @@ export function KYCStatus() {
   const supabase = createClientComponentClient<Database>();
 
   const loadProfile = useCallback(async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
 
       const { data: profile, error } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('user_id', user.id)
+            .from('user_profiles')
+            .select('*')
+            .eq('user_id', user.id)
         .single();
 
       if (error) throw error;
@@ -76,9 +76,9 @@ export function KYCStatus() {
       if (error instanceof Error) {
         console.error('Error loading profile:', error.message);
       }
-    } finally {
-      setIsLoading(false);
-    }
+      } finally {
+        setIsLoading(false);
+      }
   }, [supabase]);
 
   useEffect(() => {
@@ -197,7 +197,7 @@ export function KYCStatus() {
                   <p>Advanced verification - Proof of address and additional documentation</p>
                 )}
               </div>
-              <div>
+      <div>
                 {status === 'verified' ? (
                   <span className="text-green-500">Verified</span>
                 ) : status === 'pending' ? (
@@ -211,7 +211,7 @@ export function KYCStatus() {
                   </Button>
                 )}
               </div>
-            </div>
+      </div>
           );
         })}
       </div>

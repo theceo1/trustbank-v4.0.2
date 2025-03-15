@@ -42,7 +42,7 @@ export async function middleware(request: NextRequest) {
       '/market',
       '/learn',
       '/status',
-      '/support',
+      '/support'
     ]
     
     const publicApiRoutes = [
@@ -51,7 +51,10 @@ export async function middleware(request: NextRequest) {
       '/api/markets/price',
       '/api/markets/overview',
       '/api/markets/tickers',
-      '/api/markets/data'
+      '/api/markets/data',
+      '/api/trades/p2p/orders',
+      '/api/trades/spot/orders',
+      '/api/trades/swap/quote'
     ]
     
     // Check if the current path matches any public route
