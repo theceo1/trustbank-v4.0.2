@@ -5,15 +5,26 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatNumber(value: number | string, options: Intl.NumberFormatOptions = {}) {
-  const num = typeof value === 'string' ? parseFloat(value) : value;
-  if (isNaN(num)) return '0';
-  
-  return new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-    ...options
-  }).format(num);
+interface FormatNumberOptions extends Intl.NumberFormatOptions {
+  locale?: string;
+}
+
+export function formatNumber(
+  value: number,
+  options: FormatNumberOptions = {}
+): string {
+  const {
+    locale = 'en-US',
+    minimumFractionDigits = 2,
+    maximumFractionDigits = 2,
+    ...rest
+  } = options;
+
+  return new Intl.NumberFormat(locale, {
+    minimumFractionDigits,
+    maximumFractionDigits,
+    ...rest,
+  }).format(value);
 }
 
 export function formatCryptoAmount(amount: number | string, decimals: number = 8): string {

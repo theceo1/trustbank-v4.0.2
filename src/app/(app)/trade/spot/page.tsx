@@ -1,14 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { motion } from 'framer-motion';
-import SpotOrderForm from '@/components/trade/SpotOrderForm';
+import PlaceOrder from '@/components/trade/PlaceOrder';
 import OrderBook from '@/components/trade/OrderBook';
-import { useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 const MARKETS = [
@@ -29,20 +28,16 @@ export default function SpotTradingPage() {
   useEffect(() => {
     const fetchMarketData = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.access_token) return;
-
-        const response = await fetch(`/api/markets/${selectedMarket}/ticker`, {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`
-          }
-        });
-
+        setMarketDataLoading(true);
+        const response = await fetch(`/api/markets/${selectedMarket}/ticker`);
+        
         if (!response.ok) throw new Error('Failed to fetch market data');
 
         const data = await response.json();
-        setLastPrice(data.last);
-        setPriceChange24h(data.price_change_percent);
+        if (data.data) {
+          setLastPrice(data.data.price);
+          setPriceChange24h(data.data.priceChangePercent);
+        }
       } catch (error) {
         console.error('Error fetching market data:', error);
       } finally {
@@ -53,7 +48,9 @@ export default function SpotTradingPage() {
     fetchMarketData();
     const interval = setInterval(fetchMarketData, 5000); // Update every 5 seconds
     return () => clearInterval(interval);
-  }, [selectedMarket, supabase]);
+  }, [selectedMarket]);
+
+  const currentMarket = MARKETS.find(m => m.value === selectedMarket);
 
   return (
     <motion.div
@@ -104,11 +101,11 @@ export default function SpotTradingPage() {
             <CardTitle>Place Order</CardTitle>
           </CardHeader>
           <CardContent>
-            <SpotOrderForm
+            <PlaceOrder
               market={selectedMarket}
-              baseAsset={MARKETS.find(m => m.value === selectedMarket)?.base || ''}
-              quoteAsset={MARKETS.find(m => m.value === selectedMarket)?.quote || ''}
               lastPrice={lastPrice || '0'}
+              baseAsset={currentMarket?.base || ''}
+              quoteAsset={currentMarket?.quote || ''}
             />
           </CardContent>
         </Card>

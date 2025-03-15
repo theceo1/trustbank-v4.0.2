@@ -23,7 +23,7 @@ export async function GET(request: Request) {
       .from('p2p_orders')
       .select(`
         *,
-        creator:profiles(
+        creator:user_profiles(
           name,
           completed_trades,
           completion_rate

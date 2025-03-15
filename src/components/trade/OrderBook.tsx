@@ -8,6 +8,7 @@ import { motion } from 'framer-motion';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { AlertCircle, RefreshCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { formatNumber } from '@/lib/utils';
 
 interface Order {
   price: string;
@@ -162,10 +163,10 @@ export default function OrderBook({ market }: { market: string }) {
           style={{ width: `${percentage}%` }}
         />
         <span className={side === 'ask' ? 'text-red-500' : 'text-green-500'}>
-          {parseFloat(order.price).toFixed(2)}
+          {formatNumber(parseFloat(order.price), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </span>
-        <span>{parseFloat(order.volume).toFixed(4)}</span>
-        <span>{total.toFixed(4)}</span>
+        <span>{formatNumber(parseFloat(order.volume), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+        <span>{formatNumber(total, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
       </motion.div>
     );
   };
