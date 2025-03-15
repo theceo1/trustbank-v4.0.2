@@ -27,6 +27,19 @@ export function formatNumber(
   }).format(value);
 }
 
+export function formatAmount(amount: number | string, currency: string = 'NGN'): string {
+  const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+  if (isNaN(numAmount)) return currency === 'NGN' ? '₦0.00' : '$0.00';
+
+  const formatter = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currency === 'NGN' ? 'NGN' : 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+  return formatter.format(numAmount);
+}
+
 export function formatCryptoAmount(amount: number | string, decimals: number = 8): string {
   const num = typeof amount === 'string' ? parseFloat(amount) : amount;
   if (isNaN(num)) return '0';
