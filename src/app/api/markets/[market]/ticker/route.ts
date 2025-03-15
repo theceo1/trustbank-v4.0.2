@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 
@@ -23,7 +23,7 @@ function isValidMarket(market: string): boolean {
 }
 
 export async function GET(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { market: string } }
 ) {
   try {
@@ -49,17 +49,17 @@ export async function GET(
       );
     }
 
-    const marketLower = params.market.toLowerCase();
-
-    if (!isValidMarket(marketLower)) {
+    // Safely access and validate market parameter
+    const marketLower = params?.market?.toLowerCase();
+    if (!marketLower || !isValidMarket(marketLower)) {
       return NextResponse.json(
         { error: 'Invalid market' },
         { status: 400 }
       );
     }
 
-    // Fetch market ticker from Quidax - using the tickers endpoint instead
-    const response = await fetch(`${QUIDAX_API_URL}/tickers/${marketLower}`, {
+    // Use the correct endpoint format for Quidax API
+    const response = await fetch(`${QUIDAX_API_URL}/markets/tickers/${marketLower}`, {
       headers: {
         'Authorization': `Bearer ${QUIDAX_SECRET_KEY}`,
         'Content-Type': 'application/json',
@@ -69,17 +69,29 @@ export async function GET(
     });
 
     if (!response.ok) {
-      console.error(`Quidax API error: ${response.status} ${response.statusText}`);
       const errorText = await response.text();
+      console.error('Quidax API error:', response.status, response.statusText);
       console.error('Error response:', errorText);
-      throw new Error(`Quidax API error: ${response.status}`);
+      
+      // Return a more informative error response
+      return NextResponse.json(
+        { 
+          error: 'Failed to fetch market data',
+          details: errorText,
+          status: response.status 
+        },
+        { status: response.status }
+      );
     }
 
     const data = await response.json();
 
     if (!data || !data.data || !data.data.ticker) {
       console.error('Invalid response from Quidax API:', data);
-      throw new Error('Invalid response format from Quidax API');
+      return NextResponse.json(
+        { error: 'Invalid response format from Quidax API' },
+        { status: 500 }
+      );
     }
 
     const ticker = data.data.ticker;
@@ -102,7 +114,10 @@ export async function GET(
   } catch (error) {
     console.error('Error fetching market ticker:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to fetch market data' },
+      { 
+        error: 'Failed to fetch market data',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

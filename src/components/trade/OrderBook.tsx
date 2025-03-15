@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
-import { Alert } from '@/components/ui/alert';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { motion } from 'framer-motion';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { AlertCircle, RefreshCcw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface Order {
   price: string;
@@ -20,6 +22,8 @@ interface OrderBookData {
 }
 
 const MAX_ORDERS_TO_DISPLAY = 10;
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 2000; // 2 seconds
 
 export default function OrderBook({ market }: { market: string }) {
   const [asks, setAsks] = useState<Order[]>([]);
@@ -28,9 +32,17 @@ export default function OrderBook({ market }: { market: string }) {
   const [error, setError] = useState<string | null>(null);
   const [maxTotal, setMaxTotal] = useState(0);
   const [activeTab, setActiveTab] = useState('both');
+  const [retryCount, setRetryCount] = useState(0);
 
-  const fetchOrderBook = async () => {
+  // Fix currency pair parsing
+  const [baseAsset, quoteAsset] = market.toUpperCase().split(/(?<=^.{4})/);
+  // Example: "USDTNGN" becomes ["USDT", "NGN"]
+
+  const fetchOrderBook = useCallback(async (retryAttempt = 0) => {
     try {
+      setLoading(true);
+      setError(null);
+
       const response = await fetch(`/api/markets/${market}/order-book`);
       
       if (!response.ok) {
@@ -39,6 +51,10 @@ export default function OrderBook({ market }: { market: string }) {
       }
 
       const data: OrderBookData = await response.json();
+
+      if (!data || !Array.isArray(data.asks) || !Array.isArray(data.bids)) {
+        throw new Error('Invalid order book data format');
+      }
 
       // Process asks and bids to calculate running totals
       const processedAsks = data.asks.map((ask, index, array) => {
@@ -71,20 +87,34 @@ export default function OrderBook({ market }: { market: string }) {
       setAsks(processedAsks);
       setBids(processedBids);
       setError(null);
+      setRetryCount(0);
     } catch (err) {
       console.error('Error fetching order book:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch order book');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch order book';
+      
+      // Implement retry logic
+      if (retryAttempt < MAX_RETRIES) {
+        console.log(`Retrying... Attempt ${retryAttempt + 1} of ${MAX_RETRIES}`);
+        setTimeout(() => {
+          fetchOrderBook(retryAttempt + 1);
+        }, RETRY_DELAY);
+        setRetryCount(retryAttempt + 1);
+      } else {
+        setError(errorMessage);
+        setRetryCount(0);
+      }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  };
+  }, [market]);
 
   useEffect(() => {
     fetchOrderBook();
     const interval = setInterval(fetchOrderBook, 5000);
     return () => clearInterval(interval);
-  }, [market]);
+  }, [fetchOrderBook]);
 
-  if (loading) {
+  if (loading && !asks.length && !bids.length) {
     return (
       <Card className="p-4">
         <div className="space-y-2">
@@ -99,9 +129,18 @@ export default function OrderBook({ market }: { market: string }) {
   if (error) {
     return (
       <Card className="p-4">
-        <Alert variant="destructive">
-          {error}
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="ml-2">{error}</AlertDescription>
         </Alert>
+        <Button 
+          variant="outline" 
+          onClick={() => fetchOrderBook()}
+          className="w-full"
+        >
+          <RefreshCcw className="w-4 h-4 mr-2" />
+          Retry
+        </Button>
       </Card>
     );
   }
@@ -136,6 +175,20 @@ export default function OrderBook({ market }: { market: string }) {
 
   return (
     <Card className="p-4">
+      <div className="mb-4">
+        <h3 className="text-lg font-semibold">{baseAsset}/{quoteAsset} Order Book</h3>
+        <p className="text-sm text-muted-foreground">Price in {quoteAsset}, Amount in {baseAsset}</p>
+      </div>
+
+      {retryCount > 0 && (
+        <Alert className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="ml-2">
+            Reconnecting... Attempt {retryCount} of {MAX_RETRIES}
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="buy">Buy</TabsTrigger>
@@ -144,9 +197,9 @@ export default function OrderBook({ market }: { market: string }) {
         </TabsList>
 
         <div className="grid grid-cols-3 gap-2 text-xs font-medium text-gray-500 mb-2">
-          <span>Price</span>
-          <span>Amount</span>
-          <span>Total</span>
+          <span>Price ({quoteAsset})</span>
+          <span>Amount ({baseAsset})</span>
+          <span>Total ({quoteAsset})</span>
         </div>
 
         <TabsContent value="sell" className="space-y-1">
@@ -170,23 +223,29 @@ export default function OrderBook({ market }: { market: string }) {
         </TabsContent>
 
         <TabsContent value="both" className="space-y-1">
-          {limitedAsks.length > 0 ? (
-            limitedAsks.map((ask, i) => (
-              <OrderRow key={`ask-${i}`} order={ask} side="ask" />
-            ))
-          ) : (
-            <div className="text-center text-gray-500 text-sm">No sell orders</div>
-          )}
+          <div className="mb-2">
+            <div className="text-xs font-medium text-red-500 mb-1">Sell Orders</div>
+            {limitedAsks.length > 0 ? (
+              limitedAsks.map((ask, i) => (
+                <OrderRow key={`ask-${i}`} order={ask} side="ask" />
+              ))
+            ) : (
+              <div className="text-center text-gray-500 text-sm">No sell orders</div>
+            )}
+          </div>
 
           <div className="border-t border-gray-200 dark:border-gray-800 my-2" />
 
-          {limitedBids.length > 0 ? (
-            limitedBids.map((bid, i) => (
-              <OrderRow key={`bid-${i}`} order={bid} side="bid" />
-            ))
-          ) : (
-            <div className="text-center text-gray-500 text-sm">No buy orders</div>
-          )}
+          <div>
+            <div className="text-xs font-medium text-green-500 mb-1">Buy Orders</div>
+            {limitedBids.length > 0 ? (
+              limitedBids.map((bid, i) => (
+                <OrderRow key={`bid-${i}`} order={bid} side="bid" />
+              ))
+            ) : (
+              <div className="text-center text-gray-500 text-sm">No buy orders</div>
+            )}
+          </div>
         </TabsContent>
       </Tabs>
     </Card>
