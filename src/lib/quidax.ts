@@ -1,11 +1,11 @@
 import axios from 'axios';
 import { cookies } from 'next/headers';
 
-const QUIDAX_API_URL = process.env.QUIDAX_API_URL || 'https://www.quidax.com/api/v1';
+const QUIDAX_API_URL = process.env.NEXT_PUBLIC_QUIDAX_API_URL || 'https://www.quidax.com/api/v1';
 const QUIDAX_SECRET_KEY = process.env.QUIDAX_SECRET_KEY;
 const QUIDAX_PUBLIC_KEY = process.env.NEXT_PUBLIC_QUIDAX_PUBLIC_KEY;
 
-// Configure a single axios instance
+// Configure a single axios instance for client-side requests
 const quidaxApi = axios.create({
   baseURL: QUIDAX_API_URL,
   headers: {
@@ -252,8 +252,13 @@ export class QuidaxService {
   }
 
   async getUserWallets(userId: string): Promise<QuidaxWallet[]> {
-    const response = await quidaxApi.get(`/users/${userId}/wallets`);
-    return response.data.data;
+    try {
+      const response = await quidaxApi.get(`/users/${userId}/wallets`);
+      return response.data.data;
+    } catch (error) {
+      console.error('Error fetching wallets:', error);
+      throw error;
+    }
   }
 
   async getWallet(userId: string, currency: string): Promise<QuidaxWallet> {
@@ -340,7 +345,7 @@ export class QuidaxService {
 
   async getMarketTickers(): Promise<Record<string, MarketTicker>> {
     try {
-      const response = await axios.get<QuidaxResponse<Record<string, MarketTicker>>>(`${this.baseUrl}/tickers`);
+      const response = await axios.get<QuidaxResponse<Record<string, MarketTicker>>>(`${this.baseUrl}/markets/tickers`);
       return response.data.data;
     } catch (error) {
       console.error('Error fetching market tickers:', error);

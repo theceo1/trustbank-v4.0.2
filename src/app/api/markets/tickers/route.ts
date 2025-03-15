@@ -1,48 +1,22 @@
 import { NextResponse } from 'next/server';
-
-const QUIDAX_API_URL = 'https://www.quidax.com/api/v1';
-const QUIDAX_SECRET_KEY = process.env.QUIDAX_SECRET_KEY;
+import { quidaxService } from '@/lib/quidax';
 
 export async function GET() {
   try {
-    if (!QUIDAX_SECRET_KEY) {
-      console.error('QUIDAX_SECRET_KEY is not defined');
-      return NextResponse.json(
-        { error: 'API configuration error' },
-        { status: 500 }
-      );
-    }
-
-    const response = await fetch(`${QUIDAX_API_URL}/markets/tickers`, {
-      headers: {
-        'Authorization': `Bearer ${QUIDAX_SECRET_KEY}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      next: { revalidate: 30 }, // Cache for 30 seconds
+    const tickers = await quidaxService.getMarketTickers();
+    
+    return NextResponse.json({
+      status: 'success',
+      data: tickers
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Quidax API error:', {
-        status: response.status,
-        statusText: response.statusText,
-        body: errorText,
-      });
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    if (!data.data) {
-      throw new Error('Invalid response format from Quidax API');
-    }
-
-    return NextResponse.json(data.data);
   } catch (error) {
-    console.error('Error fetching market tickers:', error);
+    console.error('Error fetching tickers:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch market tickers' },
+      { 
+        status: 'error',
+        message: 'Failed to fetch tickers',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

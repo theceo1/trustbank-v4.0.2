@@ -1,94 +1,64 @@
 import { NextResponse } from 'next/server';
-
-const QUIDAX_API_URL = 'https://www.quidax.com/api/v1';
-const QUIDAX_SECRET_KEY = process.env.QUIDAX_SECRET_KEY;
+import { quidaxService } from '@/lib/quidax';
 
 export async function GET() {
   try {
-    if (!QUIDAX_SECRET_KEY) {
-      console.error('QUIDAX_SECRET_KEY is not defined');
-      return NextResponse.json(
-        { error: 'API configuration error' },
-        { status: 500 }
-      );
-    }
-
-    // Fetch Quidax market data
-    const response = await fetch(`${QUIDAX_API_URL}/markets/tickers`, {
-      headers: {
-        'Authorization': `Bearer ${QUIDAX_SECRET_KEY}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      next: { revalidate: 30 }, // Cache for 30 seconds
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Quidax API error:', {
-        status: response.status,
-        statusText: response.statusText,
-        body: errorText,
-      });
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-    if (!data.data) {
-      throw new Error('Invalid response format from Quidax API');
-    }
-
+    const tickers = await quidaxService.getMarketTickers();
+    
     let totalMarketCap = 0;
-    let totalVolume = 0;
+    let tradingVolume24h = 0;
     let btcMarketCap = 0;
 
-    // Calculate totals using Quidax data
-    Object.entries(data.data).forEach(([market, details]: [string, any]) => {
-      const ticker = details.ticker;
-      if (!ticker) return;
+    // Get USDT/NGN price for USD conversion
+    const usdtNgnPrice = parseFloat(tickers['usdtngn']?.ticker?.last || '0');
+    
+    if (!usdtNgnPrice) {
+      throw new Error('Unable to get USDT/NGN price for conversion');
+    }
 
-      const price = parseFloat(ticker.last);
-      const volume = parseFloat(ticker.vol);
+    // Calculate market caps and volumes
+    Object.entries(tickers).forEach(([pair, data]) => {
+      const price = parseFloat(data.ticker.last || '0');
+      const volume = parseFloat(data.ticker.vol || '0');
       
-      // Market cap calculation (price * circulating supply estimate)
-      // Since we don't have circulating supply, we'll use a proxy based on market type
-      let estimatedSupply = 0;
-      if (market.includes('btc')) {
-        estimatedSupply = 19500000; // Approximate BTC supply
-      } else if (market.includes('eth')) {
-        estimatedSupply = 120000000; // Approximate ETH supply
-      } else if (market.includes('usdt') || market.includes('usdc')) {
-        estimatedSupply = 80000000000; // Approximate stablecoin supply
-      } else {
-        estimatedSupply = volume * 100; // Rough estimate for other tokens
+      // Only process NGN pairs for now
+      if (pair.endsWith('ngn')) {
+        const volumeInNGN = price * volume;
+        const volumeInUSD = volumeInNGN / usdtNgnPrice;
+
+        // Add to trading volume
+        tradingVolume24h += volumeInUSD;
+
+        // Calculate market cap for each asset
+        if (pair === 'btcngn') {
+          btcMarketCap = volumeInUSD;
+          totalMarketCap += volumeInUSD;
+        } else if (pair === 'ethngn') {
+          totalMarketCap += volumeInUSD;
+        }
       }
-
-      const marketCap = price * estimatedSupply;
-      const volumeInUSD = volume * price;
-
-      if (market.includes('btc')) {
-        btcMarketCap = marketCap;
-      }
-
-      totalMarketCap += marketCap;
-      totalVolume += volumeInUSD;
     });
 
+    // Calculate BTC dominance
     const btcDominance = totalMarketCap > 0 ? (btcMarketCap / totalMarketCap) * 100 : 0;
 
     return NextResponse.json({
       status: 'success',
       data: {
-        totalMarketCap: totalMarketCap.toFixed(2),
-        tradingVolume24h: totalVolume.toFixed(2),
-        btcDominance: btcDominance.toFixed(1),
-        lastUpdated: new Date().toLocaleTimeString()
+        totalMarketCap,
+        tradingVolume24h,
+        btcDominance: parseFloat(btcDominance.toFixed(2)),
+        lastUpdated: new Date().toISOString()
       }
     });
   } catch (error) {
     console.error('Error fetching market overview:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch market overview' },
+      { 
+        status: 'error',
+        message: 'Failed to fetch market overview',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

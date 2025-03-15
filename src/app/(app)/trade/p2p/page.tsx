@@ -31,6 +31,8 @@ interface P2POrder {
   terms: string;
   status: 'active' | 'completed' | 'cancelled';
   created_at: string;
+  completed_trades: number;
+  completion_rate: number;
   creator: {
     name: string;
     completed_trades: number;
@@ -49,61 +51,50 @@ export default function P2PTradingPage() {
   const [selectedCurrency, setSelectedCurrency] = useState<SupportedCurrency>('BTC');
   const [orderType, setOrderType] = useState<'buy' | 'sell'>('buy');
 
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.access_token) {
-          return;
-        }
+  const fetchOrders = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
 
-        setIsLoading(true);
-        setError(null);
+      const response = await fetch(
+        `/api/trades/p2p/orders?currency=${selectedCurrency}&type=${orderType}`
+      );
 
-        const response = await fetch(`/api/trades/p2p/orders?currency=${selectedCurrency}&type=${orderType}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-          },
-          credentials: 'include'
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch orders');
-        }
-
-        const data = await response.json();
-        if (data.status !== 'success') {
-          throw new Error(data.message || 'Failed to fetch orders');
-        }
-        setOrders(data.data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch orders');
-      } finally {
-        setIsLoading(false);
+      if (!response.ok) {
+        throw new Error('Failed to fetch orders');
       }
-    };
 
-    fetchOrders();
-  }, [selectedCurrency, orderType, supabase]);
+      const { data } = await response.json();
+      setOrders(data || []);
+    } catch (err) {
+      console.error('Error fetching P2P orders:', err);
+      setError('Failed to load orders. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchOrders();
+    }
+  }, [selectedCurrency, orderType, user]);
 
   if (profileLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-green-600" />
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
 
-  if (!profile?.kyc_verified) {
+  if (!user) {
     return (
-      <div className="container mx-auto p-6">
-        <Alert variant="default" className="border-green-600/20 bg-green-50 dark:bg-green-900/10">
-          <Info className="h-4 w-4 text-green-600" />
-          <AlertTitle className="text-green-700 dark:text-green-300">Verification Required</AlertTitle>
-          <AlertDescription className="text-green-600 dark:text-green-400">
-            Please complete your KYC verification to start trading. <Link href="/kyc" className="underline">Click here to verify</Link>
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Alert>
+          <AlertTitle>Authentication Required</AlertTitle>
+          <AlertDescription>
+            Please <Link href="/login" className="underline">log in</Link> to access P2P trading.
           </AlertDescription>
         </Alert>
       </div>
@@ -112,159 +103,89 @@ export default function P2PTradingPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">P2P Trading</h1>
-        <Button onClick={() => router.push('/trade/p2p/create')}>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Order
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">P2P Trading</h1>
+        <Button asChild>
+          <Link href="/trade/p2p/create">
+            <Plus className="w-4 h-4 mr-2" />
+            Create Order
+          </Link>
         </Button>
       </div>
 
       <Card>
         <CardContent className="p-6">
-          <Tabs defaultValue="buy" onValueChange={(value) => setOrderType(value as 'buy' | 'sell')}>
-            <div className="flex justify-between items-center mb-6">
+          <Tabs defaultValue="buy" className="space-y-4">
+            <div className="flex items-center justify-between">
               <TabsList>
-                <TabsTrigger value="buy" className="data-[state=active]:bg-green-500 data-[state=active]:text-white">
+                <TabsTrigger value="buy" onClick={() => setOrderType('buy')}>
                   Buy
                 </TabsTrigger>
-                <TabsTrigger value="sell" className="data-[state=active]:bg-red-500 data-[state=active]:text-white">
+                <TabsTrigger value="sell" onClick={() => setOrderType('sell')}>
                   Sell
                 </TabsTrigger>
               </TabsList>
 
-              <div className="flex gap-2">
-                {['BTC', 'ETH', 'USDT', 'USDC'].map((currency) => (
-                  <Button
-                    key={currency}
-                    variant={selectedCurrency === currency ? "default" : "outline"}
-                    onClick={() => setSelectedCurrency(currency as SupportedCurrency)}
-                  >
-                    {currency}
-                  </Button>
-                ))}
-              </div>
+              <select
+                className="p-2 rounded-md border"
+                value={selectedCurrency}
+                onChange={(e) => setSelectedCurrency(e.target.value as SupportedCurrency)}
+              >
+                <option value="BTC">BTC</option>
+                <option value="ETH">ETH</option>
+                <option value="USDT">USDT</option>
+              </select>
             </div>
 
-            <TabsContent value="buy">
+            <TabsContent value="buy" className="space-y-4">
               {isLoading ? (
-                <div className="flex items-center justify-center h-[200px]">
-                  <Loader2 className="h-8 w-8 animate-spin text-green-600" />
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin" />
                 </div>
               ) : error ? (
                 <Alert variant="destructive">
+                  <AlertTitle>Error</AlertTitle>
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               ) : orders.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  No orders available
-                </div>
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertTitle>No Orders Available</AlertTitle>
+                  <AlertDescription>
+                    There are currently no {orderType} orders for {selectedCurrency}
+                  </AlertDescription>
+                </Alert>
               ) : (
                 <div className="space-y-4">
                   {orders.map((order) => (
-                    <Card key={order.id} className="hover:bg-accent transition-colors">
-                      <CardContent className="p-4">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <div className="font-medium">
-                              {order.creator?.name || 'Anonymous'}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {order.creator?.completed_trades || 0} trades • {order.creator?.completion_rate || 0}% completion
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-lg font-bold">₦{order.price}</div>
-                            <div className="text-sm text-muted-foreground">
-                              Limit: ₦{order.min_order} - ₦{order.max_order}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="mt-4">
-                          <div className="text-sm">Payment Methods:</div>
-                          <div className="flex gap-2 mt-1">
-                            {order.payment_methods.map((method) => (
-                              <div
-                                key={method}
-                                className="px-2 py-1 bg-secondary text-secondary-foreground rounded text-xs"
-                              >
-                                {method}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="mt-4 flex justify-end">
-                          <Button
-                            onClick={() => router.push(`/trade/p2p/orders/${order.id}`)}
-                            className="bg-green-600 hover:bg-green-700"
-                          >
-                            Buy {selectedCurrency}
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
+                    <OrderCard key={order.id} order={order} />
                   ))}
                 </div>
               )}
             </TabsContent>
 
-            <TabsContent value="sell">
+            <TabsContent value="sell" className="space-y-4">
               {isLoading ? (
-                <div className="flex items-center justify-center h-[200px]">
-                  <Loader2 className="h-8 w-8 animate-spin text-green-600" />
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin" />
                 </div>
               ) : error ? (
                 <Alert variant="destructive">
+                  <AlertTitle>Error</AlertTitle>
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               ) : orders.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  No orders available
-                </div>
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertTitle>No Orders Available</AlertTitle>
+                  <AlertDescription>
+                    There are currently no {orderType} orders for {selectedCurrency}
+                  </AlertDescription>
+                </Alert>
               ) : (
                 <div className="space-y-4">
                   {orders.map((order) => (
-                    <Card key={order.id} className="hover:bg-accent transition-colors">
-                      <CardContent className="p-4">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <div className="font-medium">
-                              {order.creator?.name || 'Anonymous'}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {order.creator?.completed_trades || 0} trades • {order.creator?.completion_rate || 0}% completion
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-lg font-bold">₦{order.price}</div>
-                            <div className="text-sm text-muted-foreground">
-                              Limit: ₦{order.min_order} - ₦{order.max_order}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="mt-4">
-                          <div className="text-sm">Payment Methods:</div>
-                          <div className="flex gap-2 mt-1">
-                            {order.payment_methods.map((method) => (
-                              <div
-                                key={method}
-                                className="px-2 py-1 bg-secondary text-secondary-foreground rounded text-xs"
-                              >
-                                {method}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="mt-4 flex justify-end">
-                          <Button
-                            onClick={() => router.push(`/trade/p2p/orders/${order.id}`)}
-                            className="bg-red-600 hover:bg-red-700"
-                          >
-                            Sell {selectedCurrency}
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
+                    <OrderCard key={order.id} order={order} />
                   ))}
                 </div>
               )}
@@ -273,5 +194,44 @@ export default function P2PTradingPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function OrderCard({ order }: { order: P2POrder }) {
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex justify-between items-start">
+          <div>
+            <h3 className="font-semibold">{order.creator.name}</h3>
+            <p className="text-sm text-muted-foreground">
+              {order.completed_trades} trades • {order.completion_rate}% completion
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="font-semibold">₦{parseFloat(order.price).toLocaleString()}</p>
+            <p className="text-sm text-muted-foreground">
+              Limit: ₦{parseFloat(order.min_order).toLocaleString()} - ₦
+              {parseFloat(order.max_order).toLocaleString()}
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 flex gap-2">
+          {order.payment_methods.map((method) => (
+            <span
+              key={method}
+              className="px-2 py-1 bg-muted rounded-md text-xs"
+            >
+              {method}
+            </span>
+          ))}
+        </div>
+        <Button className="w-full mt-4" asChild>
+          <Link href={`/trade/p2p/orders/${order.id}`}>
+            {order.type === 'buy' ? 'Sell' : 'Buy'} {order.currency}
+          </Link>
+        </Button>
+      </CardContent>
+    </Card>
   );
 } 

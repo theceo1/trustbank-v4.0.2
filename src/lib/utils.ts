@@ -37,50 +37,39 @@ export function formatCryptoAmount(amount: number | string, decimals: number = 8
   });
 }
 
-export function formatCurrency(amount: number | string, currency: string = 'NGN'): string {
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  if (isNaN(num)) return currency === 'NGN' ? '₦0.00' : '$0.00';
-
-  const formatter = new Intl.NumberFormat('en-NG', {
+export function formatCurrency(value: number | string, currency: string = 'USD'): string {
+  const numValue = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(numValue)) return currency === 'NGN' ? '₦0.00' : '$0.00';
+  
+  const formatter = new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: currency,
+    currency: currency === 'NGN' ? 'NGN' : 'USD',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });
+  return formatter.format(numValue);
+}
 
-  const formatted = formatter.format(num);
-  
-  // For NGN, replace NGN with ₦ and ensure space after symbol
-  if (currency === 'NGN') {
-    return formatted.replace('NGN', '₦').trim();
+export function formatMarketCap(value: number): string {
+  if (value >= 1e12) {
+    return `$${(value / 1e12).toFixed(2)}T`;
+  } else if (value >= 1e9) {
+    return `$${(value / 1e9).toFixed(2)}B`;
+  } else if (value >= 1e6) {
+    return `$${(value / 1e6).toFixed(2)}M`;
+  } else {
+    return `$${value.toFixed(2)}`;
   }
-  
-  return formatted;
 }
 
-export function formatCompactNumber(num: number | string): string {
-  const n = typeof num === 'string' ? parseFloat(num) : num;
-  if (isNaN(n)) return '0';
-
-  return new Intl.NumberFormat('en-US', {
-    notation: "compact",
-    compactDisplay: "short",
-    maximumFractionDigits: 2
-  }).format(n);
-}
-
-export function formatMarketCap(value: number | string): string {
-  const num = typeof value === 'string' ? parseFloat(value) : value;
-  if (isNaN(num)) return '$0';
-
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    notation: "compact",
-    compactDisplay: "short",
+export function formatCompactNumber(value: number): string {
+  const formatter = new Intl.NumberFormat('en-US', {
+    notation: 'compact',
+    compactDisplay: 'short',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
-  }).format(num);
+  });
+  return formatter.format(value);
 }
 
 export function formatNairaAmount(amount: number | string): string {
