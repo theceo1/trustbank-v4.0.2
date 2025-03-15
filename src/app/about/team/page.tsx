@@ -80,7 +80,7 @@ export default function TeamPage() {
             <CardContent className="p-8 text-center">
               <h2 className="text-xl font-semibold mb-4">We&apos;re Building Something Special</h2>
               <p className="text-muted-foreground max-w-2xl mx-auto">
-                Our team is working hard to revolutionize cryptocurrency trading in emerging markets. 
+                Our team is working hard to simplify cryptocurrency adoption in emerging markets. 
                 Stay tuned for exciting announcements about our growing team of industry experts and technology innovators.
               </p>
             </CardContent>

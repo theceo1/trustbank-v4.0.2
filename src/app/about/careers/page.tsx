@@ -39,7 +39,7 @@ export default function CareersPage() {
         <div className="container flex items-center justify-between py-4">
           <div>
             <h1 className="text-2xl font-semibold">Careers</h1>
-            <p className="text-sm text-muted-foreground">Join us in revolutionizing crypto trading</p>
+            <p className="text-sm text-muted-foreground">Join us in simplifying crypto adoption</p>
           </div>
         </div>
       </div>
@@ -53,7 +53,7 @@ export default function CareersPage() {
         >
           <h2 className="text-3xl font-bold mb-4">Join Our Mission</h2>
           <p className="text-lg text-muted-foreground mb-8">
-            Help us build the future of cryptocurrency trading in emerging markets. We&apos;re looking for passionate individuals who want to make a difference.
+            Help us build the future of cryptocurrency adoption in emerging markets. We&apos;re looking for passionate individuals who want to make a difference.
           </p>
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-green-600 to-teal-600 rounded-lg blur-xl opacity-25" />
