@@ -32,7 +32,7 @@ const blogPosts = [
     },
     tags: ["Cryptocurrency", "Market Analysis", "Future Trends"],
     content: "Explore the evolving landscape of cryptocurrency and its potential impact on the future of finance...",
-    image: "/images/blog/crypto-future.jpg"
+    image: "https://images.unsplash.com/photo-1518546305927-5a555bb7020d?w=800&auto=format&fit=crop&q=60"
   },
   {
     id: 2,
@@ -54,7 +54,7 @@ const blogPosts = [
       "The importance of seed phrase management",
       "Regular security audits for your crypto holdings"
     ],
-    image: "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=800&auto=format&fit=crop&q=60"
   },
   {
     id: 3,
@@ -76,7 +76,7 @@ const blogPosts = [
       "Risk management in DeFi investments",
       "The future of decentralized exchanges"
     ],
-    image: "https://images.unsplash.com/photo-1620321023374-d1a68fbc720d?auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1639322537228-f710d846310a?w=800&auto=format&fit=crop&q=60"
   },
   {
     id: 4,
@@ -98,15 +98,15 @@ const blogPosts = [
       "Common crypto tax mistakes to avoid",
       "Tools and software for crypto tax reporting"
     ],
-    image: "https://images.unsplash.com/photo-1554672723-b208dc85134f?auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1554672723-b208dc85134f?w=800&auto=format&fit=crop&q=60"
   }
 ];
 
 const featuredPost = blogPosts[0];
 
 export default async function BlogPage() {
-  const supabase = createServerComponentClient<Database>({ cookies });
-  
+  const cookieStore = cookies();
+  const supabase = createServerComponentClient<Database>({ cookies: () => cookieStore });
   const { data: { session } } = await supabase.auth.getSession();
 
   return (
@@ -171,6 +171,7 @@ export default async function BlogPage() {
                     alt={blogPosts[0].title}
                     fill
                     className="object-cover rounded-lg"
+                    priority={blogPosts[0].id === 1}
                   />
                 </div>
               </div>
@@ -187,6 +188,7 @@ export default async function BlogPage() {
                     alt={post.title}
                     fill
                     className="object-cover rounded-t-lg"
+                    priority={post.id === 1}
                   />
                 </div>
                 <CardContent className="p-6">
