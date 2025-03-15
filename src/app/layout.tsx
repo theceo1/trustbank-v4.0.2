@@ -1,18 +1,17 @@
-import { Inter } from "next/font/google"
+import { GeistSans } from 'geist/font/sans'
+import { GeistMono } from 'geist/font/mono'
 import "./globals.css"
 import { Metadata } from "next"
 import { ThemeProvider } from "@/components/ThemeProvider"
+import { Toaster } from "@/components/ui/toaster"
 import SupabaseProvider from "@/lib/providers/supabase-provider"
 import { AuthProvider } from "@/contexts/AuthContext"
 import { Header } from "@/components/layout/Header"
 import { Footer } from "@/components/layout/Footer"
-import { Toaster } from "@/components/ui/toaster"
 import { cookies } from "next/headers"
 import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
 import { cn } from "@/lib/utils"
 import { LanguageProvider } from "@/providers/LanguageProvider"
-
-const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: {
@@ -44,16 +43,22 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  const cookieStore = cookies()
-  const supabase = createServerComponentClient({ cookies: () => cookieStore })
-  
-  const { data: { session } } = await supabase.auth.getSession()
+  const supabase = createServerComponentClient({ cookies })
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
   const { data: { user } } = await supabase.auth.getUser()
 
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={cn("min-h-screen bg-background font-sans antialiased", inter.className)}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <body className={`${GeistSans.variable} ${GeistMono.variable} font-sans antialiased`}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
           <SupabaseProvider>
             <AuthProvider initialSession={user}>
               <LanguageProvider>
