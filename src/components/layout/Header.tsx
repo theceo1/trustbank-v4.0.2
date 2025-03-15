@@ -68,36 +68,45 @@ export function Header() {
       <header className="sticky top-0 z-[60] w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 sm:px-6">
           <div className="flex h-14 items-center justify-between">
-            <div className="flex items-center">
+            <div className="flex items-center space-x-4">
               <Link href="/" className="font-bold text-xl">
                 trustBank
               </Link>
+              <Button
+                variant="outline"
+                size="sm"
+                className="hidden md:flex h-8 bg-green-50 hover:bg-green-100 border-green-200 text-green-700 dark:bg-green-900/20 dark:hover:bg-green-900/30 dark:border-green-800 dark:text-green-400"
+                onClick={handleInstantSwap}
+              >
+                <ArrowLeftRight className="h-4 w-4 mr-2" />
+                Instant Swap
+              </Button>
             </div>
 
             {/* Mobile menu button */}
-            <button
-              onClick={toggleMenu}
-              className="md:hidden p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
-            >
-              {isMenuOpen ? (
-                <X className="h-6 w-6" />
-              ) : (
-                <Menu className="h-6 w-6" />
-              )}
-            </button>
-
-            {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center space-x-6">
-              {/* Common links for both authenticated and unauthenticated users */}
+            <div className="flex items-center space-x-2 md:hidden">
               <Button
                 variant="outline"
                 size="sm"
                 className="h-8 bg-green-50 hover:bg-green-100 border-green-200 text-green-700 dark:bg-green-900/20 dark:hover:bg-green-900/30 dark:border-green-800 dark:text-green-400"
                 onClick={handleInstantSwap}
               >
-                <ArrowLeftRight className="h-4 w-4 mr-2" />
-                Instant Swap
+                <ArrowLeftRight className="h-4 w-4" />
               </Button>
+              <button
+                onClick={toggleMenu}
+                className="p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+              >
+                {isMenuOpen ? (
+                  <X className="h-6 w-6" />
+                ) : (
+                  <Menu className="h-6 w-6" />
+                )}
+              </button>
+            </div>
+
+            {/* Desktop Navigation */}
+            <div className="hidden md:flex items-center space-x-6">
               <Link href="/market" className="text-sm font-medium transition-colors hover:text-primary">
                 Market
               </Link>
@@ -213,6 +222,7 @@ export function Header() {
         onSignOut={handleSignOut}
         loading={loading}
         isSigningOut={isSigningOut}
+        handleInstantSwap={handleInstantSwap}
       />
     </>
   );

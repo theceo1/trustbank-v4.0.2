@@ -52,16 +52,13 @@ export async function middleware(request: NextRequest) {
       '/api/markets/price',
       '/api/markets/overview',
       '/api/markets/tickers',
-      '/api/markets/data',
-      '/api/trades/p2p/orders',
-      '/api/trades/spot/orders',
-      '/api/trades/swap/quote'
+      '/api/markets/data'
     ]
     
     // Check if the current path matches any public route
     const isPublicRoute = publicRoutes.some(route => 
       request.nextUrl.pathname === route || 
-      (route !== '/' && request.nextUrl.pathname.startsWith(route + '/'))
+      (route !== '/' && request.nextUrl.pathname.startsWith(route))
     )
     
     const isPublicApiRoute = publicApiRoutes.some(route =>
@@ -71,12 +68,8 @@ export async function middleware(request: NextRequest) {
     const isApiRoute = request.nextUrl.pathname.startsWith('/api/')
     const isAdminRoute = request.nextUrl.pathname.startsWith('/admin')
 
-    // If it's a public route, allow access
+    // If it's a public route, allow access without authentication
     if (isPublicRoute || isPublicApiRoute) {
-      // If user is signed in and tries to access auth pages, redirect to dashboard
-      if (session && request.nextUrl.pathname.startsWith('/auth')) {
-        return NextResponse.redirect(new URL('/dashboard', request.url))
-      }
       return res
     }
 
@@ -102,10 +95,7 @@ export async function middleware(request: NextRequest) {
     // For all other routes (protected routes), check session
     if (!session) {
       const redirectUrl = new URL('/auth/login', request.url)
-      // Only set redirect if it's not an auth page
-      if (!request.nextUrl.pathname.startsWith('/auth/')) {
-        redirectUrl.searchParams.set('redirect', request.nextUrl.pathname)
-      }
+      redirectUrl.searchParams.set('redirect', request.nextUrl.pathname)
       return NextResponse.redirect(redirectUrl)
     }
 
