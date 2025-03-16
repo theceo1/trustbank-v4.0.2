@@ -34,7 +34,7 @@ export function TransactionHistory({ transactions = [] }: TransactionHistoryProp
     if (activeFilter === 'withdrawals') return tx.type === 'withdrawal';
     if (activeFilter === 'swaps') return tx.type === 'swap';
     return true;
-  });
+  }).slice(0, 5); // Only take the first 5 transactions
 
   const { isHidden } = useBalance();
   // Only show the 5 most recent transactions

@@ -9,6 +9,28 @@ interface MarketData {
   change_24h: number;
 }
 
+interface Transaction {
+  id: string;
+  type: string;
+  amount: number;
+  currency: string;
+  status: string;
+  created_at: string;
+}
+
+interface SwapTransaction {
+  id: string;
+  type: 'swap';
+  amount: number;
+  currency: string;
+  from_currency: string;
+  to_currency: string;
+  to_amount: number;
+  execution_price: number;
+  status: string;
+  created_at: string;
+}
+
 export async function GET(request: Request) {
   try {
     // Create a new cookie store and supabase client
@@ -130,22 +152,75 @@ export async function GET(request: Request) {
     // Fetch data from Quidax using the Quidax ID
     console.log('Fetching Quidax data for user:', userProfile.quidax_id);
     
-    const [walletsData, marketData, transactionsData] = await Promise.all([
-      getWallets(userProfile.quidax_id).catch(error => {
+    const [walletsData, marketData, regularTxsResult, swapTxsResult] = await Promise.all([
+      getWallets(userProfile.quidax_id).catch((error: Error) => {
         console.error('Error fetching wallets:', error);
         return [];
       }),
-      getMarketTickers().catch(error => {
+      getMarketTickers().catch((error: Error) => {
         console.error('Error fetching market data:', error);
         return {};
       }),
-      getSwapTransactions(userProfile.quidax_id).catch(error => {
-        console.error('Error fetching transactions:', error);
-        return [];
-      })
+      (async () => {
+        try {
+          const { data } = await supabase
+            .from('transactions')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(10);
+          return data || [];
+        } catch (error) {
+          console.error('Error fetching regular transactions:', error);
+          return [];
+        }
+      })(),
+      (async () => {
+        try {
+          const { data } = await supabase
+            .from('swap_transactions')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(10);
+          return data || [];
+        } catch (error) {
+          console.error('Error fetching swap transactions:', error);
+          return [];
+        }
+      })()
     ]);
 
-    console.log('Quidax API responses received');
+    console.log('API responses received');
+
+    // Format regular transactions
+    const formattedRegularTxs = regularTxsResult.map((tx: any): Transaction => ({
+      id: tx.id,
+      type: tx.type,
+      amount: parseFloat(tx.amount),
+      currency: tx.currency,
+      status: tx.status,
+      created_at: tx.created_at
+    }));
+
+    // Format swap transactions
+    const formattedSwapTxs = swapTxsResult.map((tx: any): SwapTransaction => ({
+      id: tx.id,
+      type: 'swap',
+      amount: parseFloat(tx.from_amount),
+      currency: tx.from_currency,
+      from_currency: tx.from_currency,
+      to_currency: tx.to_currency,
+      to_amount: parseFloat(tx.to_amount),
+      execution_price: parseFloat(tx.execution_price),
+      status: tx.status,
+      created_at: tx.created_at
+    }));
+
+    // Combine and sort all transactions by date
+    const allTransactions = [...formattedRegularTxs, ...formattedSwapTxs]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 10); // Keep only the 10 most recent
 
     // Process market data
     const processedMarketData = Object.entries(marketData || {})
@@ -172,7 +247,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       wallets: walletsData || [],
       marketData: processedMarketData,
-      transactions: transactionsData || [],
+      transactions: allTransactions,
       userId: userProfile.quidax_id
     });
   } catch (error: any) {

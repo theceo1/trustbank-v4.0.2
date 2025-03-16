@@ -31,11 +31,15 @@ interface User {
 
 interface Transaction {
   id: string;
-  type: string;
-  amount: string;
+  type: 'deposit' | 'withdrawal' | 'transfer' | 'swap';
+  amount: number;
   currency: string;
   status: 'completed' | 'pending' | 'failed';
   created_at: string;
+  from_currency?: string;
+  to_currency?: string;
+  to_amount?: number;
+  execution_price?: number;
 }
 
 interface KYCStatus {
@@ -101,17 +105,55 @@ export default function DashboardPage() {
             setLimits(limitsData);
           }
 
-          // Fetch transactions
-          const { data: txData } = await supabase
+          // Fetch both regular and swap transactions
+          const { data: regularTxs, error: regularError } = await supabase
             .from('transactions')
             .select('*')
             .eq('user_id', user.id)
             .order('created_at', { ascending: false })
             .limit(5);
 
-          if (txData) {
-            setTransactions(txData);
-          }
+          if (regularError) throw regularError;
+
+          const { data: swapTxs, error: swapError } = await supabase
+            .from('swap_transactions')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(5);
+
+          if (swapError) throw swapError;
+
+          // Format regular transactions
+          const formattedRegularTxs = (regularTxs || []).map(tx => ({
+            id: tx.id,
+            type: tx.type,
+            amount: parseFloat(tx.amount),
+            currency: tx.currency,
+            status: tx.status,
+            created_at: tx.created_at
+          }));
+
+          // Format swap transactions
+          const formattedSwapTxs = (swapTxs || []).map(tx => ({
+            id: tx.id,
+            type: 'swap' as const,
+            amount: parseFloat(tx.from_amount),
+            currency: tx.from_currency,
+            from_currency: tx.from_currency,
+            to_currency: tx.to_currency,
+            to_amount: parseFloat(tx.to_amount),
+            execution_price: parseFloat(tx.execution_price),
+            status: tx.status,
+            created_at: tx.created_at
+          }));
+
+          // Combine and sort all transactions by date
+          const allTransactions = [...formattedRegularTxs, ...formattedSwapTxs]
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+            .slice(0, 5); // Keep only the 5 most recent
+
+          setTransactions(allTransactions);
         }
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
