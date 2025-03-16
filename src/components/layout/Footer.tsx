@@ -257,8 +257,6 @@ export function Footer() {
           </div>
 
           <div className="flex items-center gap-6 text-sm text-muted-foreground order-3">
-            <Link href="/privacy-policy" className="hover:text-green-600">Privacy</Link>
-            <Link href="/terms-of-service" className="hover:text-green-600">Terms</Link>
             <Link href="/profile/security" className="hover:text-green-600">Security</Link>
           </div>
         </div>
