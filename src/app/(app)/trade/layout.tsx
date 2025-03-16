@@ -90,38 +90,48 @@ export default function TradeLayout({
     <div className="min-h-screen bg-gradient-to-br from-green-50/50 to-blue-50/50 dark:from-green-950/50 dark:to-blue-950/50">
       <div className="container mx-auto px-4 py-8">
         {/* Featured Banner */}
-        <MotionDiv 
-          className="mb-8"
+        <MotionDiv
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
+          className="relative overflow-hidden rounded-xl bg-gradient-to-br from-slate-900 to-slate-800 p-8 mb-8"
         >
-          <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-green-600 to-green-400 p-8 shadow-lg">
-            <div className="absolute inset-0 bg-grid-white/10" />
-            <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-              <div className="flex-1">
-                <h1 className="text-2xl font-bold text-white mb-3">Welcome to trustBank Trading</h1>
-                <p className="text-green-50 max-w-3xl text-base">
-                  Experience seamless trading with our advanced platform. Choose from multiple trading options
-                  and enjoy competitive rates with top-notch security.
-                </p>
-                <div className="flex gap-4 mt-4">
-                  <div className="flex items-center gap-2 text-white/90">
-                    <Shield className="h-4 w-4" />
-                    <span className="text-sm">Bank-grade Security</span>
+          {/* Gradient Mesh Background */}
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(0,255,95,0.1),transparent_50%),radial-gradient(circle_at_70%_50%,rgba(0,255,149,0.05),transparent_50%)]" />
+          
+          <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div className="flex-1">
+              <h1 className="text-3xl font-bold text-white mb-3 bg-clip-text text-transparent bg-gradient-to-r from-white to-white/90">
+                Welcome to trustBank Trading
+              </h1>
+              <p className="text-slate-300 max-w-3xl text-base">
+                Experience seamless trading with our advanced platform. Choose from multiple trading options
+                and enjoy competitive rates with top-notch security.
+              </p>
+              <div className="flex flex-wrap gap-6 mt-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-white/5">
+                    <Shield className="h-5 w-5 text-green-400" />
                   </div>
-                  <div className="flex items-center gap-2 text-white/90">
-                    <Clock className="h-4 w-4" />
-                    <span className="text-sm">24/7 Trading</span>
+                  <span className="text-sm font-medium text-slate-200">Bank-grade Security</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-white/5">
+                    <Clock className="h-5 w-5 text-green-400" />
                   </div>
-                  <div className="flex items-center gap-2 text-white/90">
-                    <LineChart className="h-4 w-4" />
-                    <span className="text-sm">Real-time Rates</span>
+                  <span className="text-sm font-medium text-slate-200">24/7 Trading</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-white/5">
+                    <LineChart className="h-5 w-5 text-green-400" />
                   </div>
+                  <span className="text-sm font-medium text-slate-200">Real-time Rates</span>
                 </div>
               </div>
-              <div className="hidden md:block">
-                <TrendingUp size={120} className="text-white/20" />
+            </div>
+            <div className="hidden md:flex items-center justify-center p-4">
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-green-500/20 to-emerald-500/20 blur-xl rounded-full" />
+                <TrendingUp size={100} className="text-green-400 relative z-10" />
               </div>
             </div>
           </div>
