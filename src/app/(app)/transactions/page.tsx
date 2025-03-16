@@ -1,97 +1,41 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { TransactionList } from '@/components/transactions/TransactionList';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-
-interface Transaction {
-  id: string;
-  type: 'deposit' | 'withdrawal' | 'transfer' | 'swap';
-  amount: number;
-  currency: string;
-  status: 'pending' | 'completed' | 'failed';
-  created_at: string;
-  from_currency?: string;
-  to_currency?: string;
-  to_amount?: number;
-  execution_price?: number;
-}
+import { TransactionService } from '@/lib/services/transaction-service';
+import type { AnyTransaction, TransactionType } from '@/types/transactions';
+import { Icons } from '@/components/ui/icons';
 
 export default function TransactionsPage() {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactions, setTransactions] = useState<AnyTransaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'deposits' | 'withdrawals' | 'swaps'>('all');
-  const supabase = createClientComponentClient();
+  const [activeFilter, setActiveFilter] = useState<'all' | TransactionType | 'swaps'>('all');
+  const transactionService = new TransactionService();
 
   useEffect(() => {
     async function fetchTransactions() {
       try {
         setIsLoading(true);
-        
-        // Fetch regular transactions
-        const { data: regularTxs, error: regularError } = await supabase
-          .from('transactions')
-          .select('*')
-          .order('created_at', { ascending: false });
+        const filters = activeFilter === 'all' 
+          ? undefined 
+          : activeFilter === 'swaps'
+          ? { type: undefined }
+          : { type: activeFilter };
 
-        if (regularError) throw regularError;
-
-        // Fetch swap transactions
-        const { data: swapTxs, error: swapError } = await supabase
-          .from('swap_transactions')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (swapError) throw swapError;
-
-        // Format regular transactions
-        const formattedRegularTxs = (regularTxs || []).map(tx => ({
-          id: tx.id,
-          type: tx.type,
-          amount: parseFloat(tx.amount),
-          currency: tx.currency,
-          status: tx.status,
-          created_at: tx.created_at
-        }));
-
-        // Format swap transactions
-        const formattedSwapTxs = (swapTxs || []).map(tx => ({
-          id: tx.id,
-          type: 'swap' as const,
-          amount: parseFloat(tx.from_amount),
-          currency: tx.from_currency,
-          from_currency: tx.from_currency,
-          to_currency: tx.to_currency,
-          to_amount: parseFloat(tx.to_amount),
-          execution_price: parseFloat(tx.execution_price),
-          status: tx.status,
-          created_at: tx.created_at
-        }));
-
-        // Combine and sort all transactions by date
-        const allTransactions = [...formattedRegularTxs, ...formattedSwapTxs]
-          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-        setTransactions(allTransactions);
+        const transactions = await transactionService.getTransactions(filters);
+        setTransactions(transactions);
       } catch (error) {
         console.error('Error fetching transactions:', error);
+        // You might want to show an error toast here
       } finally {
         setIsLoading(false);
       }
     }
 
     fetchTransactions();
-  }, []);
-
-  const filteredTransactions = transactions.filter(tx => {
-    if (activeFilter === 'all') return true;
-    if (activeFilter === 'deposits') return tx.type === 'deposit';
-    if (activeFilter === 'withdrawals') return tx.type === 'withdrawal';
-    if (activeFilter === 'swaps') return tx.type === 'swap';
-    return true;
-  });
+  }, [activeFilter]);
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl">
@@ -109,16 +53,16 @@ export default function TransactionsPage() {
               All
             </Button>
             <Button 
-              variant={activeFilter === 'deposits' ? 'default' : 'ghost'} 
+              variant={activeFilter === 'deposit' ? 'default' : 'ghost'} 
               size="sm"
-              onClick={() => setActiveFilter('deposits')}
+              onClick={() => setActiveFilter('deposit')}
             >
               Deposits
             </Button>
             <Button 
-              variant={activeFilter === 'withdrawals' ? 'default' : 'ghost'} 
+              variant={activeFilter === 'withdrawal' ? 'default' : 'ghost'} 
               size="sm"
-              onClick={() => setActiveFilter('withdrawals')}
+              onClick={() => setActiveFilter('withdrawal')}
             >
               Withdrawals
             </Button>
@@ -131,10 +75,25 @@ export default function TransactionsPage() {
             </Button>
           </div>
 
-          <TransactionList 
-            transactions={filteredTransactions}
-            isLoading={isLoading}
-          />
+          {isLoading ? (
+            <div className="flex justify-center items-center p-8">
+              <Icons.spinner className="h-8 w-8 animate-spin" />
+            </div>
+          ) : transactions.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
+                <Icons.inbox className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-medium mb-1">No transactions found</h3>
+              <p className="text-sm text-muted-foreground text-center">
+                {activeFilter === 'all' 
+                  ? "You haven't made any transactions yet."
+                  : `You haven't made any ${activeFilter === 'swaps' ? 'swap' : activeFilter} transactions yet.`}
+              </p>
+            </div>
+          ) : (
+            <TransactionList transactions={transactions} />
+          )}
         </CardContent>
       </Card>
     </div>

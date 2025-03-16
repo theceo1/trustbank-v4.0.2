@@ -162,7 +162,7 @@ export default function VisionPage() {
           <h1 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-green-600 to-green-400 bg-clip-text text-transparent">
             The Future of Finance
           </h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-sm text-muted-foreground max-w-2xl mx-auto">
             Building a comprehensive suite of financial products for the crypto economy
           </p>
         </motion.div>

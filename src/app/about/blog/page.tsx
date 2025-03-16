@@ -115,12 +115,12 @@ export default async function BlogPage() {
         <div className="max-w-7xl mx-auto space-y-12">
           {/* Hero Section */}
           <div className="text-center space-y-4">
-            <h1 className="text-4xl font-bold sm:text-5xl md:text-6xl">
+            <h1 className="text-lg font-bold sm:text-2xl md:text-3xl">
               <span className="bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
                 trustBank Blog
               </span>
             </h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-sm text-muted-foreground max-w-2xl mx-auto">
               Stay informed with the latest insights, trends, and news in cryptocurrency and blockchain technology.
             </p>
           </div>
