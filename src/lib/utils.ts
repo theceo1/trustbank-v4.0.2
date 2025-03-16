@@ -5,14 +5,20 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-interface FormatNumberOptions extends Intl.NumberFormatOptions {
+export interface NumberFormatOptions extends Intl.NumberFormatOptions {
   locale?: string;
 }
 
+/**
+ * Formats a number with specified options
+ */
 export function formatNumber(
-  value: number,
-  options: FormatNumberOptions = {}
+  value: number | string,
+  options: NumberFormatOptions = {}
 ): string {
+  const numValue = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(numValue)) return '0';
+
   const {
     locale = 'en-US',
     minimumFractionDigits = 2,
@@ -24,7 +30,7 @@ export function formatNumber(
     minimumFractionDigits,
     maximumFractionDigits,
     ...rest,
-  }).format(value);
+  }).format(numValue);
 }
 
 export function formatAmount(amount: number | string, currency: string = 'NGN'): string {
@@ -40,27 +46,38 @@ export function formatAmount(amount: number | string, currency: string = 'NGN'):
   return formatter.format(numAmount);
 }
 
-export function formatCryptoAmount(amount: number | string, decimals: number = 8): string {
+/**
+ * Formats a crypto amount with 8 decimal places
+ */
+export function formatCryptoAmount(
+  amount: number | string,
+  decimals: number = 8
+): string {
   const num = typeof amount === 'string' ? parseFloat(amount) : amount;
   if (isNaN(num)) return '0';
 
-  return num.toLocaleString('en-US', {
+  return formatNumber(num, {
     minimumFractionDigits: 2,
     maximumFractionDigits: decimals,
   });
 }
 
-export function formatCurrency(value: number | string, currency: string = 'USD'): string {
+/**
+ * Formats a currency amount with symbol
+ */
+export function formatCurrency(
+  value: number | string,
+  currency: string = 'USD'
+): string {
   const numValue = typeof value === 'string' ? parseFloat(value) : value;
   if (isNaN(numValue)) return currency === 'NGN' ? '₦0.00' : '$0.00';
   
-  const formatter = new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: currency === 'NGN' ? 'NGN' : 'USD',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
-  });
-  return formatter.format(numValue);
+  }).format(numValue);
 }
 
 export function formatMarketCap(value: number): string {
@@ -87,4 +104,28 @@ export function formatCompactNumber(value: number): string {
 
 export function formatNairaAmount(amount: number | string): string {
   return formatCurrency(amount, 'NGN');
+}
+
+/**
+ * Formats a rate with appropriate decimals
+ */
+export function formatRate(
+  value: number | string,
+  options: {
+    inputCurrency: string;
+    outputCurrency: string;
+    minimumFractionDigits?: number;
+    maximumFractionDigits?: number;
+  }
+): string {
+  const numValue = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(numValue)) return '0';
+
+  const isCrypto = options.inputCurrency !== 'NGN' && options.inputCurrency !== 'USD';
+  const decimals = isCrypto ? 8 : 2;
+
+  return formatNumber(numValue, {
+    minimumFractionDigits: options.minimumFractionDigits ?? decimals,
+    maximumFractionDigits: options.maximumFractionDigits ?? decimals,
+  });
 }

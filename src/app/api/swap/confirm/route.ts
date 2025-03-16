@@ -101,7 +101,33 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({ status: 'success', data: data.data });
+    // Record the trade in our database
+    const { error: tradeError } = await supabase
+      .from('trades')
+      .insert({
+        user_id: user.id,
+        type: 'swap',
+        market: `${from_currency}${to_currency}`.toLowerCase(),
+        amount: parseFloat(from_amount),
+        price: parseFloat(data.data.execution_price),
+        fee: 0, // We'll update this once we have fee calculation
+        from_currency: from_currency.toLowerCase(),
+        to_currency: to_currency.toLowerCase(),
+        from_amount: parseFloat(from_amount),
+        to_amount: parseFloat(data.data.received_amount),
+        status: data.data.status
+      });
+
+    if (tradeError) {
+      console.error('Failed to record trade:', tradeError);
+      // Don't return an error to the client since the swap was successful
+    }
+
+    return NextResponse.json({
+      status: 'success',
+      message: 'Swap confirmed successfully',
+      data: data.data
+    });
   } catch (error) {
     console.error('Error confirming swap:', error);
     return NextResponse.json(

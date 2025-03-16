@@ -1,13 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/app/contexts/AuthContext';
-import { format } from 'date-fns';
-import { Badge } from "@/components/ui/badge";
-import { Loader2 } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { motion } from 'framer-motion';
-import { formatNumber } from '@/lib/utils';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2 } from 'lucide-react';
 
 interface SwapTransaction {
   id: string;
@@ -21,40 +17,38 @@ interface SwapTransaction {
 }
 
 export function SwapHistory() {
-  const { user } = useAuth();
   const [transactions, setTransactions] = useState<SwapTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const supabase = createClientComponentClient();
 
   useEffect(() => {
     const fetchSwapHistory = async () => {
-      if (!user) return;
-
       try {
         setLoading(true);
-        setError(null);
+        const { data, error } = await supabase
+          .from('trades')
+          .select('*')
+          .eq('type', 'swap')
+          .order('created_at', { ascending: false });
 
-        const response = await fetch('/api/trades/swap/transactions', {
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          credentials: 'include'
-        });
+        if (error) throw error;
 
-        const data = await response.json();
+        const formattedTransactions = (data || []).map(trade => ({
+          id: trade.id,
+          from_currency: trade.from_currency,
+          to_currency: trade.to_currency,
+          from_amount: trade.from_amount?.toString() || '0',
+          to_amount: trade.to_amount?.toString() || '0',
+          rate: trade.price?.toString() || '0',
+          status: trade.status || 'pending',
+          created_at: trade.created_at
+        }));
 
-        if (!response.ok) {
-          throw new Error(data.message || 'Failed to fetch swap history');
-        }
-
-        if (data.status === 'success') {
-          setTransactions(data.data);
-        } else {
-          throw new Error(data.message || 'Failed to fetch swap history');
-        }
+        setTransactions(formattedTransactions);
       } catch (error) {
         console.error('Failed to fetch swap history:', error);
-        setError(error instanceof Error ? error.message : 'Failed to fetch swap history');
+        setError('Failed to load swap history');
       } finally {
         setLoading(false);
       }
@@ -63,12 +57,12 @@ export function SwapHistory() {
     fetchSwapHistory();
     const interval = setInterval(fetchSwapHistory, 30000); // Update every 30 seconds
     return () => clearInterval(interval);
-  }, [user]);
+  }, []);
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center py-8">
-        <Loader2 className="h-8 w-8 animate-spin text-green-600" />
+      <div className="flex justify-center items-center p-4">
+        <Loader2 className="h-6 w-6 animate-spin" />
       </div>
     );
   }
@@ -83,48 +77,47 @@ export function SwapHistory() {
 
   if (transactions.length === 0) {
     return (
-      <div className="text-center py-8 text-muted-foreground">
-        No swap transactions found
-      </div>
+      <Alert>
+        <AlertDescription>No swap transactions found.</AlertDescription>
+      </Alert>
     );
   }
 
   return (
     <div className="space-y-4">
-      {transactions.map((tx, index) => (
-        <motion.div
-          key={tx.id}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: index * 0.1 }}
-          className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+      {transactions.map((transaction) => (
+        <div
+          key={transaction.id}
+          className="flex justify-between items-center p-4 rounded-lg border bg-card text-card-foreground shadow-sm"
         >
           <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="font-medium">
-                {formatNumber(tx.from_amount)} {tx.from_currency.toUpperCase()}
-              </span>
-              <span className="text-muted-foreground">→</span>
-              <span className="font-medium">
-                {formatNumber(tx.to_amount)} {tx.to_currency.toUpperCase()}
-              </span>
-            </div>
-            <div className="text-sm text-muted-foreground">
-              Rate: 1 {tx.from_currency.toUpperCase()} = {formatNumber(tx.rate)} {tx.to_currency.toUpperCase()}
-            </div>
-            <div className="text-sm text-muted-foreground">
-              {format(new Date(tx.created_at), 'MMM d, yyyy HH:mm')}
-            </div>
+            <p className="text-sm font-medium">
+              {transaction.from_amount} {transaction.from_currency} →{' '}
+              {transaction.to_amount} {transaction.to_currency}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Rate: {transaction.rate}
+            </p>
           </div>
-          <Badge
-            variant={tx.status === 'completed' ? 'default' : 'secondary'}
-            className={`capitalize ${
-              tx.status === 'completed' ? 'bg-green-600' : ''
-            }`}
-          >
-            {tx.status}
-          </Badge>
-        </motion.div>
+          <div className="text-right">
+            <p className="text-sm">
+              <span
+                className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                  transaction.status === 'completed'
+                    ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                    : transaction.status === 'failed'
+                    ? 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                    : 'bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                }`}
+              >
+                {transaction.status}
+              </span>
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {new Date(transaction.created_at).toLocaleString()}
+            </p>
+          </div>
+        </div>
       ))}
     </div>
   );

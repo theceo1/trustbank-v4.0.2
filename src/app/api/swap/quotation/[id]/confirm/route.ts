@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
+import { quidaxService } from '@/lib/quidax';
 
 const QUIDAX_API_URL = process.env.QUIDAX_API_URL || 'https://www.quidax.com/api/v1';
 const QUIDAX_SECRET_KEY = process.env.QUIDAX_SECRET_KEY;
@@ -47,27 +48,34 @@ export async function POST(
     }
 
     // Confirm swap quotation
-    const response = await fetch(
-      `${QUIDAX_API_URL}/users/${profile.quidax_id}/swap_quotation/${params.id}/confirm`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${QUIDAX_SECRET_KEY}`,
-          'Content-Type': 'application/json',
-        }
-      }
-    );
+    const swapTransaction = await quidaxService.confirmSwapQuotation(profile.quidax_id, params.id);
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      return NextResponse.json(
-        { error: errorData.message || 'Failed to confirm swap' },
-        { status: response.status }
-      );
+    // Store the transaction in our database
+    const { error: tradeError } = await supabase
+      .from('trades')
+      .insert({
+        user_id: user.id,
+        type: 'swap',
+        market: `${swapTransaction.from_currency}${swapTransaction.to_currency}`,
+        amount: parseFloat(swapTransaction.from_amount),
+        price: parseFloat(swapTransaction.execution_price),
+        fee: 0, // We'll update this once we have fee calculation
+        from_currency: swapTransaction.from_currency,
+        to_currency: swapTransaction.to_currency,
+        from_amount: parseFloat(swapTransaction.from_amount),
+        to_amount: parseFloat(swapTransaction.received_amount),
+        status: swapTransaction.status
+      });
+
+    if (tradeError) {
+      console.error('Error storing trade:', tradeError);
+      // Don't return error since the swap was successful
     }
 
-    const data = await response.json();
-    return NextResponse.json({ status: 'success', data: data.data });
+    return NextResponse.json({
+      status: 'success',
+      data: swapTransaction
+    });
   } catch (error) {
     console.error('Error confirming swap:', error);
     return NextResponse.json(

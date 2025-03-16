@@ -52,7 +52,8 @@ export async function middleware(request: NextRequest) {
       '/api/markets/price',
       '/api/markets/overview',
       '/api/markets/tickers',
-      '/api/markets/data'
+      '/api/markets/data',
+      '/api/config/fees'
     ]
     
     // Check if the current path matches any public route
@@ -109,6 +110,20 @@ export async function middleware(request: NextRequest) {
     // If no profile exists and not already on onboarding page, redirect to onboarding
     if (!profile && !request.nextUrl.pathname.startsWith('/onboarding')) {
       return NextResponse.redirect(new URL('/onboarding', request.url))
+    }
+
+    // Check KYC status for trade pages
+    const tradePages = ['/trade', '/trade/spot', '/trade/p2p'];
+    if (tradePages.some(page => request.nextUrl.pathname.startsWith(page))) {
+      // Check if user has completed at least basic KYC
+      const verificationHistory = profile?.verification_history || {};
+      const hasBasicKyc = verificationHistory.email && 
+                         verificationHistory.phone && 
+                         verificationHistory.basic_info;
+
+      if (!hasBasicKyc) {
+        return NextResponse.redirect(new URL('/kyc?redirect=' + request.nextUrl.pathname, request.url));
+      }
     }
 
     // Special handling for admin routes

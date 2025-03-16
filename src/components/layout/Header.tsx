@@ -123,6 +123,9 @@ export function Header() {
                   <Link href="/trade" className="text-sm font-medium transition-colors hover:text-primary">
                     Trade
                   </Link>
+                  <Link href="/trade/guide" className="text-sm font-medium transition-colors hover:text-primary">
+                    Trade Guide
+                  </Link>
                 </>
               )}
 
