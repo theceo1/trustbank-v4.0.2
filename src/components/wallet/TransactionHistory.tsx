@@ -4,14 +4,21 @@ import { Button } from '@/components/ui/button';
 import { Icons } from '@/components/ui/icons';
 import { useBalance } from './BalanceContext';
 import Link from 'next/link';
+import { TransactionList } from '@/components/transactions/TransactionList';
+import { useState } from 'react';
 
 interface Transaction {
   id: string;
-  type: 'deposit' | 'withdraw' | 'swap';
+  type: 'deposit' | 'withdrawal' | 'transfer' | 'swap';
   amount: number;
   currency: string;
   status: 'completed' | 'pending' | 'failed';
   timestamp: string;
+  from_currency?: string;
+  to_currency?: string;
+  to_amount?: number;
+  execution_price?: number;
+  created_at?: string;
 }
 
 interface TransactionHistoryProps {
@@ -19,6 +26,16 @@ interface TransactionHistoryProps {
 }
 
 export function TransactionHistory({ transactions = [] }: TransactionHistoryProps) {
+  const [activeFilter, setActiveFilter] = useState<'all' | 'deposits' | 'withdrawals' | 'swaps'>('all');
+
+  const filteredTransactions = transactions.filter(tx => {
+    if (activeFilter === 'all') return true;
+    if (activeFilter === 'deposits') return tx.type === 'deposit';
+    if (activeFilter === 'withdrawals') return tx.type === 'withdrawal';
+    if (activeFilter === 'swaps') return tx.type === 'swap';
+    return true;
+  });
+
   const { isHidden } = useBalance();
   // Only show the 5 most recent transactions
   const recentTransactions = transactions.slice(0, 5);
@@ -38,7 +55,7 @@ export function TransactionHistory({ transactions = [] }: TransactionHistoryProp
     switch (type) {
       case 'deposit':
         return <Icons.download className="h-4 w-4" />;
-      case 'withdraw':
+      case 'withdrawal':
         return <Icons.upload className="h-4 w-4" />;
       case 'swap':
         return <Icons.refresh className="h-4 w-4" />;
@@ -91,53 +108,52 @@ export function TransactionHistory({ transactions = [] }: TransactionHistoryProp
       </div>
 
       <div className="flex items-center gap-2 sm:gap-4 mb-6">
-        <Button variant="ghost" size="sm" className="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300">All</Button>
-        <Button variant="ghost" size="sm" className="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300">Deposits</Button>
-        <Button variant="ghost" size="sm" className="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300">Withdrawals</Button>
-        <Button variant="ghost" size="sm" className="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300">Swaps</Button>
+        <Button 
+          variant={activeFilter === 'all' ? 'default' : 'ghost'} 
+          size="sm" 
+          onClick={() => setActiveFilter('all')}
+          className="text-xs"
+        >
+          All
+        </Button>
+        <Button 
+          variant={activeFilter === 'deposits' ? 'default' : 'ghost'} 
+          size="sm"
+          onClick={() => setActiveFilter('deposits')}
+          className="text-xs"
+        >
+          Deposits
+        </Button>
+        <Button 
+          variant={activeFilter === 'withdrawals' ? 'default' : 'ghost'} 
+          size="sm"
+          onClick={() => setActiveFilter('withdrawals')}
+          className="text-xs"
+        >
+          Withdrawals
+        </Button>
+        <Button 
+          variant={activeFilter === 'swaps' ? 'default' : 'ghost'} 
+          size="sm"
+          onClick={() => setActiveFilter('swaps')}
+          className="text-xs"
+        >
+          Swaps
+        </Button>
       </div>
 
-      {recentTransactions.length > 0 ? (
-        <div className="space-y-3">
-          {recentTransactions.map((tx) => (
-            <div key={tx.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-              <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${
-                  tx.type === 'deposit' ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400' :
-                  tx.type === 'withdraw' ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400' :
-                  'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
-                }`}>
-                  {getTypeIcon(tx.type)}
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-200 capitalize">{tx.type}</p>
-                  <p className="text-xs text-gray-600 dark:text-gray-400">
-                    {formatDate(tx.timestamp)}
-                  </p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-200">
-                  {isHidden ? '••••••' : `${tx.type === 'deposit' ? '+' : '-'}${formatAmount(tx.amount, tx.currency)} ${tx.currency}`}
-                </p>
-                <p className={`text-xs capitalize ${getStatusColor(tx.status)}`}>
-                  {tx.status}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="rounded-lg border border-dashed border-gray-200 dark:border-gray-800 p-8 text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-orange-50 dark:bg-orange-900/20">
-            <Icons.inbox className="h-6 w-6 text-orange-600 dark:text-orange-400" />
-          </div>
-          <h3 className="mt-4 text-sm font-medium text-gray-900 dark:text-gray-200">No transactions yet</h3>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            Your transaction history will appear here once you make your first transaction.
-          </p>
-        </div>
-      )}
+      <TransactionList 
+        transactions={filteredTransactions.map(tx => {
+          const transaction: any = {
+            ...tx,
+            created_at: tx.timestamp || tx.created_at
+          };
+          if (transaction.type === 'withdraw') {
+            transaction.type = 'withdrawal';
+          }
+          return transaction;
+        })} 
+      />
     </div>
   );
 } 

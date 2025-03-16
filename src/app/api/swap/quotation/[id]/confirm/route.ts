@@ -51,24 +51,22 @@ export async function POST(
     const swapTransaction = await quidaxService.confirmSwapQuotation(profile.quidax_id, params.id);
 
     // Store the transaction in our database
-    const { error: tradeError } = await supabase
-      .from('trades')
+    const { error: swapError } = await supabase
+      .from('swap_transactions')
       .insert({
         user_id: user.id,
-        type: 'swap',
-        market: `${swapTransaction.from_currency}${swapTransaction.to_currency}`,
-        amount: parseFloat(swapTransaction.from_amount),
-        price: parseFloat(swapTransaction.execution_price),
-        fee: 0, // We'll update this once we have fee calculation
         from_currency: swapTransaction.from_currency,
         to_currency: swapTransaction.to_currency,
         from_amount: parseFloat(swapTransaction.from_amount),
         to_amount: parseFloat(swapTransaction.received_amount),
-        status: swapTransaction.status
+        execution_price: parseFloat(swapTransaction.execution_price),
+        status: swapTransaction.status,
+        quidax_swap_id: swapTransaction.id,
+        quidax_quotation_id: params.id
       });
 
-    if (tradeError) {
-      console.error('Error storing trade:', tradeError);
+    if (swapError) {
+      console.error('Error storing swap:', swapError);
       // Don't return error since the swap was successful
     }
 

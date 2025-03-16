@@ -27,13 +27,13 @@ async function calculateFee(userId, amount) {
 
     const { data: trades } = await supabaseAdmin
       .from('trades')
-      .select('amount, price')
+      .select('amount, rate')
       .eq('user_id', userId)
       .gte('created_at', thirtyDaysAgo.toISOString());
 
     // Calculate total trading volume
     const tradingVolume = trades?.reduce((total, trade) => {
-      return total + (parseFloat(trade.amount) * parseFloat(trade.price));
+      return total + (parseFloat(trade.amount) * parseFloat(trade.rate));
     }, 0) || 0;
 
     // Determine fee tier based on volume
@@ -44,10 +44,20 @@ async function calculateFee(userId, amount) {
     else if (tradingVolume >= 10000000) feePercentage = 0.025; // 10M+: 2.5%
 
     // Calculate fee amount
-    return parseFloat(amount) * feePercentage;
+    const feeAmount = parseFloat(amount) * feePercentage;
+
+    return {
+      percentage: feePercentage,
+      amount: feeAmount,
+      currency: 'USDT'
+    };
   } catch (error) {
     console.error('Error calculating fee:', error);
-    return parseFloat(amount) * 0.03; // Default to 3% if error
+    return {
+      percentage: 0.03, // Default to 3% if error
+      amount: parseFloat(amount) * 0.03,
+      currency: 'USDT'
+    };
   }
 }
 
@@ -121,30 +131,28 @@ async function testSwap(quidaxId, fromCurrency, toCurrency, amount) {
     console.log('Execution price:', confirmData.data.execution_price);
 
     // Calculate fee
-    const fee = await calculateFee(profile.user_id, confirmData.data.from_amount);
-    console.log('Fee:', fee.toFixed(8), confirmData.data.from_currency.toUpperCase());
+    const fees = await calculateFee(profile.user_id, confirmData.data.from_amount);
+    console.log('Fees:', fees.amount.toFixed(8), fees.currency);
 
     // Record the swap in our database
-    const { error: tradeError } = await supabaseAdmin
-      .from('trades')
+    const { error: swapError } = await supabaseAdmin
+      .from('swap_transactions')
       .insert({
         user_id: profile.user_id,
-        type: 'swap',
-        market: `${fromCurrency}${toCurrency}`.toLowerCase(),
-        amount: parseFloat(confirmData.data.from_amount),
-        price: parseFloat(confirmData.data.execution_price),
-        fee: fee,
         from_currency: confirmData.data.from_currency,
         to_currency: confirmData.data.to_currency,
         from_amount: parseFloat(confirmData.data.from_amount),
         to_amount: parseFloat(confirmData.data.received_amount),
-        status: confirmData.data.status
+        execution_price: parseFloat(confirmData.data.execution_price),
+        status: confirmData.data.status === 'initiated' ? 'pending' : confirmData.data.status,
+        quidax_swap_id: confirmData.data.id,
+        quidax_quotation_id: quotationData.data.id
       });
 
-    if (tradeError) {
-      console.error('Error recording trade:', tradeError);
+    if (swapError) {
+      console.error('Error recording swap:', swapError);
     } else {
-      console.log('\nTrade recorded successfully in database');
+      console.log('\nSwap recorded successfully in database');
     }
   } catch (error) {
     console.error('Error:', error);
@@ -153,5 +161,5 @@ async function testSwap(quidaxId, fromCurrency, toCurrency, amount) {
   }
 }
 
-// Test swap USDT to BTC (swapping half of available balance: 0.23 USDT)
-testSwap('157fa815-214e-4ecd-8a25-448fe4815ff1', 'usdt', 'btc', '0.23'); 
+// Test swap BTC to USDT (swapping 0.000002 BTC)
+testSwap('157fa815-214e-4ecd-8a25-448fe4815ff1', 'btc', 'usdt', '0.000002'); 

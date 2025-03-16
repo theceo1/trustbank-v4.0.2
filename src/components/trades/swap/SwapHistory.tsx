@@ -11,7 +11,7 @@ interface SwapTransaction {
   to_currency: string;
   from_amount: string;
   to_amount: string;
-  rate: string;
+  execution_price: string;
   status: string;
   created_at: string;
 }
@@ -27,22 +27,21 @@ export function SwapHistory() {
       try {
         setLoading(true);
         const { data, error } = await supabase
-          .from('trades')
+          .from('swap_transactions')
           .select('*')
-          .eq('type', 'swap')
           .order('created_at', { ascending: false });
 
         if (error) throw error;
 
-        const formattedTransactions = (data || []).map(trade => ({
-          id: trade.id,
-          from_currency: trade.from_currency,
-          to_currency: trade.to_currency,
-          from_amount: trade.from_amount?.toString() || '0',
-          to_amount: trade.to_amount?.toString() || '0',
-          rate: trade.price?.toString() || '0',
-          status: trade.status || 'pending',
-          created_at: trade.created_at
+        const formattedTransactions = (data || []).map(swap => ({
+          id: swap.id,
+          from_currency: swap.from_currency,
+          to_currency: swap.to_currency,
+          from_amount: swap.from_amount?.toString() || '0',
+          to_amount: swap.to_amount?.toString() || '0',
+          execution_price: swap.execution_price?.toString() || '0',
+          status: swap.status || 'pending',
+          created_at: swap.created_at
         }));
 
         setTransactions(formattedTransactions);
@@ -92,11 +91,11 @@ export function SwapHistory() {
         >
           <div className="space-y-1">
             <p className="text-sm font-medium">
-              {transaction.from_amount} {transaction.from_currency} →{' '}
-              {transaction.to_amount} {transaction.to_currency}
+              {transaction.from_amount} {transaction.from_currency.toUpperCase()} →{' '}
+              {transaction.to_amount} {transaction.to_currency.toUpperCase()}
             </p>
             <p className="text-xs text-muted-foreground">
-              Rate: {transaction.rate}
+              Rate: {transaction.execution_price}
             </p>
           </div>
           <div className="text-right">
