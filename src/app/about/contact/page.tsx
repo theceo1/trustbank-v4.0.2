@@ -63,28 +63,26 @@ export default function ContactPage() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch('https://ipinfo.io/json');
-      const locationData = await response.json();
-      const userLocation = `${locationData.city}, ${locationData.region}, ${locationData.country}`;
-
       const supabase = createClientComponentClient<Database>();
       const { error } = await supabase
         .from('contact_messages')
         .insert([{ 
           name, 
           email, 
-          message, 
-          location: userLocation, 
-          created_at: new Date().toISOString() 
+          message
         }]);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
 
       setIsDialogOpen(true);
       setName('');
       setEmail('');
       setMessage('');
     } catch (error) {
+      console.error('Submission error:', error);
       toast({
         title: "Error",
         description: "Failed to send message. Please try again.",
