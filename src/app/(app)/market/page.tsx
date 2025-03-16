@@ -24,10 +24,10 @@ interface PriceData {
 
 type CurrencyKey = 'USDT' | 'BTC' | 'ETH';
 
-const CURRENCIES: Record<CurrencyKey, { color: string }> = {
-  USDT: { color: 'from-green-500/20 to-green-500/5' },
-  BTC: { color: 'from-orange-500/20 to-orange-500/5' },
-  ETH: { color: 'from-blue-500/20 to-blue-500/5' },
+const CURRENCIES: Record<CurrencyKey, { color: string; name: string }> = {
+  USDT: { color: 'from-green-500/20 to-green-500/5', name: 'Tether' },
+  BTC: { color: 'from-orange-500/20 to-orange-500/5', name: 'Bitcoin' },
+  ETH: { color: 'from-blue-500/20 to-blue-500/5', name: 'Ethereum' },
 };
 
 const INITIAL_MARKET_DATA: MarketData = {
@@ -45,7 +45,6 @@ const INITIAL_PRICE_DATA: PriceData = {
 
 export default function MarketOverview() {
   const [marketData, setMarketData] = useState<MarketData>(INITIAL_MARKET_DATA);
-  const [selectedCurrency, setSelectedCurrency] = useState<CurrencyKey>('USDT');
   const [priceData, setPriceData] = useState<PriceData>(INITIAL_PRICE_DATA);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -161,60 +160,50 @@ export default function MarketOverview() {
 
         <Card className="p-6">
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-semibold">Price Tracker</h2>
-                <p className="text-muted-foreground">Monitor real-time cryptocurrency prices in NGN</p>
-              </div>
-
-              <Select 
-                value={selectedCurrency} 
-                onValueChange={(value: CurrencyKey) => setSelectedCurrency(value)}
-              >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(Object.keys(CURRENCIES) as CurrencyKey[]).map((currency) => (
-                    <SelectItem key={currency} value={currency}>
-                      {currency}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div>
+              <h2 className="text-xl font-semibold">Price Tracker</h2>
+              <p className="text-muted-foreground">Monitor real-time cryptocurrency prices in NGN</p>
             </div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-              className={`rounded-lg p-6 bg-gradient-to-r ${CURRENCIES[selectedCurrency].color}`}
-            >
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-medium">{selectedCurrency}/NGN</h3>
-                  <span className="text-xs bg-muted px-2 py-1 rounded-full">Live</span>
-                </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {(Object.entries(CURRENCIES) as [CurrencyKey, { color: string; name: string }][]).map(([currency, info]) => (
+                <motion.div
+                  key={currency}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className={`rounded-lg p-6 bg-gradient-to-r ${info.color}`}
+                >
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-medium">{currency}/NGN</h3>
+                        <p className="text-sm text-muted-foreground">{info.name}</p>
+                      </div>
+                      <span className="text-xs bg-muted px-2 py-1 rounded-full">Live</span>
+                    </div>
 
-                <div className="flex items-end gap-4">
-                  <div className="text-4xl font-bold">
-                    {formatCurrency(priceData[selectedCurrency].price, 'NGN')}
-                  </div>
-                  <div className={`text-sm px-2 py-1 rounded ${
-                    priceData[selectedCurrency].change24h >= 0 
-                      ? 'bg-green-500/10 text-green-500' 
-                      : 'bg-red-500/10 text-red-500'
-                  }`}>
-                    {priceData[selectedCurrency].change24h >= 0 ? '+' : ''}
-                    {priceData[selectedCurrency].change24h.toFixed(2)}%
-                  </div>
-                </div>
+                    <div className="flex items-end gap-4">
+                      <div className="text-3xl font-bold">
+                        {formatCurrency(priceData[currency].price, 'NGN')}
+                      </div>
+                      <div className={`text-sm px-2 py-1 rounded ${
+                        priceData[currency].change24h >= 0 
+                          ? 'bg-green-500/10 text-green-500' 
+                          : 'bg-red-500/10 text-red-500'
+                      }`}>
+                        {priceData[currency].change24h >= 0 ? '+' : ''}
+                        {priceData[currency].change24h.toFixed(2)}%
+                      </div>
+                    </div>
 
-                <div className="text-sm text-muted-foreground">
-                  Vol: {formatCompactNumber(priceData[selectedCurrency].volume)} {selectedCurrency}
-                </div>
-              </div>
-            </motion.div>
+                    <div className="text-sm text-muted-foreground">
+                      Vol: {formatCompactNumber(priceData[currency].volume)} {currency}
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
           </div>
         </Card>
       </div>
