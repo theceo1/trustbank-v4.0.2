@@ -136,9 +136,9 @@ export function Footer() {
   return (
     <footer className="border-t bg-white dark:bg-gray-950">
       <div className="container mx-auto px-4 sm:px-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 py-12">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-8 py-8">
           {/* Brand Section */}
-          <div className="space-y-6">
+          <div className="space-y-6 relative">
             <div className="flex items-center space-x-2">
               <span className="text-xl font-bold">trustBank</span>
             </div>
@@ -146,16 +146,17 @@ export function Footer() {
               We are <span className="text-green-600">Crypto | Simplified</span>. Making cryptocurrency trading accessible, secure, and efficient by simplifying crypto adoption in emerging markets.
             </p>
             <Button variant="default" className="w-full bg-green-600 hover:bg-green-700 text-white" asChild>
-              <Link href="/trades">Start Trading</Link>
+              <Link href="/trade">Start Trading</Link>
             </Button>
             <div className="flex items-center space-x-2 p-3 border rounded-lg bg-green-50 dark:bg-green-900/20">
               <span className="text-sm font-medium">Refer & Earn</span>
               <Badge variant="secondary" className="bg-green-600 text-white">$50 USDT</Badge>
             </div>
+            <div className="hidden md:block absolute right-0 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-green-500/50 to-transparent" />
           </div>
 
           {/* Quick Links */}
-          <div className="space-y-6">
+          <div className="space-y-6 relative">
             <h3 className="font-semibold">Quick Links</h3>
             <ul className="grid gap-3">
               {quickLinks.map((link) => (
@@ -179,10 +180,11 @@ export function Footer() {
                 </li>
               ))}
             </ul>
+            <div className="hidden md:block absolute right-0 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-green-500/50 to-transparent" />
           </div>
 
           {/* About */}
-          <div className="space-y-6">
+          <div className="space-y-6 relative">
             <h3 className="font-semibold">About</h3>
             <ul className="grid gap-3">
               {aboutLinks.map((link) => (
@@ -194,10 +196,11 @@ export function Footer() {
                 </li>
               ))}
             </ul>
+            <div className="hidden md:block absolute right-0 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-green-500/50 to-transparent" />
           </div>
 
           {/* Support */}
-          <div className="space-y-6">
+          <div className="space-y-6 relative">
             <h3 className="font-semibold">Support</h3>
             <ul className="grid gap-3">
               {supportLinks.map((link) => (
@@ -209,20 +212,18 @@ export function Footer() {
                 </li>
               ))}
             </ul>
+            <div className="hidden md:block absolute right-0 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-green-500/50 to-transparent" />
           </div>
 
           {/* Legal Links */}
-          <div>
-            <h3 className="text-sm font-semibold mb-4">Legal</h3>
-            <ul className="space-y-3">
+          <div className="space-y-6">
+            <h3 className="font-semibold">Legal</h3>
+            <ul className="grid gap-3">
               {legalLinks.map((link) => (
                 <li key={link.name}>
-                  <Link
-                    href={link.href}
-                    className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-2"
-                  >
+                  <Link href={link.href} className="flex items-center text-sm text-muted-foreground hover:text-green-600 transition-colors">
                     {link.icon}
-                    {link.name}
+                    <span className="ml-3">{link.name}</span>
                   </Link>
                 </li>
               ))}
@@ -230,9 +231,9 @@ export function Footer() {
           </div>
         </div>
 
-        <Separator className="my-8" />
+        <Separator className="my-4" />
 
-        <div className="flex flex-col sm:flex-row items-center justify-between py-8 gap-6">
+        <div className="flex flex-col sm:flex-row items-center justify-between py-4 gap-6">
           <p className="text-sm text-muted-foreground order-2 sm:order-1">
             © {new Date().getFullYear()} trustBank. All rights reserved.
           </p>

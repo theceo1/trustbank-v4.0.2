@@ -422,246 +422,146 @@ export default function TradePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-background/80">
-      {/* Hero Section */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-green-600/10 via-emerald-600/10 to-teal-600/10 border-b">
-        <div className="container mx-auto px-4 py-12 sm:px-6 lg:px-8">
-          <div className="relative z-10">
-            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
-              Welcome to trustBank Trading
-            </h1>
-            <p className="mt-6 max-w-3xl text-xl text-muted-foreground">
-              Experience seamless trading with our advanced platform. Choose from multiple trading options and
-              enjoy competitive rates with top-notch security.
-            </p>
-            <div className="mt-8 flex items-center gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <Wallet className="h-5 w-5 text-green-500" />
-                <span>Bank-grade Security</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Clock className="h-5 w-5 text-green-500" />
-                <span>24/7 Trading</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-green-500" />
-                <span>Real-time Rates</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
+    <div className="min-h-screen">
       <div className="container mx-auto px-4 py-12 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Quick Trade Form */}
-          <Card className="lg:col-span-1 border-none shadow-lg bg-card/50 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="text-2xl font-bold">Quick Trade</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Tabs value={tab} onValueChange={setTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-2 mb-8">
-                  <TabsTrigger value="buy" className="text-lg">Buy Crypto</TabsTrigger>
-                  <TabsTrigger value="sell" className="text-lg">Sell Crypto</TabsTrigger>
-                </TabsList>
+        {/* Quick Trade Form */}
+        <Card className="max-w-xl mx-auto bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-xl">
+          <CardHeader>
+            <CardTitle className="text-2xl font-bold text-gray-900 dark:text-gray-50">Quick Trade</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Tabs value={tab} onValueChange={setTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-8">
+                <TabsTrigger value="buy" className="text-lg">Buy Crypto</TabsTrigger>
+                <TabsTrigger value="sell" className="text-lg">Sell Crypto</TabsTrigger>
+              </TabsList>
 
-                <div className="space-y-6">
-                  {/* Crypto Selection */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">
-                      {tab === 'buy' ? 'Select Asset to Buy' : 'Select Asset to Sell'}
-                    </label>
-                    <Select value={selectedCrypto} onValueChange={(value) => {
-                      setSelectedCrypto(value);
-                      setShowRate(false);
-                      setQuotation(null);
-                    }}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {SUPPORTED_CURRENCIES.map((currency) => (
-                          <SelectItem
-                            key={currency.value}
-                            value={currency.value}
-                            className="flex items-center gap-2"
-                          >
-                            <span className="font-mono">{currency.icon}</span>
-                            {currency.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Input Currency Selection */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">
-                      {tab === 'buy' ? 'Choose Payment Method' : 'Receive Payment in'}
-                    </label>
-                    <Select value={inputCurrency} onValueChange={setInputCurrency}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {INPUT_CURRENCIES.map((currency) => (
-                          <SelectItem
-                            key={currency.value}
-                            value={currency.value}
-                          >
-                            {currency.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Amount Input */}
-                  <div className="space-y-4">
-                    <div>
-                      <div className="flex justify-between mb-2">
-                        <label className="text-sm font-medium">
-                          Enter Amount to {tab === 'buy' ? 'Buy' : 'Sell'} ({tab === 'buy' ? 'NGN' : selectedCrypto})
-                        </label>
-                        <button
-                          onClick={handleMaxAmount}
-                          className="text-sm text-green-600 hover:text-green-700 font-medium"
+              <div className="space-y-6">
+                {/* Crypto Selection */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    {tab === 'buy' ? 'Select Asset to Buy' : 'Select Asset to Sell'}
+                  </label>
+                  <Select value={selectedCrypto} onValueChange={(value) => {
+                    setSelectedCrypto(value);
+                    setShowRate(false);
+                    setQuotation(null);
+                  }}>
+                    <SelectTrigger className="w-full bg-white dark:bg-gray-800">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SUPPORTED_CURRENCIES.map((currency) => (
+                        <SelectItem
+                          key={currency.value}
+                          value={currency.value}
+                          className="flex items-center gap-2"
                         >
-                          Max
-                        </button>
-                      </div>
-                      <Input
-                        type="text"
-                        value={formatInputAmount(amount)}
-                        onChange={(e) => handleAmountChange(e.target.value)}
-                        placeholder="0.00"
-                        className="text-lg"
-                      />
-                      <div className="flex justify-between mt-1">
-                        <span className="text-sm text-muted-foreground">
-                          Available Balance: {tab === 'buy' 
-                            ? formatCurrency(balances['NGN'] || '0', 'NGN')
-                            : formatCryptoAmount(balances[selectedCrypto] || '0')} 
-                        </span>
-                      </div>
-                    </div>
-
-                    {rate && (
-                      <div className="space-y-2">
-                        <div className="text-sm font-medium text-green-600">
-                          Rate: 1 {selectedCrypto} = {getDisplayRate()} NGN
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium">
-                            You {tab === 'buy' ? 'Receive' : 'Get'} ({tab === 'buy' ? selectedCrypto : 'NGN'})
-                          </label>
-                          <div className="mt-1 text-lg font-semibold">
-                            {tab === 'buy'
-                              ? formatCryptoAmount(quotation?.to_amount || '0')
-                              : formatCurrency(quotation?.to_amount || '0', 'NGN')}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            ≈ {tab === 'buy'
-                              ? formatCryptoAmount(quotation?.to_amount || '0')
-                              : formatCurrency(quotation?.to_amount || '0', 'NGN')}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Estimated Amount */}
-                  <AnimatePresence mode="wait">
-                    {showRate && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0, y: -20 }}
-                        animate={{ opacity: 1, height: 'auto', y: 0 }}
-                        exit={{ opacity: 0, height: 0, y: -20 }}
-                        transition={{ duration: 0.3, ease: "easeOut" }}
-                        className="space-y-2"
-                      >
-                        <label className="text-sm font-medium">
-                          {tab === 'buy' ? `You Receive (${selectedCrypto})` : `You Receive (NGN)`}
-                        </label>
-                        <motion.div 
-                          className="p-4 bg-muted/50 rounded-lg"
-                          initial={{ scale: 0.95 }}
-                          animate={{ scale: 1 }}
-                          transition={{ duration: 0.2 }}
-                        >
-                          <div className="text-2xl font-semibold">
-                            {tab === 'buy' 
-                              ? formatCryptoAmount(quotation?.to_amount || '0')
-                              : formatCurrency(quotation?.to_amount || '0', 'NGN')}
-                          </div>
-                          <div className="text-sm text-muted-foreground mt-1">
-                            ≈ {formatCurrency(
-                              parseFloat(quotation?.to_amount || '0'),
-                              tab === 'buy' ? selectedCrypto : 'NGN'
-                            )}
-                          </div>
-                        </motion.div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  {/* Action Button */}
-                  <Button
-                    className="w-full"
-                    size="lg"
-                    onClick={showRate ? () => setShowConfirmation(true) : handleProceed}
-                    disabled={loading || quoting || !amount}
-                  >
-                    {quoting ? (
-                      <span className="flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Getting Quote...
-                      </span>
-                    ) : showRate ? (
-                      `Proceed with ${tab === 'buy' ? 'Purchase' : 'Sale'}`
-                    ) : (
-                      'Get Quote'
-                    )}
-                  </Button>
-                </div>
-              </Tabs>
-            </CardContent>
-          </Card>
-
-          {/* Trading Options Grid */}
-          <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
-            {TRADING_OPTIONS.map((option) => (
-              <Link key={option.id} href={option.href}>
-                <Card className="group h-full cursor-pointer overflow-hidden transition-all hover:shadow-lg hover:shadow-primary/5 hover:border-primary/50">
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <option.icon className="h-8 w-8 text-primary mb-4" />
-                        <h3 className="text-xl font-semibold tracking-tight group-hover:text-primary transition-colors">
-                          {option.title}
-                        </h3>
-                        <p className="mt-2 text-muted-foreground">
-                          {option.description}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {option.tags.map((tag) => (
-                        <span
-                          key={tag}
-                          className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary"
-                        >
-                          {tag}
-                        </span>
+                          <span className="font-mono">{currency.icon}</span>
+                          {currency.label}
+                        </SelectItem>
                       ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Input Currency Selection */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    {tab === 'buy' ? 'Choose Payment Method' : 'Receive Payment in'}
+                  </label>
+                  <Select value={inputCurrency} onValueChange={setInputCurrency}>
+                    <SelectTrigger className="w-full bg-white dark:bg-gray-800">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {INPUT_CURRENCIES.map((currency) => (
+                        <SelectItem
+                          key={currency.value}
+                          value={currency.value}
+                        >
+                          {currency.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Amount Input */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    {tab === 'buy' ? 'Enter Amount to Buy (NGN)' : 'Enter Amount to Sell'}
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={amount}
+                      onChange={(e) => handleAmountChange(e.target.value)}
+                      className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary/50"
+                      placeholder="0.00"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-primary hover:text-primary/80"
+                      onClick={handleMaxAmount}
+                    >
+                      Max
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Available Balance: {getDisplayBalance()}
+                  </p>
+                </div>
+
+                {/* Action Button */}
+                <Button
+                  className="w-full bg-primary hover:bg-primary/90"
+                  size="lg"
+                  onClick={showRate ? () => setShowConfirmation(true) : handleProceed}
+                  disabled={loading || quoting || !amount}
+                >
+                  {quoting ? (
+                    <span className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Getting Quote...
+                    </span>
+                  ) : showRate ? (
+                    `Proceed with ${tab === 'buy' ? 'Purchase' : 'Sale'}`
+                  ) : (
+                    'Get Quote'
+                  )}
+                </Button>
+              </div>
+            </Tabs>
+          </CardContent>
+        </Card>
+
+        {/* Fee Config Section */}
+        {feeConfig && (
+          <div className="max-w-xl mx-auto mt-6">
+            <Card className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-lg">
+              <CardContent className="p-6">
+                <h3 className="font-semibold mb-2 text-lg text-gray-900 dark:text-gray-50">Your Trading Fees</h3>
+                <div className="space-y-2 text-sm text-gray-600 dark:text-gray-300">
+                  <p>Current Tier: {feeConfig.user_tier.tier_level}</p>
+                  <p>Fee Rate: {feeConfig.user_tier.fee_percentage}%</p>
+                  <p>30-day Volume: {formatCurrency(feeConfig.user_tier.trading_volume, 'USD')}</p>
+                  {feeConfig.user_tier.next_tier && (
+                    <p className="text-green-600 dark:text-green-400">
+                      Trade {formatCurrency(feeConfig.user_tier.next_tier.min - feeConfig.user_tier.trading_volume, 'USD')} more to reach next tier ({feeConfig.user_tier.next_tier.fee}% fee)
+                    </p>
+                  )}
+                  {feeConfig.referral_discount > 0 && (
+                    <p className="text-green-600 dark:text-green-400">
+                      Referral Discount: {feeConfig.referral_discount}%
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Confirmation Modal */}
@@ -745,27 +645,6 @@ export default function TradePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {feeConfig && (
-        <div className="mt-4 p-4 bg-muted/50 rounded-lg">
-          <h3 className="font-semibold mb-2">Your Trading Fees</h3>
-          <div className="space-y-2 text-sm">
-            <p>Current Tier: {feeConfig.user_tier.tier_level}</p>
-            <p>Fee Rate: {feeConfig.user_tier.fee_percentage}%</p>
-            <p>30-day Volume: {formatCurrency(feeConfig.user_tier.trading_volume, 'USD')}</p>
-            {feeConfig.user_tier.next_tier && (
-              <p className="text-green-600">
-                Trade {formatCurrency(feeConfig.user_tier.next_tier.min - feeConfig.user_tier.trading_volume, 'USD')} more to reach next tier ({feeConfig.user_tier.next_tier.fee}% fee)
-              </p>
-            )}
-            {feeConfig.referral_discount > 0 && (
-              <p className="text-green-600">
-                Referral Discount: {feeConfig.referral_discount}%
-              </p>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 } 

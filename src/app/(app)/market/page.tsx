@@ -22,12 +22,18 @@ interface PriceData {
   };
 }
 
-type CurrencyKey = 'USDT' | 'BTC' | 'ETH';
+type CurrencyKey = 'USDT' | 'BTC' | 'ETH' | 'XRP' | 'SOL' | 'ADA' | 'DOGE' | 'MATIC' | 'DOT';
 
 const CURRENCIES: Record<CurrencyKey, { color: string; name: string }> = {
   USDT: { color: 'from-green-500/20 to-green-500/5', name: 'Tether' },
   BTC: { color: 'from-orange-500/20 to-orange-500/5', name: 'Bitcoin' },
   ETH: { color: 'from-blue-500/20 to-blue-500/5', name: 'Ethereum' },
+  XRP: { color: 'from-indigo-500/20 to-indigo-500/5', name: 'Ripple' },
+  SOL: { color: 'from-purple-500/20 to-purple-500/5', name: 'Solana' },
+  ADA: { color: 'from-cyan-500/20 to-cyan-500/5', name: 'Cardano' },
+  DOGE: { color: 'from-yellow-500/20 to-yellow-500/5', name: 'Dogecoin' },
+  MATIC: { color: 'from-pink-500/20 to-pink-500/5', name: 'Polygon' },
+  DOT: { color: 'from-rose-500/20 to-rose-500/5', name: 'Polkadot' }
 };
 
 const INITIAL_MARKET_DATA: MarketData = {
@@ -40,7 +46,13 @@ const INITIAL_MARKET_DATA: MarketData = {
 const INITIAL_PRICE_DATA: PriceData = {
   USDT: { price: 0, volume: 0, change24h: 0 },
   BTC: { price: 0, volume: 0, change24h: 0 },
-  ETH: { price: 0, volume: 0, change24h: 0 }
+  ETH: { price: 0, volume: 0, change24h: 0 },
+  XRP: { price: 0, volume: 0, change24h: 0 },
+  SOL: { price: 0, volume: 0, change24h: 0 },
+  ADA: { price: 0, volume: 0, change24h: 0 },
+  DOGE: { price: 0, volume: 0, change24h: 0 },
+  MATIC: { price: 0, volume: 0, change24h: 0 },
+  DOT: { price: 0, volume: 0, change24h: 0 }
 };
 
 export default function MarketOverview() {
@@ -74,7 +86,13 @@ export default function MarketOverview() {
       const newPriceData: PriceData = {
         USDT: { price: 0, volume: 0, change24h: 0 },
         BTC: { price: 0, volume: 0, change24h: 0 },
-        ETH: { price: 0, volume: 0, change24h: 0 }
+        ETH: { price: 0, volume: 0, change24h: 0 },
+        XRP: { price: 0, volume: 0, change24h: 0 },
+        SOL: { price: 0, volume: 0, change24h: 0 },
+        ADA: { price: 0, volume: 0, change24h: 0 },
+        DOGE: { price: 0, volume: 0, change24h: 0 },
+        MATIC: { price: 0, volume: 0, change24h: 0 },
+        DOT: { price: 0, volume: 0, change24h: 0 }
       };
 
       if (tickersData.status === 'success') {
@@ -92,6 +110,30 @@ export default function MarketOverview() {
             newPriceData.ETH.price = parseFloat(data.ticker.last);
             newPriceData.ETH.volume = parseFloat(data.ticker.vol);
             newPriceData.ETH.change24h = parseFloat(data.ticker.change || '0');
+          } else if (pair === 'xrpngn') {
+            newPriceData.XRP.price = parseFloat(data.ticker.last);
+            newPriceData.XRP.volume = parseFloat(data.ticker.vol);
+            newPriceData.XRP.change24h = parseFloat(data.ticker.change || '0');
+          } else if (pair === 'solngn') {
+            newPriceData.SOL.price = parseFloat(data.ticker.last);
+            newPriceData.SOL.volume = parseFloat(data.ticker.vol);
+            newPriceData.SOL.change24h = parseFloat(data.ticker.change || '0');
+          } else if (pair === 'adangn') {
+            newPriceData.ADA.price = parseFloat(data.ticker.last);
+            newPriceData.ADA.volume = parseFloat(data.ticker.vol);
+            newPriceData.ADA.change24h = parseFloat(data.ticker.change || '0');
+          } else if (pair === 'dogengn') {
+            newPriceData.DOGE.price = parseFloat(data.ticker.last);
+            newPriceData.DOGE.volume = parseFloat(data.ticker.vol);
+            newPriceData.DOGE.change24h = parseFloat(data.ticker.change || '0');
+          } else if (pair === 'maticngn') {
+            newPriceData.MATIC.price = parseFloat(data.ticker.last);
+            newPriceData.MATIC.volume = parseFloat(data.ticker.vol);
+            newPriceData.MATIC.change24h = parseFloat(data.ticker.change || '0');
+          } else if (pair === 'dotngn') {
+            newPriceData.DOT.price = parseFloat(data.ticker.last);
+            newPriceData.DOT.volume = parseFloat(data.ticker.vol);
+            newPriceData.DOT.change24h = parseFloat(data.ticker.change || '0');
           }
         });
       }
