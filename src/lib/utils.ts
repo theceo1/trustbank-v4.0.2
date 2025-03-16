@@ -33,17 +33,29 @@ export function formatNumber(
   }).format(numValue);
 }
 
-export function formatAmount(amount: number | string, currency: string = 'NGN'): string {
-  const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
-  if (isNaN(numAmount)) return currency === 'NGN' ? '₦0.00' : '$0.00';
-
-  const formatter = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: currency === 'NGN' ? 'NGN' : 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  });
-  return formatter.format(numAmount);
+export function formatAmount(amount: number, currency: string) {
+  if (typeof amount !== 'number') return '0.00';
+  
+  try {
+    // For NGN, always use 2 decimal places
+    if (currency === 'NGN') {
+      return new Intl.NumberFormat('en-NG', {
+        style: 'currency',
+        currency: 'NGN',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(amount);
+    }
+    
+    // For cryptocurrencies, always show up to 8 decimal places
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 8
+    }).format(amount) + ' ' + currency.toUpperCase();
+  } catch (error) {
+    console.error('Error formatting amount:', error);
+    return '0.00';
+  }
 }
 
 /**
