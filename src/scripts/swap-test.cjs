@@ -114,7 +114,12 @@ async function testSwap(quidaxId, fromCurrency, toCurrency, amount) {
         headers: {
           'Authorization': `Bearer ${QUIDAX_SECRET_KEY}`,
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({
+          from_currency: fromCurrency.toLowerCase(),
+          to_currency: toCurrency.toLowerCase(),
+          from_amount: amount
+        })
       }
     );
 
@@ -161,5 +166,5 @@ async function testSwap(quidaxId, fromCurrency, toCurrency, amount) {
   }
 }
 
-// Test swap BTC to USDT (swapping 0.000002 BTC)
-testSwap('157fa815-214e-4ecd-8a25-448fe4815ff1', 'btc', 'usdt', '0.000002'); 
+// Test swap BTC to USDT (swapping 0.0000015 BTC)
+testSwap('157fa815-214e-4ecd-8a25-448fe4815ff1', 'btc', 'usdt', '0.0000015'); 
