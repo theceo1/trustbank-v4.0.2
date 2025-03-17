@@ -88,4 +88,55 @@ async function checkSchema() {
   }
 }
 
-checkSchema(); 
+async function updateKycStatus() {
+  try {
+    const quidaxId = '157fa815-214e-4ecd-8a25-448fe4815ff1';
+    console.log('Looking up user with Quidax ID:', quidaxId);
+
+    // First get the user_id from the quidax_id
+    const { data: profile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('user_id')
+      .eq('quidax_id', quidaxId)
+      .single();
+
+    if (profileError) {
+      console.error('Error finding profile:', profileError);
+      return;
+    }
+
+    if (!profile) {
+      console.error('No profile found with Quidax ID:', quidaxId);
+      return;
+    }
+
+    console.log('Found user_id:', profile.user_id);
+    console.log('Updating KYC status...');
+
+    // Update the profile with verified KYC status
+    const { error: updateError } = await supabase
+      .from('user_profiles')
+      .update({
+        verification_history: {
+          email: true,
+          phone: true,
+          basic_info: true
+        }
+      })
+      .eq('user_id', profile.user_id);
+
+    if (updateError) {
+      console.error('Error updating profile:', updateError);
+      return;
+    }
+
+    console.log('KYC status updated successfully');
+  } catch (error) {
+    console.error('Error:', error);
+  } finally {
+    process.exit(0);
+  }
+}
+
+checkSchema();
+updateKycStatus(); 

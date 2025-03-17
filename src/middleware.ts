@@ -53,7 +53,8 @@ export async function middleware(request: NextRequest) {
       '/api/markets/overview',
       '/api/markets/tickers',
       '/api/markets/data',
-      '/api/config/fees'
+      '/api/config/fees',
+      '/api/user/kyc'
     ]
     
     // Check if the current path matches any public route
@@ -127,12 +128,19 @@ export async function middleware(request: NextRequest) {
                          verificationHistory.phone && 
                          verificationHistory.basic_info;
 
+      console.log('[Middleware] KYC Check:', {
+        userId: session.user.id,
+        verificationHistory,
+        hasBasicKyc
+      });
+
       // Set KYC status in cookies
       res.cookies.set('x-kyc-status', hasBasicKyc ? 'verified' : 'unverified', {
         httpOnly: false, // Allow JavaScript access
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
-        path: '/'
+        path: '/',
+        maxAge: hasBasicKyc ? 3600 : 0 // Expire immediately if not verified
       });
 
       return res;

@@ -15,25 +15,41 @@ export default async function DashboardPage() {
     return redirect('/auth/login');
   }
 
-  // Fetch KYC status
-  const { data: kycData } = await supabase
-    .from('kyc_verifications')
-    .select('status')
+  // Fetch user profile and verification history
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('verification_history')
     .eq('user_id', user.id)
     .single();
+
+  const verificationHistory = profile?.verification_history || {};
+  const hasBasicKyc = verificationHistory.email && 
+                     verificationHistory.phone && 
+                     verificationHistory.basic_info;
 
   // Calculate 30-day trading volume
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  const { data: volumeTrades } = await supabase
-    .from('trades')
-    .select('amount,price')
-    .eq('user_id', user.id)
-    .gte('created_at', thirtyDaysAgo.toISOString());
+  // Fetch trades and swap transactions in parallel
+  const [{ data: trades }, { data: swaps }] = await Promise.all([
+    supabase
+      .from('trades')
+      .select('*')
+      .eq('user_id', user.id)
+      .gte('created_at', thirtyDaysAgo.toISOString()),
+    supabase
+      .from('swap_transactions')
+      .select('*')
+      .eq('user_id', user.id)
+      .gte('created_at', thirtyDaysAgo.toISOString())
+  ]);
 
-  const tradingVolume = volumeTrades?.reduce((sum, trade) => 
-    sum + (Number(trade.amount) * Number(trade.price)), 0) || 0;
+  // Calculate total trading volume from both trades and swaps
+  const tradingVolume = (trades || []).reduce((sum, trade) => 
+    sum + (Number(trade.amount) * Number(trade.price)), 0) +
+    (swaps || []).reduce((sum, swap) => 
+    sum + Number(swap.from_amount), 0);
 
   // Get user limits
   const { data: limits } = await supabase
@@ -42,26 +58,64 @@ export default async function DashboardPage() {
     .eq('user_id', user.id)
     .single();
 
-  // Get recent transactions
-  const { data: recentTransactions } = await supabase
-    .from('trades')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-    .limit(5);
+  // Get recent transactions from both tables
+  const [{ data: recentTrades }, { data: recentSwaps }] = await Promise.all([
+    supabase
+      .from('trades')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(5),
+    supabase
+      .from('swap_transactions')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(5)
+  ]);
+
+  // Format trades
+  const formattedTrades = (recentTrades || []).map(trade => ({
+    id: trade.id,
+    type: trade.type,
+    amount: Number(trade.amount),
+    currency: trade.currency,
+    status: trade.status,
+    created_at: trade.created_at
+  }));
+
+  // Format swaps
+  const formattedSwaps = (recentSwaps || []).map(swap => ({
+    id: swap.id,
+    type: 'swap',
+    amount: Number(swap.from_amount),
+    currency: swap.from_currency,
+    to_amount: Number(swap.to_amount),
+    to_currency: swap.to_currency,
+    status: swap.status,
+    created_at: swap.created_at
+  }));
+
+  // Combine and sort all transactions
+  const recentTransactions = [...formattedTrades, ...formattedSwaps]
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 5); // Keep only the 5 most recent
 
   return (
     <ClientDashboard
       user={user}
-      kycStatus={{ status: kycData?.status || 'unverified', tier: 0 }}
-      limits={{
-        withdrawal_limit: limits?.withdrawal_limit || 0,
-        trading_limit: limits?.trading_limit || 0,
-        withdrawal_used: limits?.withdrawal_used || 0,
-        trading_used: tradingVolume
+      kycStatus={{
+        status: hasBasicKyc ? 'verified' : 'unverified',
+        tier: hasBasicKyc ? 1 : 0
       }}
-      volumeTrades={volumeTrades || []}
-      transactions={recentTransactions || []}
+      limits={{
+        withdrawal_limit: limits?.withdrawal_limit || 10000000,
+        trading_limit: limits?.trading_limit || 10000000,
+        withdrawal_used: limits?.withdrawal_used || 0,
+        trading_used: tradingVolume || 0
+      }}
+      volumeTrades={trades || []}
+      transactions={recentTransactions}
     />
   );
 } 

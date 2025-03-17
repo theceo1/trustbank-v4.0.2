@@ -249,6 +249,14 @@ export default function ClientDashboard({
                         {tx.type === 'deposit' ? '+' : '-'}{formatAmount(tx.amount, tx.currency)}
                       </p>
                     )}
+                    <span className={cn(
+                      "inline-block px-2 py-1 text-xs rounded-full mt-1",
+                      tx.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400' :
+                      tx.status === 'pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400' :
+                      'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400'
+                    )}>
+                      {tx.status}
+                    </span>
                   </div>
                 </div>
               ))}
