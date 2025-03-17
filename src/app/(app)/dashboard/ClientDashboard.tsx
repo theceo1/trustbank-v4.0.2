@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Card } from "@/components/ui/card";
+import { useState, useEffect } from 'react';
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { formatAmount } from "@/lib/utils";
 import Link from 'next/link';
@@ -19,7 +19,11 @@ import {
   ArrowDownRight,
   RefreshCcw,
   EyeOff,
-  Eye
+  Eye,
+  Gift,
+  Zap,
+  ArrowRight,
+  Users
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 
@@ -46,6 +50,7 @@ export default function ClientDashboard({
   volumeTrades,
   transactions 
 }: ClientDashboardProps) {
+  const [isLoading, setIsLoading] = useState(true);
   const [isBalanceHidden, setIsBalanceHidden] = useState(false);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [isSwapModalOpen, setIsSwapModalOpen] = useState(false);
@@ -54,8 +59,38 @@ export default function ClientDashboard({
     setIsBalanceHidden(!isBalanceHidden);
   };
 
+  // Simulate loading state
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[80vh]">
+        <div className="flex flex-col items-center gap-2">
+          <div className="animate-spin">
+            <RefreshCcw className="h-8 w-8 text-green-600" />
+          </div>
+          <p className="text-sm text-muted-foreground">Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 p-4 md:p-8">
+      {/* Dashboard Header */}
+      <div className="space-y-2">
+        <h1 className="text-lg font-bold tracking-tight">Dashboard</h1>
+        <p className="text-muted-foreground">
+          Welcome back! Here's an overview of your account and quick actions.
+        </p>
+      </div>
+
       {/* Balance Cards */}
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="relative overflow-hidden bg-gradient-to-br from-green-500/5 via-emerald-500/5 to-teal-500/5 border border-gray-800/10 p-6">
@@ -122,79 +157,128 @@ export default function ClientDashboard({
         </Card>
       )}
 
+      {/* Update the second announcement to P2P - Made more compact */}
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* First Announcement */}
+        <Card className="relative overflow-hidden bg-gradient-to-br from-purple-500/20 via-fuchsia-500/20 to-pink-500/20 border-0">
+          <div className="absolute inset-0 bg-white/5 backdrop-blur-sm" />
+          <CardContent className="relative p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-full bg-purple-500/10 shrink-0">
+                <Gift className="h-5 w-5 text-purple-600" />
+              </div>
+              <div>
+                <h3 className="font-medium text-base">Earn 50 USDT Welcome Bonus!</h3>
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="text-xs text-muted-foreground">Complete your first trade for bonus</p>
+                  <Button asChild variant="link" className="p-0 h-auto text-purple-600 hover:text-purple-700 text-xs">
+                    <Link href="/trade" className="flex items-center">
+                      Trade <ArrowRight className="ml-1 h-3 w-3" />
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Second Announcement - Updated to P2P */}
+        <Card className="relative overflow-hidden bg-gradient-to-br from-blue-500/20 via-cyan-500/20 to-teal-500/20 border-0">
+          <div className="absolute inset-0 bg-white/5 backdrop-blur-sm" />
+          <CardContent className="relative p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-full bg-blue-500/10 shrink-0">
+                <Users className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="font-medium text-base">Try P2P Trading!</h3>
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="text-xs text-muted-foreground">Trade directly with other users</p>
+                  <Button asChild variant="link" className="p-0 h-auto text-blue-600 hover:text-blue-700 text-xs">
+                    <Link href="/trade/p2p" className="flex items-center">
+                      P2P <ArrowRight className="ml-1 h-3 w-3" />
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Quick Actions */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold">Quick Actions</h3>
+      <Card className="p-6 bg-white dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800">
+        <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
           <Button
             variant="outline"
-            className="relative h-auto py-8 flex flex-col items-center justify-center gap-2 hover:bg-primary/5 hover:text-primary transition-colors bg-black/90 hover:bg-black/80 text-white border-0"
+            className="relative h-auto py-8 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 hover:from-green-500 hover:to-emerald-600 text-gray-900 dark:text-white hover:text-white border border-green-100 dark:border-green-900/50 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg"
             onClick={() => setIsSwapModalOpen(true)}
           >
             <ArrowRightLeft className="h-6 w-6" />
             <div className="text-center">
               <p className="font-medium">Instant Swap</p>
-              <p className="text-xs text-gray-400">Swap between cryptocurrencies</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Swap between crypto</p>
             </div>
           </Button>
 
           <Button
             variant="outline"
-            className="relative h-auto py-8 flex flex-col items-center justify-center gap-2 hover:bg-primary/5 hover:text-primary transition-colors bg-black/90 hover:bg-black/80 text-white border-0"
+            className="relative h-auto py-8 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 hover:from-green-500 hover:to-emerald-600 text-gray-900 dark:text-white hover:text-white border border-green-100 dark:border-green-900/50 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg"
             asChild
           >
             <Link href="/trade">
               <LineChart className="h-6 w-6" />
               <div className="text-center">
                 <p className="font-medium">Trade</p>
-                <p className="text-xs text-gray-400">Buy and sell cryptocurrencies</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Buy and sell crypto</p>
               </div>
             </Link>
           </Button>
 
           <Button
             variant="outline"
-            className="relative h-auto py-8 flex flex-col items-center justify-center gap-2 hover:bg-primary/5 hover:text-primary transition-colors bg-black/90 hover:bg-black/80 text-white border-0"
+            className="relative h-auto py-8 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 hover:from-green-500 hover:to-emerald-600 text-gray-900 dark:text-white hover:text-white border border-green-100 dark:border-green-900/50 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg"
             asChild
           >
             <Link href="/profile/wallet">
               <Wallet className="h-6 w-6" />
               <div className="text-center">
                 <p className="font-medium">Manage Funds</p>
-                <p className="text-xs text-gray-400">Deposit and withdraw funds</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Deposit and withdraw funds</p>
               </div>
             </Link>
           </Button>
 
           <Button
             variant="outline"
-            className="relative h-auto py-8 flex flex-col items-center justify-center gap-2 hover:bg-primary/5 hover:text-primary transition-colors bg-black/90 hover:bg-black/80 text-white border-0"
+            className="relative h-auto py-8 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 hover:from-green-500 hover:to-emerald-600 text-gray-900 dark:text-white hover:text-white border border-green-100 dark:border-green-900/50 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg"
             asChild
           >
             <Link href="/transactions">
               <History className="h-6 w-6" />
               <div className="text-center">
                 <p className="font-medium">Transaction History</p>
-                <p className="text-xs text-gray-400">View your transactions</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">View your transactions</p>
               </div>
             </Link>
           </Button>
 
           <Button
             variant="outline"
-            className="relative h-auto py-8 flex flex-col items-center justify-center gap-2 hover:bg-primary/5 hover:text-primary transition-colors bg-black/90 hover:bg-black/80 text-white border-0"
+            className="relative h-auto py-8 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 hover:from-green-500 hover:to-emerald-600 text-gray-900 dark:text-white hover:text-white border border-green-100 dark:border-green-900/50 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg"
             asChild
           >
             <Link href="/profile">
               <Settings className="h-6 w-6" />
               <div className="text-center">
                 <p className="font-medium">Account Settings</p>
-                <p className="text-xs text-gray-400">Manage your account</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Manage your account</p>
               </div>
             </Link>
           </Button>
         </div>
-      </div>
+      </Card>
 
       {/* Transactions and Limits Grid */}
       <div className="grid gap-4 md:grid-cols-2">
