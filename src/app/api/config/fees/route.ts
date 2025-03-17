@@ -1,108 +1,127 @@
-import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
+import { NextResponse } from 'next/server';
 
-// Fee tiers based on 30-day trading volume (in USD)
-const VOLUME_TIERS = {
-  TIER_1: { min: 0, max: 10000, fee: 3.0 }, // 0-10k: 3.0%
-  TIER_2: { min: 10000, max: 50000, fee: 2.5 }, // 10k-50k: 2.5%
-  TIER_3: { min: 50000, max: 100000, fee: 2.0 }, // 50k-100k: 2.0%
-  TIER_4: { min: 100000, max: 500000, fee: 1.5 }, // 100k-500k: 1.5%
-  TIER_5: { min: 500000, max: Infinity, fee: 1.0 }, // 500k+: 1.0%
+type VolumeTier = {
+  min: number;
+  max: number | null;
+  fee: number;
 };
 
-// Network fees in the respective currency
-const NETWORK_FEES = {
-  BTC: 0.0001,
-  ETH: 0.005,
-  USDT: 1,
-};
-
-// Base fee configuration
-const BASE_FEES = {
-  quidax: 1.4, // Quidax's fee
-  trustBank: 1.6, // Our additional fee
-  total: 3.0, // Total fee percentage
+type VolumeTiers = {
+  [key in 'TIER_1' | 'TIER_2' | 'TIER_3' | 'TIER_4' | 'TIER_5']: VolumeTier;
 };
 
 export async function GET() {
   try {
     const cookieStore = cookies();
     const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
-    
-    // Get the current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    // Get user session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) {
+      console.error('Session error:', sessionError);
+      return NextResponse.json(
+        { status: 'error', message: 'Authentication error' },
+        { status: 401 }
+      );
+    }
+    if (!session) {
+      return NextResponse.json(
+        { status: 'error', message: 'Unauthorized' },
+        { status: 401 }
+      );
     }
 
-    // Get user's 30-day trading volume
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    // Get user profile to determine tier
+    const { data: profile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('kyc_tier, completed_trades')
+      .eq('user_id', session.user.id)
+      .single();
 
-    const { data: trades, error: tradesError } = await supabase
-      .from('trades')
-      .select('amount, price')
-      .eq('user_id', user.id)
-      .gte('created_at', thirtyDaysAgo.toISOString());
-
-    if (tradesError) {
-      console.error('Error fetching trading volume:', tradesError);
-      return NextResponse.json({ error: 'Failed to fetch trading volume' }, { status: 500 });
+    if (profileError) {
+      console.error('Error fetching profile:', profileError);
+      return NextResponse.json(
+        { status: 'error', message: 'Failed to fetch user profile' },
+        { status: 500 }
+      );
     }
 
-    // Calculate total trading volume
-    const tradingVolume = trades?.reduce((total, trade) => {
-      return total + (parseFloat(trade.amount) * parseFloat(trade.price));
-    }, 0) || 0;
+    if (!profile) {
+      return NextResponse.json(
+        { status: 'error', message: 'User profile not found' },
+        { status: 404 }
+      );
+    }
 
-    // Determine user's fee tier
-    let userTier = VOLUME_TIERS.TIER_1;
-    for (const tier of Object.values(VOLUME_TIERS)) {
-      if (tradingVolume >= tier.min && tradingVolume < tier.max) {
-        userTier = tier;
+    // Define fee tiers based on number of completed trades for now
+    // We'll update this to use trading_volume once the column is added
+    const volumeTiers: VolumeTiers = {
+      TIER_1: { min: 0, max: 1000000, fee: 4.0 },        // 0-1M NGN: 4.0%
+      TIER_2: { min: 1000000, max: 5000000, fee: 3.5 },  // 1M-5M NGN: 3.5%
+      TIER_3: { min: 5000000, max: 20000000, fee: 3.0 }, // 5M-20M NGN: 3.0%
+      TIER_4: { min: 20000000, max: 100000000, fee: 2.8 }, // 20M-100M NGN: 2.8%
+      TIER_5: { min: 100000000, max: null, fee: 2.5 }    // 100M+ NGN: 2.5%
+    };
+
+    // Get current tier based on completed trades
+    const completedTrades = profile.completed_trades || 0;
+    let currentTier: keyof VolumeTiers = 'TIER_1';
+    let nextTier: VolumeTier | null = null;
+
+    for (const [tier, config] of Object.entries(volumeTiers)) {
+      if (completedTrades >= config.min && (!config.max || completedTrades < config.max)) {
+        currentTier = tier as keyof VolumeTiers;
+        // Find next tier
+        const tiers = Object.entries(volumeTiers);
+        const currentIndex = tiers.findIndex(([t]) => t === tier);
+        if (currentIndex < tiers.length - 1) {
+          const [nextTierKey, nextTierConfig] = tiers[currentIndex + 1];
+          nextTier = {
+            min: nextTierConfig.min,
+            max: nextTierConfig.max,
+            fee: nextTierConfig.fee
+          };
+        }
         break;
       }
     }
 
-    // Get user's referral status
-    const { data: referral } = await supabase
-      .from('referrals')
-      .select('referral_code, referred_users')
-      .eq('user_id', user.id)
-      .single();
-
-    // Calculate referral discount (0.1% per referral, max 0.5%)
-    const referralDiscount = referral
-      ? Math.min((referral.referred_users?.length || 0) * 0.1, 0.5)
-      : 0;
-
-    // Final fee calculation
-    const finalFee = Math.max(userTier.fee - referralDiscount, BASE_FEES.quidax + 0.1); // Never go below Quidax fee + 0.1%
+    // Define network fees
+    const networkFees = {
+      BTC: 0.0001,
+      ETH: 0.005,
+      USDT: 1
+    };
 
     return NextResponse.json({
       status: 'success',
       data: {
-        base_fees: BASE_FEES,
-        network_fees: NETWORK_FEES,
-        user_tier: {
-          trading_volume: tradingVolume,
-          fee_percentage: finalFee,
-          tier_level: Object.keys(VOLUME_TIERS).find(key => 
-            VOLUME_TIERS[key as keyof typeof VOLUME_TIERS] === userTier
-          ),
-          next_tier: tradingVolume < VOLUME_TIERS.TIER_5.min 
-            ? Object.values(VOLUME_TIERS).find(tier => tier.min > tradingVolume)
-            : null
+        base_fees: {
+          platform: 3.0,  // Combined platform fee
+          total: 3.0
         },
-        referral_discount: referralDiscount,
-        volume_tiers: VOLUME_TIERS
+        network_fees: networkFees,
+        user_tier: {
+          completed_trades: completedTrades,
+          fee_percentage: volumeTiers[currentTier].fee,
+          tier_level: currentTier,
+          next_tier: nextTier
+        },
+        referral_discount: 0.1,
+        volume_tiers: volumeTiers
       }
     });
+
   } catch (error) {
-    console.error('Error in fees config:', error);
+    console.error('Error in fees endpoint:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        status: 'error', 
+        message: 'Failed to fetch fee configuration',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

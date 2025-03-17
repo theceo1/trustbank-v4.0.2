@@ -113,17 +113,29 @@ export async function middleware(request: NextRequest) {
     }
 
     // Check KYC status for trade pages
-    const tradePages = ['/trade', '/trade/spot', '/trade/p2p'];
+    const tradePages = ['/trade', '/trade/spot', '/trade/p2p', '/trade/swap'];
     if (tradePages.some(page => request.nextUrl.pathname.startsWith(page))) {
-      // Check if user has completed at least basic KYC
+      // Get verification history
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('verification_history')
+        .eq('user_id', session.user.id)
+        .single();
+
       const verificationHistory = profile?.verification_history || {};
       const hasBasicKyc = verificationHistory.email && 
                          verificationHistory.phone && 
                          verificationHistory.basic_info;
 
-      if (!hasBasicKyc) {
-        return NextResponse.redirect(new URL('/kyc?redirect=' + request.nextUrl.pathname, request.url));
-      }
+      // Set KYC status in cookies
+      res.cookies.set('x-kyc-status', hasBasicKyc ? 'verified' : 'unverified', {
+        httpOnly: false, // Allow JavaScript access
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/'
+      });
+
+      return res;
     }
 
     // Special handling for admin routes

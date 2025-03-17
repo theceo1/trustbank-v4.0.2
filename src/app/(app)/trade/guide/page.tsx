@@ -100,11 +100,11 @@ const KYC_TIERS = {
 
 // Volume-based fee tiers
 const VOLUME_TIERS = {
-  TIER_1: { min: 0, max: 10000000, fee: 3.0 }, // 0-10M NGN: 3.0%
-  TIER_2: { min: 10000000, max: 50000000, fee: 2.5 }, // 10M-50M NGN: 2.5%
-  TIER_3: { min: 50000000, max: 100000000, fee: 2.0 }, // 50M-100M NGN: 2.0%
-  TIER_4: { min: 100000000, max: 500000000, fee: 1.5 }, // 100M-500M NGN: 1.5%
-  TIER_5: { min: 500000000, max: Infinity, fee: 1.0 }, // 500M+ NGN: 1.0%
+  TIER_1: { min: 0, max: 1000000, fee: 4.0 },        // 0-1M NGN: 4.0%
+  TIER_2: { min: 1000000, max: 5000000, fee: 3.5 },  // 1M-5M NGN: 3.5%
+  TIER_3: { min: 5000000, max: 20000000, fee: 3.0 }, // 5M-20M NGN: 3.0%
+  TIER_4: { min: 20000000, max: 100000000, fee: 2.8 }, // 20M-100M NGN: 2.8%
+  TIER_5: { min: 100000000, max: Infinity, fee: 2.5 }  // 100M+ NGN: 2.5%
 };
 
 export default function TradingGuidePage() {
@@ -244,12 +244,13 @@ export default function TradingGuidePage() {
 
               <Alert className="bg-primary/10 border-primary/20">
                 <ArrowUpDown className="h-4 w-4" />
-                <AlertTitle>Additional Fee Discounts</AlertTitle>
+                <AlertTitle>Additional Fee Information</AlertTitle>
                 <AlertDescription>
                   <ul className="list-disc list-inside mt-2">
                     <li>Get 0.1% fee discount for each successful referral (up to 0.5%)</li>
                     <li>Network fees vary by cryptocurrency and are displayed during trading</li>
-                    <li>No hidden fees or charges</li>
+                    <li>Volume is calculated based on your 30-day trading activity</li>
+                    <li>All fees are transparent and displayed before each trade</li>
                   </ul>
                 </AlertDescription>
               </Alert>

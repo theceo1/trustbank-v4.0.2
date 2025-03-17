@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Info, Loader2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { KYCBanner } from '@/components/trades/KYCBanner';
 import {
   Tabs,
   TabsContent,
@@ -50,6 +51,23 @@ export default function P2PTradingPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedCurrency, setSelectedCurrency] = useState<SupportedCurrency>('BTC');
   const [orderType, setOrderType] = useState<'buy' | 'sell'>('buy');
+  const [hasBasicKyc, setHasBasicKyc] = useState(true);
+
+  useEffect(() => {
+    const checkKyc = async () => {
+      try {
+        const cookies = document.cookie.split(';');
+        const kycCookie = cookies.find(c => c.trim().startsWith('x-kyc-status='));
+        const kycStatus = kycCookie ? kycCookie.split('=')[1] === 'verified' : false;
+        setHasBasicKyc(kycStatus);
+      } catch (error) {
+        console.error('Error checking KYC status:', error);
+        setHasBasicKyc(false);
+      }
+    };
+
+    checkKyc();
+  }, []);
 
   const fetchOrders = async () => {
     try {
@@ -75,10 +93,8 @@ export default function P2PTradingPage() {
   };
 
   useEffect(() => {
-    if (user) {
-      fetchOrders();
-    }
-  }, [selectedCurrency, orderType, user]);
+    fetchOrders();
+  }, [selectedCurrency, orderType]);
 
   if (profileLoading) {
     return (
@@ -88,24 +104,13 @@ export default function P2PTradingPage() {
     );
   }
 
-  if (!user) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Alert>
-          <AlertTitle>Authentication Required</AlertTitle>
-          <AlertDescription>
-            Please <Link href="/login" className="underline">log in</Link> to access P2P trading.
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
+      <KYCBanner />
+      
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">P2P Trading</h1>
-        <Button asChild>
+        <Button asChild disabled={!hasBasicKyc}>
           <Link href="/trade/p2p/create">
             <Plus className="w-4 h-4 mr-2" />
             Create Order
@@ -118,10 +123,10 @@ export default function P2PTradingPage() {
           <Tabs defaultValue="buy" className="space-y-4">
             <div className="flex items-center justify-between">
               <TabsList>
-                <TabsTrigger value="buy" onClick={() => setOrderType('buy')}>
+                <TabsTrigger value="buy" onClick={() => setOrderType('buy')} disabled={!hasBasicKyc}>
                   Buy
                 </TabsTrigger>
-                <TabsTrigger value="sell" onClick={() => setOrderType('sell')}>
+                <TabsTrigger value="sell" onClick={() => setOrderType('sell')} disabled={!hasBasicKyc}>
                   Sell
                 </TabsTrigger>
               </TabsList>
@@ -130,6 +135,7 @@ export default function P2PTradingPage() {
                 className="p-2 rounded-md border"
                 value={selectedCurrency}
                 onChange={(e) => setSelectedCurrency(e.target.value as SupportedCurrency)}
+                disabled={!hasBasicKyc}
               >
                 <option value="BTC">BTC</option>
                 <option value="ETH">ETH</option>
@@ -198,6 +204,24 @@ export default function P2PTradingPage() {
 }
 
 function OrderCard({ order }: { order: P2POrder }) {
+  const [hasBasicKyc, setHasBasicKyc] = useState(true);
+
+  useEffect(() => {
+    const checkKyc = async () => {
+      try {
+        const cookies = document.cookie.split(';');
+        const kycCookie = cookies.find(c => c.trim().startsWith('x-kyc-status='));
+        const kycStatus = kycCookie ? kycCookie.split('=')[1] === 'verified' : false;
+        setHasBasicKyc(kycStatus);
+      } catch (error) {
+        console.error('Error checking KYC status:', error);
+        setHasBasicKyc(false);
+      }
+    };
+
+    checkKyc();
+  }, []);
+
   return (
     <Card>
       <CardContent className="p-4">
@@ -226,7 +250,7 @@ function OrderCard({ order }: { order: P2POrder }) {
             </span>
           ))}
         </div>
-        <Button className="w-full mt-4" asChild>
+        <Button className="w-full mt-4" asChild disabled={!hasBasicKyc}>
           <Link href={`/trade/p2p/orders/${order.id}`}>
             {order.type === 'buy' ? 'Sell' : 'Buy'} {order.currency}
           </Link>

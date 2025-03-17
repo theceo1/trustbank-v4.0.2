@@ -20,6 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { KYCBanner } from '@/components/trades/KYCBanner';
 
 const SUPPORTED_CURRENCIES = [
   { value: 'NGN', label: 'Nigerian Naira (NGN)' },
@@ -65,9 +66,26 @@ export function SwapForm() {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [countdown, setCountdown] = useState(14);
   const [quotation, setQuotation] = useState<any>(null);
+  const [hasBasicKyc, setHasBasicKyc] = useState(true);
   
   const { toast } = useToast();
   const supabase = createClientComponentClient<Database>();
+
+  useEffect(() => {
+    const checkKyc = async () => {
+      try {
+        const cookies = document.cookie.split(';');
+        const kycCookie = cookies.find(c => c.trim().startsWith('x-kyc-status='));
+        const kycStatus = kycCookie ? kycCookie.split('=')[1] === 'verified' : false;
+        setHasBasicKyc(kycStatus);
+      } catch (error) {
+        console.error('Error checking KYC status:', error);
+        setHasBasicKyc(false);
+      }
+    };
+
+    checkKyc();
+  }, []);
 
   useEffect(() => {
     fetchBalances();
@@ -257,13 +275,18 @@ export function SwapForm() {
               value={amount}
               onChange={handleAmountChange}
               className={cn("flex-1", error && "border-red-500")}
+              disabled={!hasBasicKyc}
             />
-            <Select value={fromCurrency} onValueChange={(value) => {
-              setFromCurrency(value);
-              setAmount('');
-              setNgnEquivalent('');
-              setRate(null);
-            }}>
+            <Select 
+              value={fromCurrency} 
+              onValueChange={(value) => {
+                setFromCurrency(value);
+                setAmount('');
+                setNgnEquivalent('');
+                setRate(null);
+              }}
+              disabled={!hasBasicKyc}
+            >
               <SelectTrigger className="w-[140px]">
                 <SelectValue />
               </SelectTrigger>
@@ -294,7 +317,7 @@ export function SwapForm() {
           size="icon"
           onClick={handleSwapCurrencies}
           className="mx-auto"
-          disabled={toCurrency === 'NGN'}
+          disabled={toCurrency === 'NGN' || !hasBasicKyc}
         >
           <ArrowUpDown className="h-4 w-4" />
         </Button>
@@ -309,13 +332,18 @@ export function SwapForm() {
               value={ngnEquivalent}
               readOnly
               className="flex-1"
+              disabled={!hasBasicKyc}
             />
-            <Select value={toCurrency} onValueChange={(value) => {
-              setToCurrency(value);
-              setAmount('');
-              setNgnEquivalent('');
-              setRate(null);
-            }}>
+            <Select 
+              value={toCurrency} 
+              onValueChange={(value) => {
+                setToCurrency(value);
+                setAmount('');
+                setNgnEquivalent('');
+                setRate(null);
+              }}
+              disabled={!hasBasicKyc}
+            >
               <SelectTrigger className="w-[140px]">
                 <SelectValue />
               </SelectTrigger>
@@ -354,7 +382,7 @@ export function SwapForm() {
           className="w-full"
           size="lg"
           onClick={handleProceed}
-          disabled={loading || quoting || !amount || !rate || !!error}
+          disabled={loading || quoting || !amount || !rate || !!error || !hasBasicKyc}
         >
           {loading ? (
             <span className="flex items-center gap-2">

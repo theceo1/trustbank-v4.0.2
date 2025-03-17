@@ -9,6 +9,7 @@ import { motion } from 'framer-motion';
 import PlaceOrder from '@/components/trade/PlaceOrder';
 import OrderBook from '@/components/trade/OrderBook';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { KYCBanner } from '@/components/trades/KYCBanner';
 
 const MARKETS = [
   { value: 'usdtngn', label: 'USDT/NGN', base: 'USDT', quote: 'NGN' },
@@ -23,7 +24,24 @@ export default function SpotTradingPage() {
   const [marketDataLoading, setMarketDataLoading] = useState(true);
   const [lastPrice, setLastPrice] = useState<string | null>(null);
   const [priceChange24h, setPriceChange24h] = useState<string | null>(null);
+  const [hasBasicKyc, setHasBasicKyc] = useState(true);
   const supabase = createClientComponentClient();
+
+  useEffect(() => {
+    const checkKyc = async () => {
+      try {
+        const cookies = document.cookie.split(';');
+        const kycCookie = cookies.find(c => c.trim().startsWith('x-kyc-status='));
+        const kycStatus = kycCookie ? kycCookie.split('=')[1] === 'verified' : false;
+        setHasBasicKyc(kycStatus);
+      } catch (error) {
+        console.error('Error checking KYC status:', error);
+        setHasBasicKyc(false);
+      }
+    };
+
+    checkKyc();
+  }, []);
 
   useEffect(() => {
     const fetchMarketData = async () => {
@@ -59,10 +77,13 @@ export default function SpotTradingPage() {
       transition={{ duration: 0.5 }}
       className="space-y-6"
     >
+      <KYCBanner />
+      
       <div className="flex items-center space-x-4">
         <Select
           value={selectedMarket}
           onValueChange={setSelectedMarket}
+          disabled={!hasBasicKyc}
         >
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Select market" />
@@ -106,6 +127,7 @@ export default function SpotTradingPage() {
               lastPrice={lastPrice || '0'}
               baseAsset={currentMarket?.base || ''}
               quoteAsset={currentMarket?.quote || ''}
+              disabled={!hasBasicKyc}
             />
           </CardContent>
         </Card>

@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowUpDown, Wallet, Clock, TrendingUp, Users, Loader2, Info } from 'lucide-react';
+import { ArrowUpDown, Wallet, Clock, TrendingUp, Users, Loader2, Info, Shield, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/use-toast';
@@ -25,6 +25,7 @@ import {
   validateNumericInput,
   type NumericValue
 } from '@/lib/format';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const SUPPORTED_CURRENCIES = [
   { value: 'USDT', label: 'Tether (USDT)', icon: '💵' },
@@ -110,6 +111,7 @@ export default function TradePage() {
   const [usdRate, setUsdRate] = useState<number>(0);
   const [showRate, setShowRate] = useState(false);
   const [feeConfig, setFeeConfig] = useState<FeeConfig | null>(null);
+  const [hasBasicKyc, setHasBasicKyc] = useState(false);
   
   const { toast } = useToast();
 
@@ -165,6 +167,24 @@ export default function TradePage() {
     };
 
     fetchFeeConfig();
+  }, []);
+
+  useEffect(() => {
+    const checkKyc = async () => {
+      try {
+        const cookies = document.cookie.split(';');
+        const kycCookie = cookies.find(c => c.trim().startsWith('x-kyc-status='));
+        const kycStatus = kycCookie ? kycCookie.split('=')[1] === 'verified' : false;
+        setHasBasicKyc(kycStatus);
+      } catch (error) {
+        console.error('Error checking KYC status:', error);
+        // Default to false if there's an error checking KYC status
+        // This ensures users can't bypass KYC by causing errors
+        setHasBasicKyc(false);
+      }
+    };
+
+    checkKyc();
   }, []);
 
   const fetchUsdRate = async () => {
@@ -424,6 +444,27 @@ export default function TradePage() {
   return (
     <div className="min-h-screen">
       <div className="container mx-auto px-4 py-12 sm:px-6 lg:px-8">
+        {/* Only show KYC banner if not verified */}
+        {!hasBasicKyc && (
+          <Alert className="mb-6 border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20">
+            <AlertTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-yellow-500" />
+              Complete KYC to Start Trading
+            </AlertTitle>
+            <AlertDescription className="mt-2">
+              <p className="mb-2">
+                To ensure the security of our platform and comply with regulations, you need to complete basic KYC verification before trading.
+              </p>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/kyc" className="inline-flex items-center">
+                  Complete Verification
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Link>
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Quick Trade Form */}
         <Card className="max-w-xl mx-auto bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-xl">
           <CardHeader>
@@ -432,8 +473,8 @@ export default function TradePage() {
           <CardContent>
             <Tabs value={tab} onValueChange={setTab} className="w-full">
               <TabsList className="grid w-full grid-cols-2 mb-8">
-                <TabsTrigger value="buy" className="text-lg">Buy Crypto</TabsTrigger>
-                <TabsTrigger value="sell" className="text-lg">Sell Crypto</TabsTrigger>
+                <TabsTrigger value="buy" className="text-lg" disabled={!hasBasicKyc}>Buy Crypto</TabsTrigger>
+                <TabsTrigger value="sell" className="text-lg" disabled={!hasBasicKyc}>Sell Crypto</TabsTrigger>
               </TabsList>
 
               <div className="space-y-6">
@@ -442,11 +483,15 @@ export default function TradePage() {
                   <label className="text-sm font-medium text-gray-900 dark:text-gray-100">
                     {tab === 'buy' ? 'Select Asset to Buy' : 'Select Asset to Sell'}
                   </label>
-                  <Select value={selectedCrypto} onValueChange={(value) => {
-                    setSelectedCrypto(value);
-                    setShowRate(false);
-                    setQuotation(null);
-                  }}>
+                  <Select 
+                    value={selectedCrypto} 
+                    onValueChange={(value) => {
+                      setSelectedCrypto(value);
+                      setShowRate(false);
+                      setQuotation(null);
+                    }}
+                    disabled={!hasBasicKyc}
+                  >
                     <SelectTrigger className="w-full bg-white dark:bg-gray-800">
                       <SelectValue />
                     </SelectTrigger>
@@ -470,7 +515,7 @@ export default function TradePage() {
                   <label className="text-sm font-medium text-gray-900 dark:text-gray-100">
                     {tab === 'buy' ? 'Choose Payment Method' : 'Receive Payment in'}
                   </label>
-                  <Select value={inputCurrency} onValueChange={setInputCurrency}>
+                  <Select value={inputCurrency} onValueChange={setInputCurrency} disabled={!hasBasicKyc}>
                     <SelectTrigger className="w-full bg-white dark:bg-gray-800">
                       <SelectValue />
                     </SelectTrigger>
@@ -499,12 +544,14 @@ export default function TradePage() {
                       onChange={(e) => handleAmountChange(e.target.value)}
                       className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary/50"
                       placeholder="0.00"
+                      disabled={!hasBasicKyc}
                     />
                     <Button
                       variant="ghost"
                       size="sm"
                       className="absolute right-2 top-1/2 -translate-y-1/2 text-primary hover:text-primary/80"
                       onClick={handleMaxAmount}
+                      disabled={!hasBasicKyc}
                     >
                       Max
                     </Button>
@@ -519,7 +566,7 @@ export default function TradePage() {
                   className="w-full bg-primary hover:bg-primary/90"
                   size="lg"
                   onClick={showRate ? () => setShowConfirmation(true) : handleProceed}
-                  disabled={loading || quoting || !amount}
+                  disabled={loading || quoting || !amount || !hasBasicKyc}
                 >
                   {quoting ? (
                     <span className="flex items-center gap-2">

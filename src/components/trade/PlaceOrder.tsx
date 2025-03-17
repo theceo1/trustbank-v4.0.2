@@ -35,6 +35,7 @@ interface PlaceOrderProps {
   lastPrice?: string;
   baseAsset: string;
   quoteAsset: string;
+  disabled?: boolean;
 }
 
 interface SwapQuotation {
@@ -47,7 +48,7 @@ interface SwapQuotation {
   expires_at: string;
 }
 
-export default function PlaceOrder({ market, lastPrice, baseAsset, quoteAsset }: PlaceOrderProps) {
+export default function PlaceOrder({ market, lastPrice, baseAsset, quoteAsset, disabled }: PlaceOrderProps) {
   const [orderType, setOrderType] = useState('market');
   const [side, setSide] = useState('buy');
   const [wallets, setWallets] = useState<Wallet[]>([]);
@@ -203,8 +204,8 @@ export default function PlaceOrder({ market, lastPrice, baseAsset, quoteAsset }:
     <Card className="p-4">
       <Tabs value={orderType} onValueChange={setOrderType} className="space-y-4">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="market">Market</TabsTrigger>
-          <TabsTrigger value="limit">Limit</TabsTrigger>
+          <TabsTrigger value="market" disabled={disabled}>Market</TabsTrigger>
+          <TabsTrigger value="limit" disabled={disabled}>Limit</TabsTrigger>
         </TabsList>
 
         <div className="bg-muted/50 rounded-lg p-3 mb-4">
@@ -226,6 +227,7 @@ export default function PlaceOrder({ market, lastPrice, baseAsset, quoteAsset }:
             variant={side === 'buy' ? 'default' : 'outline'}
             onClick={() => setSide('buy')}
             className="w-full"
+            disabled={disabled}
           >
             Buy
           </Button>
@@ -233,6 +235,7 @@ export default function PlaceOrder({ market, lastPrice, baseAsset, quoteAsset }:
             variant={side === 'sell' ? 'default' : 'outline'}
             onClick={() => setSide('sell')}
             className="w-full"
+            disabled={disabled}
           >
             Sell
           </Button>
@@ -281,6 +284,7 @@ export default function PlaceOrder({ market, lastPrice, baseAsset, quoteAsset }:
                   placeholder="0.00" 
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
+                  disabled={disabled}
                 />
               </div>
             </div>
@@ -294,11 +298,13 @@ export default function PlaceOrder({ market, lastPrice, baseAsset, quoteAsset }:
                 placeholder="0.00"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
+                disabled={disabled}
               />
               <Button 
                 variant="outline" 
                 onClick={handleMaxAmount}
                 className="whitespace-nowrap"
+                disabled={disabled}
               >
                 Max
               </Button>
@@ -320,7 +326,7 @@ export default function PlaceOrder({ market, lastPrice, baseAsset, quoteAsset }:
             className="w-full" 
             variant={side === 'buy' ? 'default' : 'destructive'}
             onClick={handleTrade}
-            disabled={!amount || (orderType === 'limit' && !price) || loading || swapLoading}
+            disabled={!amount || (orderType === 'limit' && !price) || loading || swapLoading || disabled}
           >
             {swapLoading ? 'Processing...' : side === 'buy' ? `Buy ${baseAsset}` : `Sell ${baseAsset}`}
           </Button>

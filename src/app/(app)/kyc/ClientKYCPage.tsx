@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -25,6 +25,18 @@ import {
 import { cn } from '@/lib/utils';
 import { LucideIcon } from 'lucide-react';
 import React from 'react';
+
+const VERIFICATION_TYPE_MAP: Record<string, string> = {
+  'Email Verification': 'email',
+  'Phone Number Verification': 'phone',
+  'Basic Personal Information': 'basic_info',
+  'NIN Verification': 'nin',
+  'BVN Verification': 'bvn',
+  'LiveCheck Verification': 'livecheck',
+  'Government-issued ID': 'government_id',
+  'International Passport': 'passport',
+  'Selfie Verification': 'selfie'
+};
 
 interface KYCTierConfig {
   name: string;
@@ -105,19 +117,6 @@ const KYC_TIERS: Record<string, KYCTierConfig> = {
   },
 };
 
-// Add this mapping at the top of the file
-const VERIFICATION_TYPE_MAP: Record<string, string> = {
-  'Email Verification': 'email',
-  'Phone Number Verification': 'phone',
-  'Basic Personal Information': 'basic_info',
-  'NIN Verification': 'nin',
-  'BVN Verification': 'bvn',
-  'LiveCheck Verification': 'livecheck',
-  'Government-issued ID': 'government_id',
-  'International Passport': 'passport',
-  'Selfie Verification': 'selfie'
-};
-
 interface VerificationStatus {
   email: boolean;
   phone: boolean;
@@ -128,6 +127,11 @@ interface VerificationStatus {
   government_id: boolean;
   passport: boolean;
   selfie: boolean;
+}
+
+// Add new interface for tracking pending verifications
+interface PendingVerifications {
+  [key: string]: boolean;
 }
 
 interface TierProgress {
@@ -228,13 +232,8 @@ export default function ClientKYCPage({ initialProfile }: ClientKYCPageProps) {
     selfie: false,
   };
 
-  // Initialize with verification history, ensuring all required fields exist
-  const initialStatus = {
-    ...defaultStatus,
-    ...(initialProfile?.verification_history || {})
-  };
-
-  const [verificationStatus, setVerificationStatus] = useState<VerificationStatus>(initialStatus);
+  const [verificationStatus, setVerificationStatus] = useState<VerificationStatus>(defaultStatus);
+  const [pendingVerifications, setPendingVerifications] = useState<PendingVerifications>({});
   const [isLoading, setIsLoading] = useState(false);
   const [verificationModal, setVerificationModal] = useState<{
     isOpen: boolean;
@@ -242,37 +241,216 @@ export default function ClientKYCPage({ initialProfile }: ClientKYCPageProps) {
     requestId: string;
   }>({ isOpen: false, type: 'email', requestId: '' });
   const [tierProgress, setTierProgress] = useState<Record<string, TierProgress>>({});
-  const [processedToasts, setProcessedToasts] = useState<Set<string>>(new Set());
+  
+  // Replace processedToasts state with ref
+  const processedToastsRef = useRef<Set<string>>(new Set());
+  const previousStatusRef = useRef<VerificationStatus>(defaultStatus);
   
   const supabase = createClientComponentClient();
   const { toast } = useToast();
 
-  useEffect(() => {
-    // Initial fetch
-    fetchUserStatus();
+  // Add logging function
+  const logDebug = (message: string, data?: any) => {
+    console.log(`[KYC Debug] ${message}`, data || '');
+  };
 
-    // Set up polling with a cleanup
+  // Add function to check if verification is newly completed
+  const isNewlyVerified = (type: string, newStatus: VerificationStatus) => {
+    return (
+      newStatus[type as keyof VerificationStatus] && // Is verified in new status
+      !previousStatusRef.current[type as keyof VerificationStatus] && // Wasn't verified in previous status
+      !processedToastsRef.current.has(type) // Haven't shown toast yet
+    );
+  };
+
+  // Add function to handle verification status updates
+  const updateVerificationStatus = (newStatus: VerificationStatus) => {
+    logDebug('Updating verification status', newStatus);
+    logDebug('Previous status', previousStatusRef.current);
+    logDebug('Processed toasts', Array.from(processedToastsRef.current));
+    
+    // Get the differences between current and new status
+    const newlyVerified = Object.entries(newStatus).filter(
+      ([key, isVerified]) => isVerified && isNewlyVerified(key, newStatus)
+    );
+
+    // Show toasts only for newly verified items
+    newlyVerified.forEach(([type]) => {
+      logDebug(`Showing toast for newly verified: ${type}`);
+      toast({
+        title: "Verification Complete",
+        description: `Your ${type.replace(/_/g, ' ')} has been approved!`,
+        duration: 5000,
+      });
+      // Add to processed toasts ref
+      processedToastsRef.current.add(type);
+    });
+
+    // Update verification status and previous status ref
+    setVerificationStatus(newStatus);
+    previousStatusRef.current = newStatus;
+  };
+
+  useEffect(() => {
+    const initializeVerificationStatus = async () => {
+      try {
+        logDebug('Initializing verification status');
+        
+        // Get user session to access metadata
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          logDebug('No user found');
+          return;
+        }
+
+        logDebug('User metadata:', user.user_metadata);
+
+        // Get profile data
+        const { data: profile, error: profileError } = await supabase
+          .from('user_profiles')
+          .select('kyc_tier, verification_history')
+          .eq('user_id', user.id)
+          .single();
+
+        if (profileError) {
+          logDebug('Error fetching profile:', profileError);
+        }
+
+        logDebug('Profile data:', profile);
+
+        const userMetadata = user.user_metadata;
+        const verificationHistory = profile?.verification_history || {};
+        
+        logDebug('Current verification history:', verificationHistory);
+        
+        // Create initial status combining profile history and user metadata
+        const combinedStatus = {
+          ...defaultStatus,
+          ...verificationHistory,
+          // Set email and phone verification from user metadata
+          email: userMetadata?.email_verified || false,
+          phone: userMetadata?.phone_verified || false,
+          // If NIN exists in metadata, mark it as verified
+          nin: userMetadata?.nin ? true : false,
+          // Set basic info as verified if we have first_name and last_name
+          basic_info: !!(userMetadata?.first_name && userMetadata?.last_name)
+        };
+
+        logDebug('Combined verification status:', combinedStatus);
+
+        // Update verification history in database if it's empty or different
+        if (!profile?.verification_history || JSON.stringify(profile.verification_history) !== JSON.stringify(combinedStatus)) {
+          logDebug('Updating verification history in database');
+          const { error: updateError } = await supabase
+            .from('user_profiles')
+            .update({
+              verification_history: combinedStatus
+            })
+            .eq('user_id', user.id);
+
+          if (updateError) {
+            logDebug('Error updating verification history:', updateError);
+          }
+        }
+
+        // Initialize verification status and refs without showing toasts
+        setVerificationStatus(combinedStatus);
+        previousStatusRef.current = combinedStatus;
+        
+        // Initialize processed toasts ref with verified items
+        Object.entries(combinedStatus)
+          .filter(([_, isVerified]) => isVerified)
+          .forEach(([type]) => processedToastsRef.current.add(type));
+        
+        // Calculate initial progress
+        const progress = calculateTierProgress(combinedStatus);
+        setTierProgress(progress);
+
+      } catch (error) {
+        logDebug('Error in initialization:', error);
+      }
+    };
+
+    initializeVerificationStatus();
+  }, []);
+
+  useEffect(() => {
+    // Set up polling for updates
     const interval = setInterval(fetchUserStatus, 10000);
     return () => clearInterval(interval);
   }, []);
+
+  const fetchUserStatus = async () => {
+    try {
+      logDebug('Fetching user status');
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Get both profile and user data
+      const [{ data: profile }, { data: { user: updatedUser } }] = await Promise.all([
+        supabase
+          .from('user_profiles')
+          .select('kyc_tier, verification_history')
+          .eq('user_id', user.id)
+          .single(),
+        supabase.auth.getUser()
+      ]);
+
+      logDebug('Profile data from fetch:', profile);
+      logDebug('Updated user data:', updatedUser?.user_metadata);
+
+      if (profile?.verification_history || updatedUser?.user_metadata) {
+        const userMetadata = updatedUser?.user_metadata;
+        const newVerificationHistory = profile?.verification_history || {};
+        
+        // Combine profile history with user metadata
+        const combinedStatus = {
+          ...verificationStatus,
+          ...newVerificationHistory,
+          email: userMetadata?.email_verified || false,
+          phone: userMetadata?.phone_verified || false,
+          nin: userMetadata?.nin ? true : false,
+          basic_info: !!(userMetadata?.first_name && userMetadata?.last_name)
+        };
+
+        logDebug('Combined status from fetch:', combinedStatus);
+        
+        // Update verification status using the new handler
+        updateVerificationStatus(combinedStatus);
+
+        if (profile?.kyc_tier) {
+          setCurrentTier(profile.kyc_tier);
+        }
+        
+        // Calculate progress
+        const progress = calculateTierProgress(combinedStatus);
+        setTierProgress(progress);
+      }
+    } catch (error) {
+      logDebug('Error fetching user status:', error);
+    }
+  };
 
   const calculateTierProgress = (verificationStatus: VerificationStatus) => {
     const progress: Record<string, TierProgress> = {};
     
     Object.entries(KYC_TIERS).forEach(([tier, details]) => {
       const requirements = details.requirements;
-      const completed = requirements.filter(req => 
-        verificationStatus[req.toLowerCase().replace(/ /g, '_') as keyof VerificationStatus]
-      ).length;
+      const completed = requirements.filter(req => {
+        const reqKey = VERIFICATION_TYPE_MAP[req];
+        return verificationStatus[reqKey as keyof VerificationStatus];
+      }).length;
       
-      const remaining = requirements.filter(req => 
-        !verificationStatus[req.toLowerCase().replace(/ /g, '_') as keyof VerificationStatus]
-      );
+      const remaining = requirements.filter(req => {
+        const reqKey = VERIFICATION_TYPE_MAP[req];
+        return !verificationStatus[reqKey as keyof VerificationStatus];
+      });
 
       progress[tier] = {
         completed,
         total: requirements.length,
-        percentage: (completed / requirements.length) * 100,
+        percentage: Math.round((completed / requirements.length) * 100),
         remainingRequirements: remaining
       };
     });
@@ -280,45 +458,20 @@ export default function ClientKYCPage({ initialProfile }: ClientKYCPageProps) {
     return progress;
   };
 
-  const fetchUserStatus = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('kyc_tier, verification_history')
-        .eq('user_id', user.id)
-        .single();
-
-      if (profile?.verification_history) {
-        const newVerificationHistory = profile.verification_history;
-        
-        // Check for newly completed verifications
-        Object.entries(newVerificationHistory).forEach(([type, isVerified]) => {
-          if (isVerified && 
-              !verificationStatus[type as keyof VerificationStatus] && 
-              !processedToasts.has(type)) {
-            toast({
-              title: "Verification Complete",
-              description: `Your ${type.replace(/_/g, ' ')} has been approved!`,
-              duration: 5000,
-            });
-            setProcessedToasts(prev => new Set([...prev, type]));
-          }
-        });
-
-        // Update verification status
-        setVerificationStatus(newVerificationHistory);
-        setCurrentTier(profile.kyc_tier);
-        
-        // Calculate progress
-        const progress = calculateTierProgress(newVerificationHistory);
-        setTierProgress(progress);
-      }
-    } catch (error) {
-      console.error('Error fetching verification status:', error);
-    }
+  // Add function to check if previous tier is completed
+  const isPreviousTierCompleted = (currentTier: string) => {
+    const tiers = Object.keys(KYC_TIERS);
+    const currentIndex = tiers.indexOf(currentTier);
+    
+    // If we're at TIER_1 or invalid tier, return true
+    if (currentIndex <= 0) return true;
+    
+    // Get previous tier
+    const previousTier = tiers[currentIndex - 1];
+    const previousTierProgress = tierProgress[previousTier];
+    
+    // Return true if previous tier is 100% complete
+    return previousTierProgress?.percentage === 100;
   };
 
   const startVerification = async (type: string) => {
@@ -335,13 +488,27 @@ export default function ClientKYCPage({ initialProfile }: ClientKYCPageProps) {
 
       if (!profile) throw new Error('Profile not found');
 
-      // Map the display type to the database type
-      const verificationType = VERIFICATION_TYPE_MAP[type] || type.toLowerCase();
-
-      // Validate verification type
-      if (!isValidVerificationType(verificationType)) {
-        throw new Error('Invalid verification type');
+      // Check if previous tier is completed
+      if (!isPreviousTierCompleted(profile.kyc_tier)) {
+        toast({
+          title: "Verification Error",
+          description: "Please complete previous tier requirements first.",
+          variant: "destructive",
+        });
+        return;
       }
+
+      // Map the display type to the database type using VERIFICATION_TYPE_MAP
+      const verificationType = VERIFICATION_TYPE_MAP[type];
+      if (!verificationType) {
+        throw new Error(`Invalid verification type: ${type}`);
+      }
+
+      // Set pending status
+      setPendingVerifications(prev => ({
+        ...prev,
+        [verificationType]: true
+      }));
 
       // Create verification request
       const { data: request, error } = await supabase
@@ -357,10 +524,14 @@ export default function ClientKYCPage({ initialProfile }: ClientKYCPageProps) {
             display_type: type
           }
         })
-        .select()
+        .select('*')
         .single();
 
       if (error) throw error;
+
+      if (!request?.id) {
+        throw new Error('Failed to create verification request');
+      }
 
       // Show verification modal
       setVerificationModal({
@@ -370,6 +541,14 @@ export default function ClientKYCPage({ initialProfile }: ClientKYCPageProps) {
       });
     } catch (error) {
       console.error('Error starting verification:', error);
+      // Reset pending status on error
+      const verificationType = VERIFICATION_TYPE_MAP[type];
+      if (verificationType) {
+        setPendingVerifications(prev => ({
+          ...prev,
+          [verificationType]: false
+        }));
+      }
       toast({
         title: "Verification Error",
         description: "Failed to start verification process. Please try again.",
@@ -378,36 +557,78 @@ export default function ClientKYCPage({ initialProfile }: ClientKYCPageProps) {
     }
   };
 
+  // Add function to check if requirement is available
+  const isRequirementAvailable = (requirement: string, tier: string) => {
+    // If it's already verified, it's not available
+    const reqKey = VERIFICATION_TYPE_MAP[requirement];
+    if (verificationStatus[reqKey as keyof VerificationStatus]) {
+      return false;
+    }
+
+    // If previous tier is not completed, it's not available
+    if (!isPreviousTierCompleted(tier)) {
+      return false;
+    }
+
+    return true;
+  };
+
   // Add type guard function
   function isValidVerificationType(type: string): type is VerificationType {
     return ['email', 'phone', 'basic_info', 'nin', 'bvn', 'livecheck', 'government_id', 'passport', 'selfie'].includes(type);
   }
 
-  const getVerificationStatus = (requirement: string) => {
-    const status = verificationStatus[requirement as keyof VerificationStatus];
-    return status || false;
-  };
-
   const renderStatusIcon = (requirement: string) => {
-    const isVerified = verificationStatus[requirement.toLowerCase().replace(/ /g, '_') as keyof VerificationStatus];
+    // Convert requirement to the correct key format using VERIFICATION_TYPE_MAP
+    const reqKey = VERIFICATION_TYPE_MAP[requirement] as keyof VerificationStatus;
+    const isVerified = verificationStatus[reqKey];
+    const isPending = pendingVerifications[reqKey];
     
-    return isVerified ? (
-      <motion.div
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        className="text-green-600"
-      >
-        <CheckCircle2 className="h-5 w-5" />
-      </motion.div>
-    ) : (
+    logDebug(`Rendering status for ${requirement}:`, {
+      key: reqKey,
+      isVerified,
+      isPending,
+      verificationStatus: verificationStatus[reqKey]
+    });
+
+    if (isVerified) {
+      return (
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          className="text-green-600"
+        >
+          <CheckCircle2 className="h-5 w-5" />
+        </motion.div>
+      );
+    }
+    
+    if (isPending) {
+      return (
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          className="text-yellow-600"
+        >
+          <Clock className="h-5 w-5" />
+        </motion.div>
+      );
+    }
+    
+    return (
       <motion.div
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
         className="text-gray-400"
       >
-        <Clock className="h-5 w-5" />
+        <XCircle className="h-5 w-5" />
       </motion.div>
     );
+  };
+
+  const getVerificationStatus = (requirement: string) => {
+    const reqKey = VERIFICATION_TYPE_MAP[requirement] as keyof VerificationStatus;
+    return verificationStatus[reqKey] || false;
   };
 
   return (
@@ -495,7 +716,7 @@ export default function ClientKYCPage({ initialProfile }: ClientKYCPageProps) {
                                 </TooltipContent>
                               </Tooltip>
                             </TooltipProvider>
-                            {!verificationStatus[req as keyof VerificationStatus] && (
+                            {!getVerificationStatus(req) && (
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -503,8 +724,11 @@ export default function ClientKYCPage({ initialProfile }: ClientKYCPageProps) {
                                 className={cn(
                                   "ml-auto transition-all duration-200 hover:scale-[1.01]",
                                   "dark:text-white dark:hover:text-green-600 dark:bg-green-600/20 dark:hover:bg-green-600/30 dark:border-green-600/20 dark:hover:border-green-600/30",
-                                  "text-black hover:text-green-600 bg-transparent hover:bg-green-600/10 border-black/20 hover:border-green-600/20"
+                                  "text-black hover:text-green-600 bg-transparent hover:bg-green-600/10 border-black/20 hover:border-green-600/20",
+                                  !isRequirementAvailable(req, tier) && "opacity-50 cursor-not-allowed"
                                 )}
+                                disabled={!isRequirementAvailable(req, tier)}
+                                title={!isPreviousTierCompleted(tier) ? "Complete previous tier first" : ""}
                               >
                                 Verify
                               </Button>
