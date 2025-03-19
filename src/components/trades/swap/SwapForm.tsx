@@ -53,7 +53,11 @@ interface SwapQuotation {
   expires_at: string;
 }
 
-export function SwapForm() {
+interface SwapFormProps {
+  disabled?: boolean;
+}
+
+export function SwapForm({ disabled }: SwapFormProps) {
   const [amount, setAmount] = useState('');
   const [ngnEquivalent, setNgnEquivalent] = useState('');
   const [fromCurrency, setFromCurrency] = useState('BTC');
@@ -66,26 +70,9 @@ export function SwapForm() {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [countdown, setCountdown] = useState(14);
   const [quotation, setQuotation] = useState<any>(null);
-  const [hasBasicKyc, setHasBasicKyc] = useState(true);
   
   const { toast } = useToast();
   const supabase = createClientComponentClient<Database>();
-
-  useEffect(() => {
-    const checkKyc = async () => {
-      try {
-        const cookies = document.cookie.split(';');
-        const kycCookie = cookies.find(c => c.trim().startsWith('x-kyc-status='));
-        const kycStatus = kycCookie ? kycCookie.split('=')[1] === 'verified' : false;
-        setHasBasicKyc(kycStatus);
-      } catch (error) {
-        console.error('Error checking KYC status:', error);
-        setHasBasicKyc(false);
-      }
-    };
-
-    checkKyc();
-  }, []);
 
   useEffect(() => {
     fetchBalances();
@@ -135,7 +122,7 @@ export function SwapForm() {
     
     try {
       setQuoting(true);
-      const response = await fetch('/api/swap/quotation', {
+      const response = await fetch('/api/swap/quote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -170,9 +157,12 @@ export function SwapForm() {
     
     try {
       setLoading(true);
-      const response = await fetch(`/api/swap/quotation/${quotation.id}/confirm`, {
+      const response = await fetch(`/api/swap/confirm`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          quotation_id: quotation.id
+        })
       });
 
       if (!response.ok) throw new Error('Failed to confirm swap');
@@ -275,7 +265,7 @@ export function SwapForm() {
               value={amount}
               onChange={handleAmountChange}
               className={cn("flex-1", error && "border-red-500")}
-              disabled={!hasBasicKyc}
+              disabled={disabled}
             />
             <Select 
               value={fromCurrency} 
@@ -285,7 +275,7 @@ export function SwapForm() {
                 setNgnEquivalent('');
                 setRate(null);
               }}
-              disabled={!hasBasicKyc}
+              disabled={disabled}
             >
               <SelectTrigger className="w-[140px]">
                 <SelectValue />
@@ -317,7 +307,7 @@ export function SwapForm() {
           size="icon"
           onClick={handleSwapCurrencies}
           className="mx-auto"
-          disabled={toCurrency === 'NGN' || !hasBasicKyc}
+          disabled={toCurrency === 'NGN' || disabled}
         >
           <ArrowUpDown className="h-4 w-4" />
         </Button>
@@ -332,7 +322,7 @@ export function SwapForm() {
               value={ngnEquivalent}
               readOnly
               className="flex-1"
-              disabled={!hasBasicKyc}
+              disabled={disabled}
             />
             <Select 
               value={toCurrency} 
@@ -342,7 +332,7 @@ export function SwapForm() {
                 setNgnEquivalent('');
                 setRate(null);
               }}
-              disabled={!hasBasicKyc}
+              disabled={disabled}
             >
               <SelectTrigger className="w-[140px]">
                 <SelectValue />
@@ -382,7 +372,7 @@ export function SwapForm() {
           className="w-full"
           size="lg"
           onClick={handleProceed}
-          disabled={loading || quoting || !amount || !rate || !!error || !hasBasicKyc}
+          disabled={loading || quoting || !amount || !rate || !!error || disabled}
         >
           {loading ? (
             <span className="flex items-center gap-2">

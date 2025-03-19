@@ -101,29 +101,77 @@ export interface Database {
           tier3_data?: Json | null
         }
       }
+      p2p_orders: {
+        Row: {
+          id: string
+          creator_id: string
+          type: 'buy' | 'sell'
+          currency: string
+          price: string
+          amount: string
+          min_order: string
+          max_order: string
+          payment_methods: string[]
+          terms: string
+          status: 'active' | 'completed' | 'cancelled'
+          created_at: string
+          completed_trades: number
+          completion_rate: number
+          creator: {
+            name: string
+            completed_trades: number
+            completion_rate: number
+          }
+        }
+        Insert: {
+          id?: string
+          creator_id: string
+          type: 'buy' | 'sell'
+          currency: string
+          price: string
+          amount: string
+          min_order: string
+          max_order: string
+          payment_methods: string[]
+          terms: string
+          status?: 'active' | 'completed' | 'cancelled'
+          created_at?: string
+          completed_trades?: number
+          completion_rate?: number
+        }
+        Update: {
+          id?: string
+          creator_id?: string
+          type?: 'buy' | 'sell'
+          currency?: string
+          price?: string
+          amount?: string
+          min_order?: string
+          max_order?: string
+          payment_methods?: string[]
+          terms?: string
+          status?: 'active' | 'completed' | 'cancelled'
+          created_at?: string
+          completed_trades?: number
+          completion_rate?: number
+        }
+      }
     }
   }
 }
 
-// Client-side Supabase instance with proper cookie handling
+// Initialize the Supabase client
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase environment variables');
+}
+
 export const supabase = createClientComponentClient<Database>({
-  options: {
-    global: {
-      headers: {
-        'x-my-custom-header': 'trustBank'
-      }
-    }
-  }
+  supabaseUrl,
+  supabaseKey: supabaseAnonKey
 });
 
-// Server-side Supabase instance
-export const supabaseAdmin = createClient<Database>(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  }
-); 
+// Remove server-side initialization as it should be in a separate file
+// for server components only 

@@ -1,155 +1,134 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/app/contexts/AuthContext';
-import { useProfile } from '@/app/hooks/useProfile';
+import { useToast } from "@/components/ui/use-toast";
+import { Loader2 } from "lucide-react";
+import type { Database } from '@/types/database';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Info, Loader2 } from 'lucide-react';
+import { Info } from 'lucide-react';
 import Link from 'next/link';
 import { type P2POrder } from '@/lib/types';
-import { useSupabase } from '@/lib/providers/supabase-provider';
 
 interface P2POrderDetailsProps {
   orderId: string;
 }
 
-export function P2POrderDetails({ orderId }: P2POrderDetailsProps) {
-  const { user } = useAuth();
-  const router = useRouter();
-  const { profile, loading: profileLoading } = useProfile();
-  const { supabase } = useSupabase();
+export default function P2POrderDetails({ orderId }: P2POrderDetailsProps) {
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
   const [order, setOrder] = useState<P2POrder | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const supabase = createClientComponentClient<Database>();
+  const router = useRouter();
+  const { toast } = useToast();
   const [amount, setAmount] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    const fetchOrder = async () => {
+    const getUser = async () => {
       try {
-        if (!user || profileLoading) {
-          return;
-        }
-
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.access_token) {
-          return;
-        }
-
-        setIsLoading(true);
-        setError(null);
-
-        const response = await fetch(`/api/trades/p2p/orders/${orderId}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-          },
-          credentials: 'include'
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch order');
-        }
-
-        const data = await response.json();
-        if (data.status !== 'success') {
-          throw new Error(data.message || 'Failed to fetch order');
-        }
-        setOrder(data.data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch order');
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        setUser(currentUser);
+      } catch (error) {
+        console.error('Error getting user:', error);
+        setError(error instanceof Error ? error.message : 'Failed to get user');
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
 
-    fetchOrder();
-  }, [orderId, user, profileLoading, supabase]);
+    getUser();
+  }, [supabase.auth]);
 
-  const handleSubmit = async () => {
+  useEffect(() => {
+    const fetchOrder = async () => {
+      if (!user) return;
+
+      try {
+        const { data, error: supabaseError } = await supabase
+          .from('p2p_orders')
+          .select('*')
+          .eq('id', orderId)
+          .single();
+
+        if (supabaseError) throw supabaseError;
+        setOrder(data);
+        setError(null);
+      } catch (error) {
+        console.error('Error fetching order:', error);
+        setError(error instanceof Error ? error.message : 'Failed to fetch order');
+        toast({
+          title: "Error",
+          description: "Failed to fetch order details. Please try again.",
+          variant: "destructive"
+        });
+      }
+    };
+
+    if (user) {
+      fetchOrder();
+    }
+  }, [user, orderId, supabase, toast]);
+
+  const handleSubmit = async (method: 'accept' | 'reject') => {
+    if (!user || !order) return;
+
     try {
       setIsSubmitting(true);
       setError(null);
 
-      if (!amount) {
-        throw new Error('Please enter an amount');
-      }
+      const { data, error: supabaseError } = await supabase
+        .from('p2p_orders')
+        .update({ status: method === 'accept' ? 'accepted' : 'rejected' })
+        .eq('id', orderId)
+        .select()
+        .single();
 
-      const numAmount = parseFloat(amount);
-      if (isNaN(numAmount)) {
-        throw new Error('Invalid amount');
-      }
+      if (supabaseError) throw supabaseError;
+      setOrder(data);
 
-      if (order) {
-        const minOrder = parseFloat(order.min_order);
-        const maxOrder = parseFloat(order.max_order);
-        if (numAmount < minOrder || numAmount > maxOrder) {
-          throw new Error(`Amount must be between ${minOrder} and ${maxOrder}`);
-        }
-      }
-
-      const response = await fetch(`/api/trades/p2p/orders/${orderId}/trade`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          amount: numAmount,
-        }),
+      toast({
+        title: "Success",
+        description: `Order ${method === 'accept' ? 'accepted' : 'rejected'} successfully.`,
       });
-
-      const data = await response.json();
-
-      if (data.status === 'success') {
-        router.push(`/trade/p2p/trades/${data.data.id}`);
-      } else {
-        throw new Error(data.message || 'Failed to create trade');
-      }
     } catch (error) {
-      console.error('Failed to create P2P trade:', error);
-      setError(error instanceof Error ? error.message : 'Failed to create trade');
+      console.error('Error updating order:', error);
+      setError(error instanceof Error ? error.message : 'Failed to update order');
+      toast({
+        title: "Error",
+        description: "Failed to update order. Please try again.",
+        variant: "destructive"
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-[200px]">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
   if (!user) {
+    router.push('/auth/login');
+    return null;
+  }
+
+  if (error) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="text-center py-8">
         <Alert variant="destructive">
-          <Info className="h-4 w-4" />
-          <AlertTitle>Authentication Required</AlertTitle>
-          <AlertDescription>
-            Please <Link href="/auth/login" className="text-green-600 hover:text-green-700 underline">log in</Link> to access trading features.
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
-
-  if (profileLoading || isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-green-600" />
-      </div>
-    );
-  }
-
-  if (!profile?.kyc_verified) {
-    return (
-      <div className="container mx-auto p-6">
-        <Alert variant="default" className="border-green-600/20 bg-green-50 dark:bg-green-900/10">
-          <Info className="h-4 w-4 text-green-600" />
-          <AlertTitle className="text-green-700 dark:text-green-300">Verification Required</AlertTitle>
-          <AlertDescription className="text-green-600 dark:text-green-400">
-            Please complete your KYC verification to start trading. <Link href="/kyc" className="underline">Click here to verify</Link>
-          </AlertDescription>
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
       </div>
     );
@@ -157,10 +136,8 @@ export function P2POrderDetails({ orderId }: P2POrderDetailsProps) {
 
   if (!order) {
     return (
-      <div className="container mx-auto p-6">
-        <Alert variant="destructive">
-          <AlertDescription>Order not found</AlertDescription>
-        </Alert>
+      <div className="text-center py-8">
+        <p>Order not found or you don't have permission to view it.</p>
       </div>
     );
   }
@@ -233,11 +210,20 @@ export function P2POrderDetails({ orderId }: P2POrderDetailsProps) {
 
           <Button
             className="w-full"
-            onClick={handleSubmit}
+            onClick={() => handleSubmit('accept')}
             disabled={isSubmitting || !amount}
           >
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {order.type === 'buy' ? 'Buy' : 'Sell'} {order.currency}
+            Accept
+          </Button>
+
+          <Button
+            className="w-full"
+            onClick={() => handleSubmit('reject')}
+            disabled={isSubmitting || !amount}
+          >
+            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Reject
           </Button>
         </CardContent>
       </Card>

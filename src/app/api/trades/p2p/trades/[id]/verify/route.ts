@@ -25,8 +25,8 @@ export async function POST(
       .select(`
         *,
         order:p2p_orders(*),
-        seller:profiles!p2p_orders(quidax_id),
-        buyer:profiles!p2p_trades(quidax_id)
+        buyer:profiles!p2p_trades_buyer_id_fkey(quidax_id),
+        seller:profiles!p2p_trades_seller_id_fkey(quidax_id)
       `)
       .eq('id', params.id)
       .single();
@@ -38,8 +38,8 @@ export async function POST(
       );
     }
 
-    // Verify seller owns the order
-    if (trade.order.creator_id !== session.user.id) {
+    // Verify seller owns the trade
+    if (trade.seller_id !== session.user.id) {
       return NextResponse.json(
         { status: 'error', message: 'Unauthorized' },
         { status: 403 }
@@ -55,47 +55,74 @@ export async function POST(
     }
 
     try {
-      // Create and confirm swap
-      const quotation = await quidaxService.createSwapQuotation(trade.seller.quidax_id, {
-        from_currency: trade.order.currency,
-        to_currency: trade.order.currency,
-        from_amount: trade.crypto_amount.toString()
-      });
+      // If this is a sell order, seller needs to transfer crypto to buyer
+      if (trade.order.type === 'sell') {
+        // Create and confirm swap from seller to buyer
+        const quotation = await quidaxService.createSwapQuotation(trade.seller.quidax_id, {
+          from_currency: trade.order.currency.toLowerCase(),
+          to_currency: trade.order.currency.toLowerCase(),
+          from_amount: trade.crypto_amount.toString()
+        });
 
-      const swap = await quidaxService.confirmSwapQuotation(
-        trade.seller.quidax_id,
-        quotation.id
-      );
+        await quidaxService.confirmSwapQuotation(
+          trade.seller.quidax_id,
+          quotation.data.id
+        );
 
-      // Update trade status
-      const { error: updateError } = await supabase
-        .from('p2p_trades')
-        .update({
-          status: 'completed',
-          completed_at: new Date().toISOString()
-        })
-        .eq('id', params.id);
+        // Update trade with swap details
+        await supabase
+          .from('p2p_trades')
+          .update({
+            quidax_swap_id: quotation.data.id,
+            status: 'completed',
+            completed_at: new Date().toISOString()
+          })
+          .eq('id', params.id);
 
-      if (updateError) throw updateError;
+        // Update completion stats
+        await supabase.rpc('increment_completed_trades', {
+          user_id: trade.buyer_id
+        });
 
-      // Update seller's stats
-      await supabase.rpc('increment_completed_trades', {
-        user_id: trade.order.creator_id
-      });
+        await supabase.rpc('increment_completed_trades', {
+          user_id: trade.seller_id
+        });
 
-      // Update buyer's stats
-      await supabase.rpc('increment_completed_trades', {
-        user_id: trade.trader_id
-      });
+        return NextResponse.json({
+          status: 'success',
+          data: {
+            trade_id: trade.id,
+            status: 'completed',
+            swap_id: quotation.data.id
+          }
+        });
+      } else {
+        // For buy orders, just mark the trade as completed since crypto was already transferred
+        await supabase
+          .from('p2p_trades')
+          .update({
+            status: 'completed',
+            completed_at: new Date().toISOString()
+          })
+          .eq('id', params.id);
 
-      return NextResponse.json({
-        status: 'success',
-        data: {
-          trade_id: trade.id,
-          swap_id: swap.id,
-          status: 'completed'
-        }
-      });
+        // Update completion stats
+        await supabase.rpc('increment_completed_trades', {
+          user_id: trade.buyer_id
+        });
+
+        await supabase.rpc('increment_completed_trades', {
+          user_id: trade.seller_id
+        });
+
+        return NextResponse.json({
+          status: 'success',
+          data: {
+            trade_id: trade.id,
+            status: 'completed'
+          }
+        });
+      }
     } catch (error) {
       console.error('Error processing swap:', error);
       return NextResponse.json(

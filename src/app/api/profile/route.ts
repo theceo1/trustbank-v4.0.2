@@ -2,9 +2,6 @@ import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 
-const QUIDAX_API_URL = process.env.QUIDAX_API_URL || 'https://www.quidax.com/api/v1';
-const QUIDAX_SECRET_KEY = process.env.QUIDAX_SECRET_KEY;
-
 export async function POST(request: Request) {
   try {
     const supabase = createRouteHandlerClient({ cookies });
@@ -18,72 +15,42 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!QUIDAX_SECRET_KEY) {
-      console.error('QUIDAX_SECRET_KEY is not defined');
-      return NextResponse.json(
-        { status: 'error', message: 'API configuration error' },
-        { status: 500 }
-      );
-    }
-
-    // Create Quidax user
-    const quidaxResponse = await fetch(`${QUIDAX_API_URL}/users`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${QUIDAX_SECRET_KEY}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify({
-        email: user.email,
-        first_name: user.user_metadata?.first_name || '',
-        last_name: user.user_metadata?.last_name || '',
-      }),
-    });
-
-    const quidaxData = await quidaxResponse.json();
+    // Get the request body
+    const body = await request.json();
     
-    if (!quidaxResponse.ok) {
-      console.error('Quidax API error:', {
-        status: quidaxResponse.status,
-        statusText: quidaxResponse.statusText,
-        data: quidaxData,
-      });
-      return NextResponse.json(
-        { status: 'error', message: 'Failed to create Quidax user' },
-        { status: quidaxResponse.status }
-      );
-    }
-
-    // Create user profile with Quidax ID
+    // Update user profile
     const { data: profile, error: profileError } = await supabase
       .from('user_profiles')
-      .insert([
-        {
-          user_id: user.id,
-          quidax_id: quidaxData.data.id,
-          kyc_verified: false,
-        },
-      ])
+      .update({
+        full_name: body.full_name,
+        phone_number: body.phone_number,
+        address: body.address,
+        city: body.city,
+        state: body.state,
+        country: body.country,
+        postal_code: body.postal_code,
+        updated_at: new Date().toISOString()
+      })
+      .eq('user_id', user.id)
       .select()
       .single();
 
     if (profileError) {
-      console.error('Error creating profile:', profileError);
+      console.error('Error updating profile:', profileError);
       return NextResponse.json(
-        { status: 'error', message: 'Failed to create user profile' },
+        { status: 'error', message: 'Failed to update profile' },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ 
-      status: 'success', 
-      data: profile 
+    return NextResponse.json({
+      status: 'success',
+      data: profile
     });
-  } catch (error) {
-    console.error('Error in profile creation:', error);
+  } catch (error: any) {
+    console.error('Error in profile route:', error);
     return NextResponse.json(
-      { status: 'error', message: 'Failed to create profile' },
+      { status: 'error', message: 'Internal server error' },
       { status: 500 }
     );
   }

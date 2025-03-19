@@ -19,52 +19,29 @@ const AuthContext = createContext<AuthContextType>({
   signOut: async () => {},
 });
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+interface AuthProviderProps {
+  children: React.ReactNode;
+  initialSession?: User | null;
+}
+
+export function AuthProvider({ children, initialSession }: AuthProviderProps) {
+  const [user, setUser] = useState<User | null>(initialSession || null);
+  const [loading, setLoading] = useState(false);
   const supabase = createClientComponentClient<Database>();
   const { toast } = useToast();
   const router = useRouter();
 
   useEffect(() => {
-    let mounted = true;
-
-    // Get initial session
-    const initializeAuth = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) throw error;
-        
-        if (mounted) {
-          setUser(session?.user ?? null);
-          console.log('AuthProvider initializing with session:', session?.user);
-        }
-      } catch (error) {
-        console.error('Error getting initial session:', error);
-        if (mounted) {
-          setUser(null);
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    initializeAuth();
-
+    // Set up auth state change listener
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (mounted) {
-        setUser(session?.user ?? null);
-        setLoading(false);
-        console.log('Auth state changed:', { event, session });
-      }
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event, 'user:', session?.user ? session.user.id : 'none');
+      setUser(session?.user ?? null);
     });
 
+    // Cleanup subscription
     return () => {
-      mounted = false;
       subscription.unsubscribe();
     };
   }, [supabase.auth]);

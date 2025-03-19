@@ -32,15 +32,15 @@ const NETWORKS_BY_CURRENCY: Record<string, Array<{
   fee?: string;
 }>> = {
   btc: [{ id: 'bitcoin', name: 'Bitcoin Network' }],
-  eth: [{ id: 'ethereum', name: 'ERC20' }],
+  eth: [{ id: 'erc20', name: 'ERC20' }],
   usdt: [
-    { id: 'tron', name: 'TRC20', isRecommended: true, fee: '1 USDT' },
-    { id: 'ethereum', name: 'ERC20', fee: '10-20 USDT' },
-    { id: 'bsc', name: 'BEP20 (BSC)', fee: '0.5-1 USDT' }
+    { id: 'trc20', name: 'TRC20', isRecommended: true, fee: '1 USDT' },
+    { id: 'erc20', name: 'ERC20', fee: '10-20 USDT' },
+    { id: 'bep20', name: 'BEP20 (BSC)', fee: '0.5-1 USDT' }
   ],
   usdc: [
-    { id: 'ethereum', name: 'ERC20' },
-    { id: 'bsc', name: 'BEP20 (BSC)' }
+    { id: 'erc20', name: 'ERC20' },
+    { id: 'bep20', name: 'BEP20 (BSC)' }
   ]
 };
 

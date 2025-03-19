@@ -6,7 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { motion } from 'framer-motion';
 import { KYCBanner } from '@/components/trades/KYCBanner';
 
-export default function SwapClient() {
+interface SwapClientProps {
+  disabled?: boolean;
+}
+
+export default function SwapClient({ disabled }: SwapClientProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -21,7 +25,7 @@ export default function SwapClient() {
           <CardTitle>Instant Swap</CardTitle>
         </CardHeader>
         <CardContent>
-          <SwapForm />
+          <SwapForm disabled={disabled} />
         </CardContent>
       </Card>
 

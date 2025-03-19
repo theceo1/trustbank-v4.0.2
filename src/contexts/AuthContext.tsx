@@ -23,25 +23,45 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children, initialSession }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(initialSession);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialSession);
   const supabase = createClientComponentClient();
 
   useEffect(() => {
     if (initialSession) {
       setUser(initialSession);
       setLoading(false);
+    } else {
+      // Only check user if we don't have an initial session
+      const checkUser = async () => {
+        try {
+          const { data: { user: currentUser }, error } = await supabase.auth.getUser();
+          if (error) {
+            throw error;
+          }
+          setUser(currentUser);
+        } catch (error) {
+          console.error('Error checking auth status:', error);
+          setUser(null);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      checkUser();
     }
 
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', { event, session });
       
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        setUser(session?.user ?? null);
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        setUser(currentUser);
+        setLoading(false);
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
+        setLoading(false);
       }
-      
-      setLoading(false);
     });
 
     return () => {

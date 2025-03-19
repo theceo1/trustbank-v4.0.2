@@ -10,10 +10,19 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 const PAYMENT_METHODS = [
   { 
@@ -45,7 +54,24 @@ const PAYMENT_METHODS = [
 const formSchema = z.object({
   amount: z.string().min(1, 'Amount is required'),
   price: z.string().min(1, 'Price is required'),
+  min_order: z.string().min(1, 'Minimum order amount is required'),
+  max_order: z.string().min(1, 'Maximum order amount is required'),
   payment_methods: z.array(z.string()).min(1, 'Select at least one payment method'),
+  terms: z.string().optional(),
+}).refine((data) => {
+  const min = parseFloat(data.min_order);
+  const max = parseFloat(data.max_order);
+  return min <= max;
+}, {
+  message: "Minimum order amount must be less than maximum order amount",
+  path: ["min_order"]
+}).refine((data) => {
+  const amount = parseFloat(data.amount);
+  const max = parseFloat(data.max_order);
+  return max <= amount;
+}, {
+  message: "Maximum order amount must be less than total amount",
+  path: ["max_order"]
 });
 
 interface P2POrderFormProps {
@@ -61,7 +87,10 @@ export function P2POrderForm({ type, currency }: P2POrderFormProps) {
     defaultValues: {
       amount: '',
       price: '',
+      min_order: '',
+      max_order: '',
       payment_methods: [],
+      terms: '',
     },
   });
 
@@ -76,12 +105,15 @@ export function P2POrderForm({ type, currency }: P2POrderFormProps) {
         body: JSON.stringify({
           type,
           currency,
-          amount: parseFloat(values.amount),
-          price: parseFloat(values.price),
+          amount: values.amount,
+          price: values.price,
+          min_order: values.min_order,
+          max_order: values.max_order,
           payment_methods: values.payment_methods.map(method => ({
             type: method,
             details: '', // User can update details later
           })),
+          terms: values.terms || '',
         }),
       });
 
@@ -108,18 +140,26 @@ export function P2POrderForm({ type, currency }: P2POrderFormProps) {
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <FormField
           control={form.control}
-          name="amount"
+          name="currency"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Amount ({currency})</FormLabel>
-              <FormControl>
-                <Input
-                  placeholder="0.00"
-                  type="number"
-                  step="any"
-                  {...field}
-                />
-              </FormControl>
+              <FormLabel>Currency</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select currency" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="BTC">Bitcoin (BTC)</SelectItem>
+                  <SelectItem value="ETH">Ethereum (ETH)</SelectItem>
+                  <SelectItem value="USDT">Tether (USDT)</SelectItem>
+                  <SelectItem value="USDC">USD Coin (USDC)</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormDescription>
+                Select the cryptocurrency you want to trade
+              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -130,15 +170,107 @@ export function P2POrderForm({ type, currency }: P2POrderFormProps) {
           name="price"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Price per {currency}</FormLabel>
+              <FormLabel>Price (NGN)</FormLabel>
               <FormControl>
-                <Input
-                  placeholder="0.00"
-                  type="number"
-                  step="any"
+                <Input 
+                  type="number" 
+                  placeholder="Enter price in Naira" 
+                  {...field}
+                  onChange={(e) => field.onChange(Number(e.target.value))}
+                />
+              </FormControl>
+              <FormDescription>
+                Enter the price in Nigerian Naira (NGN) per unit of cryptocurrency
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="amount"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Total Amount</FormLabel>
+              <FormControl>
+                <Input 
+                  type="number" 
+                  placeholder="Enter total amount" 
+                  {...field}
+                  onChange={(e) => field.onChange(Number(e.target.value))}
+                />
+              </FormControl>
+              <FormDescription>
+                Enter the total amount of cryptocurrency you want to trade
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="min_order"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Minimum Order</FormLabel>
+                <FormControl>
+                  <Input 
+                    type="number" 
+                    placeholder="Enter minimum order amount" 
+                    {...field}
+                    onChange={(e) => field.onChange(Number(e.target.value))}
+                  />
+                </FormControl>
+                <FormDescription>
+                  Minimum amount that can be traded in a single order
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="max_order"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Maximum Order</FormLabel>
+                <FormControl>
+                  <Input 
+                    type="number" 
+                    placeholder="Enter maximum order amount" 
+                    {...field}
+                    onChange={(e) => field.onChange(Number(e.target.value))}
+                  />
+                </FormControl>
+                <FormDescription>
+                  Maximum amount that can be traded in a single order
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <FormField
+          control={form.control}
+          name="terms"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Terms & Instructions</FormLabel>
+              <FormControl>
+                <Textarea 
+                  placeholder="Enter your terms and instructions for the trade" 
+                  className="min-h-[100px]"
                   {...field}
                 />
               </FormControl>
+              <FormDescription>
+                Add any specific terms, conditions, or instructions for the trade
+              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -147,46 +279,24 @@ export function P2POrderForm({ type, currency }: P2POrderFormProps) {
         <FormField
           control={form.control}
           name="payment_methods"
-          render={() => (
+          render={({ field }) => (
             <FormItem>
               <FormLabel>Payment Methods</FormLabel>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {PAYMENT_METHODS.map((method) => (
-                  <FormField
-                    key={method.id}
-                    control={form.control}
-                    name="payment_methods"
-                    render={({ field }) => (
-                      <FormItem
-                        key={method.id}
-                        className="flex items-start space-x-3 p-4 rounded-lg border bg-card hover:bg-accent transition-colors"
-                      >
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value?.includes(method.id)}
-                            onCheckedChange={(checked) => {
-                              const value = field.value || [];
-                              if (checked) {
-                                field.onChange([...value, method.id]);
-                              } else {
-                                field.onChange(value.filter((v) => v !== method.id));
-                              }
-                            }}
-                          />
-                        </FormControl>
-                        <div className="space-y-1">
-                          <FormLabel className="text-base font-medium">
-                            {method.label}
-                          </FormLabel>
-                          <p className="text-sm text-muted-foreground">
-                            {method.description}
-                          </p>
-                        </div>
-                      </FormItem>
-                    )}
-                  />
-                ))}
-              </div>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select payment methods" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="mobile_money">Mobile Money</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormDescription>
+                Select the payment methods you accept for this trade
+              </FormDescription>
               <FormMessage />
             </FormItem>
           )}

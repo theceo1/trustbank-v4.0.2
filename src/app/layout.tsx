@@ -5,11 +5,9 @@ import { Metadata } from "next"
 import { ThemeProvider } from "@/components/ThemeProvider"
 import { Toaster } from "@/components/ui/toaster"
 import SupabaseProvider from "@/lib/providers/supabase-provider"
-import { AuthProvider } from "@/contexts/AuthContext"
+import { ProfileProvider } from "@/app/contexts/ProfileContext"
 import { Header } from "@/components/layout/Header"
 import { Footer } from "@/components/layout/Footer"
-import { cookies } from "next/headers"
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
 import { cn } from "@/lib/utils"
 import { LanguageProvider } from "@/providers/LanguageProvider"
 
@@ -38,17 +36,11 @@ export const metadata: Metadata = {
   creator: "trustBank",
 }
 
-export default async function RootLayout({
-  children,
-}: {
+interface RootLayoutProps {
   children: React.ReactNode
-}) {
-  const cookieStore = cookies();
-  const supabase = createServerComponentClient({ cookies: () => cookieStore });
+}
 
-  const { data: { session } } = await supabase.auth.getSession();
-  const { data: { user } } = await supabase.auth.getUser();
-
+export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={cn(
@@ -63,14 +55,14 @@ export default async function RootLayout({
           disableTransitionOnChange
         >
           <SupabaseProvider>
-            <AuthProvider initialSession={user}>
+            <ProfileProvider>
               <LanguageProvider>
                 <Header />
                 {children}
                 <Footer />
                 <Toaster />
               </LanguageProvider>
-            </AuthProvider>
+            </ProfileProvider>
           </SupabaseProvider>
         </ThemeProvider>
       </body>

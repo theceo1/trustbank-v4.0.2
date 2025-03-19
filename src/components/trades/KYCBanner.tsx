@@ -42,38 +42,28 @@ export function KYCBanner() {
         });
 
         setHasBasicKyc(isVerified);
-
-        // Update cookie to match database state
-        if (isVerified) {
-          document.cookie = 'x-kyc-status=verified; path=/; max-age=3600; SameSite=Lax';
-        } else {
-          // Clear the cookie if not verified
-          document.cookie = 'x-kyc-status=unverified; path=/; max-age=0; SameSite=Lax';
-        }
       } catch (error) {
-        console.error('[KYC Banner] Error checking KYC status:', error);
+        console.error('Error checking KYC status:', error);
         setHasBasicKyc(false);
       }
     };
 
     checkKyc();
-  }, []);
+  }, [supabase]);
 
-  if (hasBasicKyc) return null;
+  if (hasBasicKyc) {
+    return null;
+  }
 
   return (
-    <Alert className="mb-6 border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20">
-      <AlertTitle className="flex items-center gap-2">
-        <Shield className="h-5 w-5 text-yellow-500" />
-        Complete KYC to Start Trading
-      </AlertTitle>
-      <AlertDescription className="mt-2">
-        <p className="mb-2">
-          To ensure the security of our platform and comply with regulations, you need to complete basic KYC verification before trading.
-        </p>
-        <Button asChild variant="outline" size="sm">
-          <Link href="/kyc" className="inline-flex items-center">
-            Complete Verification
+    <Alert variant="default" className="border-yellow-600/20 bg-yellow-50 dark:bg-yellow-900/10">
+      <Shield className="h-4 w-4" />
+      <AlertTitle>Complete Your Profile</AlertTitle>
+      <AlertDescription className="flex items-center justify-between">
+        <span>Complete your profile verification to start trading.</span>
+        <Button variant="link" asChild className="p-0 h-auto font-normal">
+          <Link href="/kyc" className="flex items-center">
+            Verify Now
             <ChevronRight className="h-4 w-4 ml-1" />
           </Link>
         </Button>

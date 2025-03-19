@@ -311,21 +311,21 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
           throw new Error(data.message || 'NGN withdrawal failed');
         }
       } else {
-        const withdrawal = await quidaxService.createWithdrawal(userId, {
-          currency: currency.toLowerCase(),
-          amount: amountInCrypto.toString(),
-          address,
+        // Handle crypto withdrawal
+        const response = await fetch('/api/wallet/withdraw', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            currency: currency.toLowerCase(),
+            amount: amountInCrypto.toString(),
+            address,
+          }),
         });
 
-        await supabase.from('transactions').insert({
-          user_id: userId,
-          wallet_id: wallet.id,
-          type: 'withdrawal',
-          amount: amountInCrypto,
-          currency: currency,
-          status: 'pending',
-          quidax_transaction_id: withdrawal.id,
-        });
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || 'Withdrawal failed');
+        }
       }
 
       toast({

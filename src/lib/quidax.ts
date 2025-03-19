@@ -1,9 +1,8 @@
 import axios from 'axios';
 import { cookies } from 'next/headers';
 
-const QUIDAX_API_URL = process.env.NEXT_PUBLIC_QUIDAX_API_URL || 'https://www.quidax.com/api/v1';
-const QUIDAX_SECRET_KEY = process.env.QUIDAX_SECRET_KEY;
-const QUIDAX_PUBLIC_KEY = process.env.NEXT_PUBLIC_QUIDAX_PUBLIC_KEY;
+const QUIDAX_API_URL = (process.env.NEXT_PUBLIC_QUIDAX_API_URL || 'https://www.quidax.com/api/v1') as string;
+const QUIDAX_PUBLIC_KEY = process.env.NEXT_PUBLIC_QUIDAX_PUBLIC_KEY || '';
 
 // Configure a single axios instance for client-side requests
 const quidaxApi = axios.create({
@@ -14,26 +13,151 @@ const quidaxApi = axios.create({
   }
 });
 
-// Add authentication interceptor
-quidaxApi.interceptors.request.use(config => {
-  if (!QUIDAX_SECRET_KEY) {
-    throw new Error('QUIDAX_SECRET_KEY is not configured');
-  }
-  
-  config.headers.Authorization = `Bearer ${QUIDAX_SECRET_KEY}`;
-  return config;
-});
-
-// Add Cloudflare error interceptor
-quidaxApi.interceptors.response.use(
-  response => response,
-  error => {
-    if (error.response?.data?.includes('Cloudflare')) {
-      throw new Error('Quidax API is currently unavailable. Please try again later');
+// Client-side service that uses the public key
+export class QuidaxClientService {
+  constructor() {
+    if (!QUIDAX_PUBLIC_KEY) {
+      console.warn('QUIDAX_PUBLIC_KEY is not set. Some features may be limited.');
     }
-    return Promise.reject(error);
+    
+    quidaxApi.interceptors.request.use(config => {
+      config.headers.Authorization = `Bearer ${QUIDAX_PUBLIC_KEY}`;
+      return config;
+    });
   }
-);
+
+  // Client-side methods that only need public key
+  async getMarketTickers() {
+    const response = await quidaxApi.get('/tickers');
+    return response.data;
+  }
+
+  async getOrderBook(market: string) {
+    const response = await quidaxApi.get(`/markets/${market}/order_book`);
+    return response.data;
+  }
+}
+
+// Server-side service that uses the secret key
+export class QuidaxServerService {
+  private secretKey: string;
+
+  constructor(secretKey: string) {
+    if (!secretKey) {
+      throw new Error('QUIDAX_SECRET_KEY is required');
+    }
+    this.secretKey = secretKey;
+  }
+
+  // Add getMarketTickers method
+  async getMarketTickers() {
+    return this.request('/markets/tickers');
+  }
+
+  async request(endpoint: string, options: RequestInit = {}) {
+    const url = `${QUIDAX_API_URL}${endpoint}`;
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          ...options.headers,
+          'Authorization': `Bearer ${this.secretKey}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        console.error('Quidax API error:', {
+          status: response.status,
+          statusText: response.statusText,
+          url,
+          response: text
+        });
+        throw new Error(`Quidax API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Quidax request failed:', {
+        url,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      throw error;
+    }
+  }
+
+  // Server-side methods that need secret key
+  async createSubAccount(email: string, firstName: string, lastName: string) {
+    return this.request('/users', {
+      method: 'POST',
+      body: JSON.stringify({
+        email,
+        first_name: firstName,
+        last_name: lastName
+      })
+    });
+  }
+
+  async getSubAccount(userId: string) {
+    return this.request(`/users/${userId}`);
+  }
+
+  async getWallets(userId: string) {
+    return this.request(`/users/${userId}/wallets`);
+  }
+
+  async createSwapQuotation(userId: string, params: {
+    from_currency: string;
+    to_currency: string;
+    from_amount: string;
+  }) {
+    return this.request(`/users/${userId}/swap_quotation`, {
+      method: 'POST',
+      body: JSON.stringify(params)
+    });
+  }
+
+  async confirmSwapQuotation(userId: string, quotationId: string) {
+    return this.request(`/users/${userId}/swap_quotation/${quotationId}/confirm`, {
+      method: 'POST'
+    });
+  }
+
+  // Withdrawals
+  async createWithdrawal(userId: string, params: {
+    currency: string;
+    amount: string;
+    address: string;
+  }) {
+    return this.request(`/users/${userId}/withdraws`, {
+      method: 'POST',
+      body: JSON.stringify(params)
+    });
+  }
+
+  // Wallet addresses
+  async getWalletAddress(userId: string, currency: string, network: string) {
+    return this.request(`/users/${userId}/wallets/${currency}/addresses?network=${network}`);
+  }
+
+  async createWalletAddress(userId: string, currency: string, network: string) {
+    return this.request(`/users/${userId}/wallets/${currency}/addresses`, {
+      method: 'POST',
+      body: JSON.stringify({ network })
+    });
+  }
+}
+
+// Export a singleton instance for client-side usage
+export const quidaxClient = new QuidaxClientService();
+
+// Helper to create server-side instance
+export function createQuidaxServer(secretKey: string) {
+  return new QuidaxServerService(secretKey);
+}
 
 export async function fetchQuidaxData(endpoint: string) {
   try {
@@ -172,253 +296,243 @@ interface Order {
 }
 
 export class QuidaxService {
-  private readonly baseUrl: string;
+  private baseUrl: string;
+  private secretKey?: string;
 
-  constructor() {
-    this.baseUrl = QUIDAX_API_URL;
+  constructor(baseUrl = QUIDAX_API_URL, secretKey?: string) {
+    this.baseUrl = baseUrl;
+    this.secretKey = secretKey;
   }
 
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<Response> {
-    const QUIDAX_SECRET_KEY = process.env.QUIDAX_SECRET_KEY;
-
-    if (!QUIDAX_SECRET_KEY) {
-      throw new Error('QUIDAX_SECRET_KEY is not configured');
-    }
-
-    const url = `${this.baseUrl}${endpoint}`;
-    const headers = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${QUIDAX_SECRET_KEY}`,
-      ...options.headers,
-    };
-
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    });
-
-    return response;
-  }
-
-  async createSubAccount(userData: { 
-    email: string; 
-    first_name: string; 
-    last_name: string; 
-  }): Promise<QuidaxUser> {
+  private async request(endpoint: string, options: RequestInit = {}) {
+    const url = `${QUIDAX_API_URL}${endpoint}`;
     try {
-      const response = await axios.post('/api/users', userData);
-      return response.data.data;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Failed to create sub-account');
-    }
-  }
-
-  async createSwapQuotation(userId: string, data: {
-    from_currency: string;
-    to_currency: string;
-    from_amount: string;
-  }): Promise<SwapQuotation> {
-    try {
-      const response = await quidaxApi.post(`/users/${userId}/swap_quotation`, data);
-      return response.data.data;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to create swap quotation');
-    }
-  }
-
-  async confirmSwapQuotation(userId: string, quotationId: string): Promise<SwapTransaction> {
-    try {
-      const response = await quidaxApi.post(`/users/${userId}/swap_quotation/${quotationId}/confirm`);
-      return response.data.data;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to confirm swap quotation');
-    }
-  }
-
-  async getTemporarySwapQuotation(userId: string, data: {
-    from_currency: string;
-    to_currency: string;
-    from_amount: string;
-  }): Promise<SwapQuotation> {
-    try {
-      const response = await axios.post('/api/markets/temporary-swap-quotation', {
-        userId,
-        ...data
-      });
-      return response.data.data;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Failed to get swap quotation');
-    }
-  }
-
-  async getUserWallets(userId: string): Promise<QuidaxWallet[]> {
-    try {
-      const response = await quidaxApi.get(`/users/${userId}/wallets`);
-      return response.data.data;
-    } catch (error) {
-      console.error('Error fetching wallets:', error);
-      throw error;
-    }
-  }
-
-  async getWallet(userId: string, currency: string): Promise<QuidaxWallet> {
-    const response = await quidaxApi.get(`/users/${userId}/wallets/${currency}`);
-    return response.data.data;
-  }
-
-  async getWalletAddress(userId: string, currency: string): Promise<string> {
-    try {
-      const response = await fetch(`${this.baseUrl}/users/${userId}/wallets/${currency}/address`, {
+      const response = await fetch(url, {
+        ...options,
         headers: {
-          'Authorization': `Bearer ${process.env.QUIDAX_SECRET_KEY}`,
+          ...options.headers,
+          'Authorization': `Bearer ${this.secretKey}`,
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch wallet address: ${response.statusText}`);
+        const text = await response.text();
+        console.error('Quidax API error:', {
+          status: response.status,
+          statusText: response.statusText,
+          url,
+          response: text
+        });
+        throw new Error(`Quidax API error: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
-      return data.data.address;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch wallet address');
+      return data;
+    } catch (error) {
+      console.error('Quidax request failed:', {
+        url,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      throw error;
     }
   }
 
-  async createWalletAddress(userId: string, currency: string, network?: string): Promise<string> {
+  // Sub-account management
+  async createSubAccount(email: string, firstName: string, lastName: string) {
     try {
-      const response = await quidaxApi.post(`/users/${userId}/wallets/${currency}/addresses`, { network });
-      return response.data.data.id;
+      // Create the sub-account
+      const response = await this.request('/users', {
+        method: 'POST',
+        body: JSON.stringify({
+          email,
+          first_name: firstName,
+          last_name: lastName
+        })
+      });
+
+      // Validate UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!response?.data?.sn || !uuidRegex.test(response.data.sn)) {
+        throw new Error('Invalid sub-account ID returned from Quidax');
+      }
+
+      // Wait for the sub-account to be ready
+      let retries = 10;
+      let lastError = null;
+      
+      while (retries > 0) {
+        try {
+          // Verify the sub-account exists
+          const verifyResponse = await this.request(`/users/${response.data.sn}`);
+          
+          // If we get a response with the same sn, consider it a success
+          if (verifyResponse?.data?.sn === response.data.sn) {
+            console.log('Sub-account verified successfully:', response.data.sn);
+            return response;
+          }
+        } catch (error: any) {
+          lastError = error;
+          console.log(`Waiting for sub-account ${response.data.sn} to be ready... (${retries} retries left)`);
+          console.log('Verification error:', error.message);
+        }
+        
+        // Wait 3 seconds before retrying
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        retries--;
+      }
+
+      throw new Error(`Failed to verify sub-account ${response.data.sn}. Last error: ${lastError?.message || 'Unknown error'}`);
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to create wallet address');
+      // If the error is from the initial creation
+      if (error.message.includes('Invalid sub-account ID')) {
+        throw error;
+      }
+      
+      // For other errors, provide more context
+      throw new Error(`Error in sub-account creation/verification: ${error.message}`);
     }
   }
 
-  async createWithdrawal(userId: string, data: {
+  async getSubAccount(userId: string) {
+    return this.request(`/users/${userId}`);
+  }
+
+  // Wallet management
+  async getWallets(userId: string) {
+    return this.request(`/users/${userId}/wallets`);
+  }
+
+  async getWallet(userId: string, currency: string) {
+    return this.request(`/users/${userId}/wallets/${currency}`);
+  }
+
+  async createPaymentAddress(userId: string, currency: string, network?: string) {
+    return this.request(`/users/${userId}/wallets/${currency}/addresses`, {
+      method: 'POST',
+      body: JSON.stringify({ network })
+    });
+  }
+
+  // Instant swap
+  async createSwapQuotation(userId: string, params: {
+    from_currency: string;
+    to_currency: string;
+    from_amount: string;
+  }) {
+    return this.request(`/users/${userId}/swap_quotation`, {
+      method: 'POST',
+      body: JSON.stringify(params)
+    });
+  }
+
+  async confirmSwapQuotation(userId: string, quotationId: string) {
+    return this.request(`/users/${userId}/swap_quotation/${quotationId}/confirm`, {
+      method: 'POST'
+    });
+  }
+
+  async refreshSwapQuotation(userId: string, quotationId: string, params: {
+    from_currency: string;
+    to_currency: string;
+    from_amount: string;
+  }) {
+    return this.request(`/users/${userId}/swap_quotation/${quotationId}/refresh`, {
+      method: 'POST',
+      body: JSON.stringify(params)
+    });
+  }
+
+  async getSwapTransaction(userId: string, swapId: string) {
+    return this.request(`/users/${userId}/swap_transactions/${swapId}`);
+  }
+
+  async getSwapTransactions(userId: string) {
+    return this.request(`/users/${userId}/swap_transactions`);
+  }
+
+  async getTemporarySwapQuotation(userId: string, params: {
+    from_currency: string;
+    to_currency: string;
+    from_amount: string;
+  }) {
+    return this.request(`/users/${userId}/temporary_swap_quotation`, {
+      method: 'POST',
+      body: JSON.stringify(params)
+    });
+  }
+
+  // Internal transfers
+  async transferToSubAccount(mainAccountId: string, params: {
+    currency: string;
+    amount: string;
+    fund_uid: string;
+    transaction_note?: string;
+    narration?: string;
+  }) {
+    return this.request(`/users/${mainAccountId}/withdraws`, {
+      method: 'POST',
+      body: JSON.stringify(params)
+    });
+  }
+
+  async transferToMainAccount(subAccountId: string, params: {
+    currency: string;
+    amount: string;
+    fund_uid: string;
+    transaction_note?: string;
+    narration?: string;
+  }) {
+    return this.request(`/users/${subAccountId}/withdraws`, {
+      method: 'POST',
+      body: JSON.stringify(params)
+    });
+  }
+
+  // Market data
+  async getMarketQuote(params: {
+    market: string;
+    unit: string;
+    kind: 'ask' | 'bid';
+    volume: string;
+  }) {
+    const query = new URLSearchParams(params);
+    return this.request(`/quotes?${query}`);
+  }
+
+  async getOrderBook(currency: string, askLimit = 20, bidsLimit = 20) {
+    const query = new URLSearchParams({
+      ask_limit: askLimit.toString(),
+      bids_limit: bidsLimit.toString()
+    });
+    return this.request(`/markets/${currency}/order_book?${query}`);
+  }
+
+  // Withdrawals
+  async createWithdrawal(userId: string, params: {
     currency: string;
     amount: string;
     address: string;
-  }): Promise<WithdrawalRequest> {
-    try {
-      const response = await quidaxApi.post(`/users/${userId}/withdraws`, {
-        currency: data.currency,
-        amount: data.amount,
-        address: data.address,
-      });
-      return response.data.data;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to create withdrawal request');
-    }
+  }) {
+    return this.request(`/users/${userId}/withdraws`, {
+      method: 'POST',
+      body: JSON.stringify(params)
+    });
   }
 
-  async transferToSubAccount(currency: string, amount: string, subAccountId: string, note?: string): Promise<any> {
-    try {
-      const response = await quidaxApi.post('/users/me/withdraws', {
-        currency,
-        amount,
-        fund_uid: subAccountId,
-        transaction_note: note,
-        narration: note,
-      });
-      return response.data.data;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to transfer to sub-account');
-    }
+  // Wallet addresses
+  async createWalletAddress(userId: string, currency: string, network: string) {
+    return this.request(`/users/${userId}/wallets/${currency}/addresses`, {
+      method: 'POST',
+      body: JSON.stringify({ network })
+    });
   }
 
-  async transferToMainAccount(userId: string, currency: string, amount: string, mainAccountId: string, note?: string): Promise<any> {
-    try {
-      const response = await quidaxApi.post(`/users/${userId}/withdraws`, {
-        currency,
-        amount,
-        fund_uid: mainAccountId,
-        transaction_note: note,
-        narration: note,
-      });
-      return response.data.data;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to transfer to main account');
-    }
-  }
-
-  async getMarketTickers(): Promise<Record<string, MarketTicker>> {
-    try {
-      const response = await axios.get<QuidaxResponse<Record<string, MarketTicker>>>(`${this.baseUrl}/markets/tickers`);
-      return response.data.data;
-    } catch (error) {
-      console.error('Error fetching market tickers:', error);
-      throw error;
-    }
-  }
-
-  async getMarketRate(fromCurrency: string, toCurrency: string, userId?: string): Promise<number> {
-    try {
-      // For same currency, return 1
-      if (fromCurrency === toCurrency) {
-        return 1;
-      }
-
-      if (!userId) {
-        throw new Error('Quidax user ID is required for rate calculation');
-      }
-
-      // Use temporary swap quotation for rate calculation
-      try {
-        const quotation = await this.getTemporarySwapQuotation(userId, {
-          from_currency: fromCurrency.toLowerCase(),
-          to_currency: toCurrency.toLowerCase(),
-          from_amount: '1', // Request quote for 1 unit to get the rate
-        });
-
-        if (quotation && quotation.quoted_price) {
-          return parseFloat(quotation.quoted_price);
-        }
-      } catch (error) {
-        console.error('Error getting swap quotation:', error);
-        throw new Error(`Cannot convert from ${fromCurrency} to ${toCurrency}. Please try a different currency pair.`);
-      }
-      
-      throw new Error(`No market pair available for ${fromCurrency}/${toCurrency}`);
-    } catch (error) {
-      console.error('Error fetching market rate:', error);
-      throw error;
-    }
-  }
-
-  async getSwapTransactions(userId: string): Promise<SwapTransaction[]> {
-    try {
-      const response = await quidaxApi.get(`/users/${userId}/swap_transactions`);
-      return response.data.data;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch swap transactions');
-    }
-  }
-
-  async createOrder(params: CreateOrderParams): Promise<Order> {
-    const response = await this.request(
-      `/users/${params.user_id}/orders`,
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          market: params.market,
-          side: params.side,
-          ord_type: params.ord_type,
-          price: params.price,
-          volume: params.volume
-        })
-      }
-    );
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to create order');
-    }
-
-    const data = await response.json();
-    return data.data;
+  async getWalletAddress(userId: string, currency: string, network: string) {
+    return this.request(`/users/${userId}/wallets/${currency}/addresses?network=${network}`);
   }
 }
 
+// Export a singleton instance for client-side usage (no secret key)
 export const quidaxService = new QuidaxService(); 

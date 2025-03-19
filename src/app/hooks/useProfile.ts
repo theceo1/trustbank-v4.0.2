@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { useAuth } from '@/app/contexts/AuthContext';
 import type { Database } from '@/types/database';
 
 interface Profile {
@@ -21,7 +20,6 @@ interface Profile {
 }
 
 export function useProfile() {
-  const { user } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +30,8 @@ export function useProfile() {
 
     async function loadProfile() {
       try {
-        if (!user) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) {
           if (mounted) {
             setProfile(null);
             setLoading(false);
@@ -40,29 +39,22 @@ export function useProfile() {
           return;
         }
 
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session && mounted) {
-          setProfile(null);
-          setLoading(false);
-          return;
-        }
-
-        const { data, error } = await supabase
+        const { data, error: profileError } = await supabase
           .from('user_profiles')
           .select('*')
-          .eq('user_id', user.id)
+          .eq('user_id', session.user.id)
           .single();
 
-        if (error) throw error;
+        if (profileError) throw profileError;
         
         if (mounted) {
           setProfile(data);
           setError(null);
         }
-      } catch (err: any) {
+      } catch (err) {
         console.error('Error loading profile:', err);
         if (mounted) {
-          setError(err.message);
+          setError(err instanceof Error ? err.message : 'Failed to load profile');
           setProfile(null);
         }
       } finally {
@@ -89,7 +81,7 @@ export function useProfile() {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [user, supabase]);
+  }, [supabase]);
 
   return { profile, loading, error };
 } 

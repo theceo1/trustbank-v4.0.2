@@ -13,27 +13,26 @@ import { formatDistanceToNow } from 'date-fns';
 
 interface P2POrder {
   id: string;
-  user_id: string;
+  creator_id: string;
   type: 'buy' | 'sell';
   currency: string;
-  amount: number;
-  price: number;
+  amount: string;
+  price: string;
+  min_order: string;
+  max_order: string;
   payment_methods: {
     type: string;
     details: string;
   }[];
+  terms: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
   creator: {
     name: string;
     completed_trades: number;
     completion_rate: number;
-  };
-  order_type: string;
-  post_only: boolean;
-  trigger_price: string | null;
-  expiry: string;
-  expires_at: string | null;
-  user: {
-    username: string;
+    quidax_id: string;
   };
 }
 
@@ -119,12 +118,11 @@ export function P2POrderBook({ currency, type, onSelect }: P2POrderBookProps) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Type</TableHead>
-            <TableHead>Price (NGN)</TableHead>
-            <TableHead>Amount ({currency})</TableHead>
-            <TableHead>Total (NGN)</TableHead>
             <TableHead>Trader</TableHead>
-            <TableHead>Expiry</TableHead>
+            <TableHead>Price (NGN)</TableHead>
+            <TableHead>Available ({currency})</TableHead>
+            <TableHead>Limits (NGN)</TableHead>
+            <TableHead>Payment Methods</TableHead>
             <TableHead>Action</TableHead>
           </TableRow>
         </TableHeader>
@@ -136,44 +134,45 @@ export function P2POrderBook({ currency, type, onSelect }: P2POrderBookProps) {
               onClick={() => onSelect(order)}
             >
               <TableCell>
-                {getOrderTypeBadge(order.order_type)}
-                {order.post_only && (
-                  <Badge variant="outline" className="ml-2">
-                    Post Only
-                  </Badge>
-                )}
-              </TableCell>
-              <TableCell>
-                <div className="font-medium">₦{Number(order.price).toLocaleString()}</div>
-                {order.trigger_price && (
-                  <div className="text-sm text-muted-foreground">
-                    Trigger: ₦{Number(order.trigger_price).toLocaleString()}
-                  </div>
-                )}
-              </TableCell>
-              <TableCell>{Number(order.amount).toLocaleString()} {currency}</TableCell>
-              <TableCell>₦{(Number(order.amount) * Number(order.price)).toLocaleString()}</TableCell>
-              <TableCell>
                 <div className="flex flex-col">
-                  <span className="font-medium">{order.user.username}</span>
+                  <span className="font-medium">{order.creator.name}</span>
                   <span className="text-sm text-muted-foreground">
-                    {order.creator.completed_trades} trades
+                    {order.creator.completed_trades} trades • {order.creator.completion_rate}% completion
                   </span>
                 </div>
               </TableCell>
               <TableCell>
-                {getExpiryBadge(order.expiry, order.expires_at)}
+                <div className="font-medium">₦{Number(order.price).toLocaleString()}</div>
+              </TableCell>
+              <TableCell>{Number(order.amount).toLocaleString()} {currency}</TableCell>
+              <TableCell>
+                <div className="text-sm">
+                  <span>Min: ₦{Number(order.min_order).toLocaleString()}</span>
+                  <br />
+                  <span>Max: ₦{Number(order.max_order).toLocaleString()}</span>
+                </div>
               </TableCell>
               <TableCell>
-                <button
-                  className="text-sm font-medium text-green-600 hover:text-green-700"
+                <div className="flex flex-wrap gap-1">
+                  {order.payment_methods.map((method) => (
+                    <Badge key={method.type} variant="outline" className="capitalize">
+                      {method.type.replace('_', ' ')}
+                    </Badge>
+                  ))}
+                </div>
+              </TableCell>
+              <TableCell>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-green-600 hover:text-green-700 hover:bg-green-50"
                   onClick={(e) => {
                     e.stopPropagation();
                     onSelect(order);
                   }}
                 >
                   {type === 'buy' ? 'Sell' : 'Buy'}
-                </button>
+                </Button>
               </TableCell>
             </TableRow>
           ))}

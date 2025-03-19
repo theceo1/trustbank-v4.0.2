@@ -1,117 +1,119 @@
 "use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
-import { Loader2, Mail } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useState, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useRouter } from 'next/navigation';
+import { useToast } from "@/components/ui/use-toast";
+import { Loader2 } from "lucide-react";
+import type { Database } from '@/types/database';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export default function EmailVerificationPage() {
-  const [isLoading, setIsLoading] = useState(false);
-  const { user, loading: authLoading } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
+  const [newEmail, setNewEmail] = useState('');
+  const [isUpdating, setIsUpdating] = useState(false);
+  const supabase = createClientComponentClient<Database>();
   const router = useRouter();
   const { toast } = useToast();
 
-  // Show loading state while auth is initializing
-  if (authLoading) {
+  useEffect(() => {
+    const getUser = async () => {
+      try {
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        setUser(currentUser);
+        if (currentUser?.email) {
+          setNewEmail(currentUser.email);
+        }
+      } catch (error) {
+        console.error('Error getting user:', error);
+        toast({
+          title: "Error",
+          description: "Failed to get user information. Please try again.",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    getUser();
+  }, [supabase.auth, toast]);
+
+  const handleUpdateEmail = async () => {
+    if (!user || !newEmail) return;
+
+    try {
+      setIsUpdating(true);
+      const { error } = await supabase.auth.updateUser({ email: newEmail });
+      
+      if (error) throw error;
+
+      toast({
+        title: "Verification Email Sent",
+        description: "Please check your email to verify your new address.",
+      });
+
+      router.push('/profile/security');
+    } catch (error) {
+      console.error('Error updating email:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update email",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  if (loading) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-green-600" />
+      <div className="flex justify-center items-center min-h-[200px]">
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
 
-  // Redirect if no user
   if (!user) {
     router.push('/auth/login');
     return null;
   }
 
-  const handleResendVerification = async () => {
-    if (!user?.email) {
-      toast({
-        title: "Error",
-        description: "No email address found",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const supabase = createClientComponentClient();
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email: user.email,
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Verification Email Sent",
-        description: "Please check your inbox and follow the verification link.",
-      });
-    } catch (error) {
-      console.error('Error sending verification email:', error);
-      toast({
-        title: "Error",
-        description: "Failed to send verification email. Please try again later.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   return (
-    <div className="min-h-screen py-8 px-4">
-      <div className="max-w-2xl mx-auto">
-        <Card className="border-none shadow-lg">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Mail className="h-5 w-5 text-green-600" />
-              Email Verification
-            </CardTitle>
-            <CardDescription>
-              Verify your email address to enhance your account security
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="bg-muted p-4 rounded-lg">
-              <p className="text-sm">Current email: <span className="font-medium">{user?.email}</span></p>
-            </div>
+    <div className="container mx-auto px-4 py-8 max-w-lg">
+      <Card>
+        <CardHeader>
+          <CardTitle>Update Email Address</CardTitle>
+          <CardDescription>
+            Enter your new email address. You'll need to verify it before the change takes effect.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="email">Email Address</Label>
+            <Input
+              id="email"
+              type="email"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              placeholder="Enter your new email address"
+            />
+          </div>
 
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">
-                We&apos;ve sent a verification link to your email address. Click the link to verify your email.
-                Haven&apos;t received the email?
-              </p>
-
-              <Button
-                onClick={handleResendVerification}
-                disabled={isLoading}
-                className="w-full bg-green-600 hover:bg-green-500"
-              >
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Resend Verification Email
-              </Button>
-            </div>
-
-            <div className="pt-4">
-              <Button
-                variant="outline"
-                onClick={() => router.back()}
-                className="w-full"
-              >
-                Go Back
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          <Button
+            className="w-full"
+            onClick={handleUpdateEmail}
+            disabled={isUpdating || !newEmail || newEmail === user.email}
+          >
+            {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Update Email
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 } 

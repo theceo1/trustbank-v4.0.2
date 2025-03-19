@@ -35,18 +35,18 @@ const NETWORKS_BY_CURRENCY: Record<string, Array<{
   isRecommended?: boolean;
   fee?: string;
 }>> = {
-  btc: [{ id: 'bitcoin', name: 'Bitcoin Network' }],
-  eth: [{ id: 'ethereum', name: 'ERC20' }],
+  btc: [{ id: 'btc', name: 'Bitcoin Network' }],
+  eth: [{ id: 'erc20', name: 'ERC20' }],
   usdt: [
-    { id: 'tron', name: 'TRC20', isRecommended: true, fee: '1 USDT' },
-    { id: 'ethereum', name: 'ERC20', fee: '10-20 USDT' },
-    { id: 'bsc', name: 'BEP20 (BSC)', fee: '0.5-1 USDT' }
+    { id: 'trc20', name: 'TRC20', isRecommended: true, fee: '1 USDT' },
+    { id: 'erc20', name: 'ERC20', fee: '10-20 USDT' },
+    { id: 'bep20', name: 'BEP20 (BSC)', fee: '0.5-1 USDT' }
   ],
   usdc: [
-    { id: 'ethereum', name: 'ERC20' },
-    { id: 'bsc', name: 'BEP20 (BSC)' }
+    { id: 'erc20', name: 'ERC20' },
+    { id: 'bep20', name: 'BEP20 (BSC)' }
   ],
-  bnb: [{ id: 'bsc', name: 'BEP20 (BSC)' }],
+  bnb: [{ id: 'bep20', name: 'BEP20 (BSC)' }],
   matic: [{ id: 'polygon', name: 'Polygon Network' }]
 }
 
@@ -78,7 +78,7 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
           fetchAddress(networks[0].id)
         } else if (wallet.currency.toUpperCase() === 'USDT') {
           // Default to TRC20 for USDT as it's recommended
-          const tronNetwork = networks?.find(n => n.id === 'tron')
+          const tronNetwork = networks?.find(n => n.id === 'trc20')
           if (tronNetwork) {
             setSelectedNetwork(tronNetwork.id)
             fetchAddress(tronNetwork.id)
@@ -283,7 +283,7 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
                       ))}
                     </SelectContent>
                   </Select>
-                  {selectedNetwork === 'tron' && (
+                  {selectedNetwork === 'trc20' && (
                     <p className="text-sm text-green-600">
                       TRC20 is recommended for faster and cheaper transactions
                     </p>

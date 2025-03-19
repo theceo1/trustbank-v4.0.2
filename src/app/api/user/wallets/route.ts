@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
-import { quidaxService } from '@/lib/quidax';
+import { QuidaxServerService } from '@/lib/quidax';
 
 export async function GET() {
   try {
-    // Initialize Supabase client
+    // Initialize Supabase client with proper cookie handling
     const cookieStore = cookies();
     const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
 
@@ -33,8 +33,21 @@ export async function GET() {
       );
     }
 
+    // Initialize Quidax service with secret key
+    const quidaxSecretKey = process.env.QUIDAX_SECRET_KEY;
+    if (!quidaxSecretKey) {
+      throw new Error('QUIDAX_SECRET_KEY is not configured');
+    }
+    
+    const quidaxService = new QuidaxServerService(quidaxSecretKey);
+
     // Fetch wallets from Quidax
-    const wallets = await quidaxService.getUserWallets(profile.quidax_id);
+    const response = await quidaxService.getWallets(profile.quidax_id);
+    
+    // Ensure we have an array of wallets
+    const wallets = Array.isArray(response.data) ? response.data : 
+                   Array.isArray(response) ? response : 
+                   [];
 
     return NextResponse.json({
       status: 'success',

@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { getWallets, getMarketTickers, getSwapTransactions } from '@/lib/quidax'
+import { createQuidaxServer } from '@/lib/quidax'
 import { NextResponse } from 'next/server'
 
 interface MarketData {
@@ -126,8 +126,7 @@ export async function GET(request: Request) {
           two_factor_enabled: false,
           completed_trades: 0,
           completion_rate: 0,
-          is_verified: false,
-          quidax_id: 'TEST_' + user.id.substring(0, 8)
+          is_verified: false
         }])
         .select()
         .single();
@@ -149,17 +148,20 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: 'Quidax ID not found' }, { status: 400 });
     }
 
+    // Initialize Quidax server service
+    const quidaxServer = createQuidaxServer(process.env.QUIDAX_SECRET_KEY!);
+
     // Fetch data from Quidax using the Quidax ID
     console.log('Fetching Quidax data for user:', userProfile.quidax_id);
     
-    const [walletsData, marketData, regularTxsResult, swapTxsResult] = await Promise.all([
-      getWallets(userProfile.quidax_id).catch((error: Error) => {
+    const [walletsResponse, marketTickersResponse, regularTxsResult, swapTxsResult] = await Promise.all([
+      quidaxServer.getWallets(userProfile.quidax_id).catch((error: Error) => {
         console.error('Error fetching wallets:', error);
-        return [];
+        return { data: [] };
       }),
-      getMarketTickers().catch((error: Error) => {
+      quidaxServer.getMarketTickers().catch((error: Error) => {
         console.error('Error fetching market data:', error);
-        return {};
+        return { data: {} };
       }),
       (async () => {
         try {
@@ -223,7 +225,7 @@ export async function GET(request: Request) {
       .slice(0, 10); // Keep only the 10 most recent
 
     // Process market data
-    const processedMarketData = Object.entries(marketData || {})
+    const processedMarketData = Object.entries(marketTickersResponse.data || {})
       .filter(([key]) => key.toLowerCase().endsWith('ngn'))
       .map(([key, value]: [string, any]) => {
         if (!value || !value.ticker) return null;
@@ -245,7 +247,7 @@ export async function GET(request: Request) {
     });
 
     return NextResponse.json({
-      wallets: walletsData || [],
+      wallets: walletsResponse.data || [],
       marketData: processedMarketData,
       transactions: allTransactions,
       userId: userProfile.quidax_id

@@ -3,178 +3,58 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+  const res = NextResponse.next()
+  const supabase = createMiddlewareClient({ req: request, res })
+
+  // Public paths that don't require authentication
+  const publicPaths = [
+    '/api/auth/test-token',
+    '/api/auth/callback',
+    '/api/auth/sign-in',
+    '/api/auth/sign-up',
+    '/auth/login',
+    '/auth/register'
+  ]
+
+  // Check if the current path is public
+  if (publicPaths.some(path => request.nextUrl.pathname.startsWith(path))) {
+    return res
+  }
+
   try {
-    // Create a response early
-    const res = NextResponse.next()
-    
-    // Create the Supabase client with proper cookie handling
-    const supabase = createMiddlewareClient({ 
-      req: request,
-      res,
-    })
+    // Refresh session if expired and valid refresh token exists
+    const { data: { session }, error } = await supabase.auth.getSession()
 
-    // Refresh session if expired - required for Server Components
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    if (error) throw error
 
-    // Define public routes that don't need auth
-    const publicRoutes = [
-      '/',
-      '/auth/login',
-      '/auth/signup',
-      '/auth/forgot-password',
-      '/auth/reset-password',
-      '/about',
-      '/about/vision',
-      '/about/mission',
-      '/about/team',
-      '/about/careers',
-      '/about/faq',
-      '/about/contact',
-      '/about/blog',
-      '/legal',
-      '/legal/terms',
-      '/legal/privacy',
-      '/legal/aml',
-      '/legal/kyc',
-      '/legal/risk',
-      '/legal/cookies',
-      '/calculator',
-      '/market',
-      '/learn',
-      '/status',
-      '/support',
-      '/features',
-    ]
-    
-    const publicApiRoutes = [
-      '/api/auth/login',
-      '/api/auth/signup',
-      '/api/markets/price',
-      '/api/markets/overview',
-      '/api/markets/tickers',
-      '/api/markets/data',
-      '/api/config/fees',
-      '/api/user/kyc'
-    ]
-    
-    // Check if the current path matches any public route
-    const isPublicRoute = publicRoutes.some(route => 
-      request.nextUrl.pathname === route || 
-      (route !== '/' && request.nextUrl.pathname.startsWith(route))
-    )
-    
-    const isPublicApiRoute = publicApiRoutes.some(route =>
-      request.nextUrl.pathname === route
-    )
-
-    const isApiRoute = request.nextUrl.pathname.startsWith('/api/')
-    const isAdminRoute = request.nextUrl.pathname.startsWith('/admin')
-
-    // If it's a public route, allow access without authentication
-    if (isPublicRoute || isPublicApiRoute) {
-      return res
-    }
-
-    // For API routes, check Authorization header or session
-    if (isApiRoute) {
-      const authHeader = request.headers.get('Authorization')
-      if (authHeader?.startsWith('Bearer ')) {
-        const token = authHeader.split(' ')[1]
-        const { data: { user }, error } = await supabase.auth.getUser(token)
-        if (!error && user) {
-          return res
-        }
-      }
-      
-      // If no valid token in header, check for session
-      if (session) {
-        return res
-      }
-      
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // For all other routes (protected routes), check session
     if (!session) {
-      const redirectUrl = new URL('/auth/login', request.url)
+      // For API routes, return 401
+      if (request.nextUrl.pathname.startsWith('/api/')) {
+        return NextResponse.json(
+          { error: 'Unauthorized' },
+          { status: 401 }
+        )
+      }
+
+      // For other routes, redirect to login
+      const redirectUrl = request.nextUrl.clone()
+      redirectUrl.pathname = '/auth/login'
       redirectUrl.searchParams.set('redirect', request.nextUrl.pathname)
       return NextResponse.redirect(redirectUrl)
     }
 
-    // Check if user has a profile
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('*')
-      .eq('user_id', session.user.id)
-      .single()
-
-    // If no profile exists and not already on onboarding page, redirect to onboarding
-    if (!profile && !request.nextUrl.pathname.startsWith('/onboarding')) {
-      return NextResponse.redirect(new URL('/onboarding', request.url))
-    }
-
-    // Check KYC status for trade pages
-    const tradePages = ['/trade', '/trade/spot', '/trade/p2p', '/trade/swap'];
-    if (tradePages.some(page => request.nextUrl.pathname.startsWith(page))) {
-      // Get verification history
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('verification_history')
-        .eq('user_id', session.user.id)
-        .single();
-
-      const verificationHistory = profile?.verification_history || {};
-      const hasBasicKyc = verificationHistory.email && 
-                         verificationHistory.phone && 
-                         verificationHistory.basic_info;
-
-      console.log('[Middleware] KYC Check:', {
-        userId: session.user.id,
-        verificationHistory,
-        hasBasicKyc
-      });
-
-      // Set KYC status in cookies
-      res.cookies.set('x-kyc-status', hasBasicKyc ? 'verified' : 'unverified', {
-        httpOnly: false, // Allow JavaScript access
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        path: '/',
-        maxAge: hasBasicKyc ? 3600 : 0 // Expire immediately if not verified
-      });
-
-      return res;
-    }
-
-    // Special handling for admin routes
-    if (isAdminRoute) {
-      const { data: userProfile } = await supabase
-        .from('user_profiles')
-        .select('role')
-        .eq('user_id', session.user.id)
-        .single()
-
-      if (!userProfile?.role || userProfile.role !== 'admin') {
-        return NextResponse.redirect(new URL('/dashboard', request.url))
-      }
-    }
-
     return res
-  } catch (e) {
-    console.error('Middleware error:', e)
-    // If there's an error, return the original response
-    return NextResponse.next()
+  } catch (error) {
+    console.error('Auth error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
     '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 } 

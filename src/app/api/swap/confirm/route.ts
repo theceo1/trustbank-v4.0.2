@@ -7,135 +7,129 @@ const QUIDAX_SECRET_KEY = process.env.QUIDAX_SECRET_KEY;
 
 export async function POST(request: Request) {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
+    // Check Authorization header first
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const cookieStore = cookies();
+    const supabase = createRouteHandlerClient({ 
+      cookies: () => cookieStore 
+    }, {
+      supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY
+    });
+
+    // Get user from token
+    const token = authHeader.split(' ')[1];
+    const { data: { user }, error: tokenError } = await supabase.auth.getUser(token);
     
-    // Check if user is authenticated
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json(
-        { status: 'error', message: 'Unauthorized' },
-        { status: 401 }
-      );
+    if (tokenError || !user) {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    if (!QUIDAX_SECRET_KEY) {
-      console.error('QUIDAX_SECRET_KEY is not defined');
-      return NextResponse.json(
-        { status: 'error', message: 'API configuration error' },
-        { status: 500 }
-      );
-    }
-
+    // Get request body
     const body = await request.json();
-    const { quotation_id, from_currency, to_currency, from_amount, user_id } = body;
+    const { quotation_id } = body;
 
-    if (!quotation_id || !from_currency || !to_currency || !from_amount || !user_id) {
+    // Validate required parameters
+    if (!quotation_id) {
       return NextResponse.json(
-        { status: 'error', message: 'Missing required parameters' },
+        { error: 'Missing quotation ID' },
         { status: 400 }
       );
     }
 
     // Get user's Quidax ID from profile
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile } = await supabase
       .from('user_profiles')
       .select('quidax_id')
       .eq('user_id', user.id)
       .single();
 
-    if (profileError || !profile?.quidax_id) {
+    if (!profile?.quidax_id) {
       return NextResponse.json(
-        { status: 'error', message: 'Failed to get Quidax ID' },
-        { status: 400 }
+        { error: 'Trading account not found' },
+        { status: 404 }
       );
     }
 
-    // Ensure the user_id matches the profile's quidax_id
-    if (user_id !== profile.quidax_id) {
+    // Get the pending swap transaction
+    const { data: pendingSwap } = await supabase
+      .from('swap_transactions')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('quidax_quotation_id', quotation_id)
+      .eq('status', 'pending')
+      .single();
+
+    if (!pendingSwap) {
       return NextResponse.json(
-        { status: 'error', message: 'Invalid user ID' },
-        { status: 400 }
+        { error: 'Swap quotation not found or expired' },
+        { status: 404 }
       );
     }
 
-    console.log('Making request to Quidax API:', {
-      url: `${QUIDAX_API_URL}/users/${user_id}/swap_quotation/${quotation_id}/confirm`,
-      body: {
-        from_currency,
-        to_currency,
-        from_amount,
+    // Confirm swap with Quidax
+    const confirmResponse = await fetch(
+      `${QUIDAX_API_URL}/users/${profile.quidax_id}/swap_quotation/${quotation_id}/confirm`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${QUIDAX_SECRET_KEY}`,
+          'Content-Type': 'application/json'
+        }
       }
-    });
+    );
 
-    const response = await fetch(`${QUIDAX_API_URL}/users/${user_id}/swap_quotation/${quotation_id}/confirm`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${QUIDAX_SECRET_KEY}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify({
-        from_currency,
-        to_currency,
-        from_amount,
-      }),
-    });
-
-    const data = await response.json();
-    console.log('Quidax API response:', data);
-
-    if (!response.ok) {
-      console.error('Quidax API error:', {
-        status: response.status,
-        statusText: response.statusText,
-        data,
-      });
-
+    if (!confirmResponse.ok) {
+      console.error('Failed to confirm swap with Quidax:', await confirmResponse.text());
       return NextResponse.json(
-        { 
-          status: 'error', 
-          message: data.message || `Failed to confirm swap`,
-          data: data.data
-        },
-        { status: response.status }
+        { error: 'Failed to confirm swap' },
+        { status: 500 }
       );
     }
 
-    // Record the trade in our database
-    const { error: tradeError } = await supabase
-      .from('trades')
-      .insert({
-        user_id: user.id,
-        type: 'swap',
-        market: `${from_currency}${to_currency}`.toLowerCase(),
-        amount: parseFloat(from_amount),
-        price: parseFloat(data.data.execution_price),
-        fee: 0, // We'll update this once we have fee calculation
-        from_currency: from_currency.toLowerCase(),
-        to_currency: to_currency.toLowerCase(),
-        from_amount: parseFloat(from_amount),
-        to_amount: parseFloat(data.data.received_amount),
-        status: data.data.status
-      });
+    const confirmData = await confirmResponse.json();
 
-    if (tradeError) {
-      console.error('Failed to record trade:', tradeError);
-      // Don't return an error to the client since the swap was successful
+    // Update the swap transaction
+    const { error: updateError } = await supabase
+      .from('swap_transactions')
+      .update({
+        status: confirmData.data.status,
+        quidax_swap_id: confirmData.data.id,
+        to_amount: confirmData.data.received_amount,
+        execution_price: confirmData.data.execution_price,
+        updated_at: new Date().toISOString()
+      })
+      .eq('quidax_quotation_id', quotation_id);
+
+    if (updateError) {
+      console.error('Failed to update swap transaction:', updateError);
+      return NextResponse.json(
+        { error: 'Failed to update swap record' },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({
       status: 'success',
-      message: 'Swap confirmed successfully',
-      data: data.data
+      data: {
+        id: confirmData.data.id,
+        from_currency: confirmData.data.from_currency,
+        to_currency: confirmData.data.to_currency,
+        from_amount: confirmData.data.from_amount,
+        received_amount: confirmData.data.received_amount,
+        execution_price: confirmData.data.execution_price,
+        status: confirmData.data.status,
+        created_at: confirmData.data.created_at,
+        updated_at: confirmData.data.updated_at
+      }
     });
   } catch (error) {
-    console.error('Error confirming swap:', error);
+    console.error('Error in swap confirmation endpoint:', error);
     return NextResponse.json(
-      { 
-        status: 'error', 
-        message: error instanceof Error ? error.message : 'Failed to confirm swap',
-        data: null
-      },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

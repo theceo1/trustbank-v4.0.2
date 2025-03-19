@@ -1,11 +1,10 @@
-import { Metadata } from 'next';
-import SwapClient from './SwapClient';
+'use client';
 
-export const metadata: Metadata = {
-  title: 'Swap Trading | trustBank',
-  description: 'Instantly swap between different cryptocurrencies at the best rates.',
-};
+import SwapClient from './SwapClient';
+import { useKycStatus } from '@/hooks/useKycStatus';
 
 export default function SwapPage() {
-  return <SwapClient />;
+  const { hasBasicKyc, loading: kycLoading } = useKycStatus();
+
+  return <SwapClient disabled={!hasBasicKyc || kycLoading} />;
 } 

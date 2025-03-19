@@ -1,16 +1,19 @@
 import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
+import { Database } from '@/lib/supabase';
 
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    const cookieStore = await cookies();
+    const supabase = createRouteHandlerClient<Database>({ 
+      cookies: () => cookieStore 
+    });
+
+    const { data: { session } } = await supabase.auth.getSession();
 
     if (!session) {
       return NextResponse.json(
@@ -23,7 +26,7 @@ export async function GET(
       .from('p2p_orders')
       .select(`
         *,
-        creator:profiles(
+        creator:user_profiles(
           name,
           completed_trades,
           completion_rate

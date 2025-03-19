@@ -1,14 +1,18 @@
 import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
-import { Database } from '@/lib/database.types';
+import { Database } from '@/lib/supabase';
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { order_id, amount } = body;
     
-    const supabase = createRouteHandlerClient<Database>({ cookies });
+    const cookieStore = cookies();
+    const supabase = createRouteHandlerClient<Database>({ 
+      cookies: () => cookieStore 
+    });
+    
     const { data: { user } } = await supabase.auth.getUser();
     
     if (!user) {

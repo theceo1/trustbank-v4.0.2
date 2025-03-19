@@ -1,74 +1,118 @@
+import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
-import { NextResponse } from 'next/server';
-import { quidaxService } from '@/lib/quidax';
+import { QuidaxServerService } from '@/lib/quidax';
 
 export async function GET(request: Request) {
   try {
+    // Get URL parameters
     const { searchParams } = new URL(request.url);
     const currency = searchParams.get('currency');
-    const network = searchParams.get('network') || undefined;
+    const network = searchParams.get('network');
 
-    if (!currency) {
-      return NextResponse.json({ message: 'Currency is required' }, { status: 400 });
+    if (!currency || !network) {
+      return NextResponse.json(
+        { error: 'Currency and network are required' },
+        { status: 400 }
+      );
     }
 
-    // Create a new supabase client
-    const supabase = createRouteHandlerClient({ 
-      cookies
-    }, {
-      supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY
-    });
+    // Initialize Supabase client with proper cookie handling
+    const cookieStore = cookies();
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
 
-    // Check Authorization header first
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    // Get the current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
     }
 
-    const token = authHeader.split(' ')[1];
-    const { data: { user }, error: tokenError } = await supabase.auth.getUser(token);
-    
-    if (tokenError || !user) {
-      return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
-    }
-
-    // Get user profile to get Quidax ID
-    const { data: userProfile } = await supabase
+    // Get user's Quidax ID from profile
+    const { data: profile } = await supabase
       .from('user_profiles')
       .select('quidax_id')
       .eq('user_id', user.id)
       .single();
 
-    if (!userProfile?.quidax_id) {
-      return NextResponse.json({ message: 'User profile not found' }, { status: 404 });
+    if (!profile?.quidax_id) {
+      return NextResponse.json(
+        { error: 'User profile not found' },
+        { status: 404 }
+      );
     }
 
+    // Initialize Quidax service
+    const quidaxSecretKey = process.env.QUIDAX_SECRET_KEY;
+    if (!quidaxSecretKey) {
+      throw new Error('QUIDAX_SECRET_KEY is not configured');
+    }
+    
+    const quidaxService = new QuidaxServerService(quidaxSecretKey);
+
     try {
-      // Try to get existing address first
-      const address = await quidaxService.getWalletAddress(userProfile.quidax_id, currency);
-      return NextResponse.json({ 
-        status: 'success',
-        data: { address } 
-      });
-    } catch (error) {
-      // If no address exists, create a new one
-      const newAddress = await quidaxService.createWalletAddress(
-        userProfile.quidax_id, 
-        currency, 
-        network
+      // First try to get existing addresses
+      const response = await quidaxService.request(
+        `/users/${profile.quidax_id}/wallets/${currency}/addresses?network=${network}`
       );
-      return NextResponse.json({ 
+
+      // If we have addresses, return the first one
+      if (response?.data?.length > 0) {
+        return NextResponse.json({
+          status: 'success',
+          data: response.data[0]
+        });
+      }
+
+      // If no addresses found, create a new one
+      const newAddress = await quidaxService.request(
+        `/users/${profile.quidax_id}/wallets/${currency}/addresses`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ network })
+        }
+      );
+
+      return NextResponse.json({
         status: 'success',
-        data: { address: newAddress } 
+        data: newAddress.data
       });
+    } catch (error: any) {
+      // If address already exists, try to fetch it again
+      if (error.message?.includes('Address already generated')) {
+        try {
+          // Retry fetching addresses
+          const existingAddresses = await quidaxService.request(
+            `/users/${profile.quidax_id}/wallets/${currency}/addresses?network=${network}`
+          );
+
+          if (existingAddresses?.data?.length > 0) {
+            return NextResponse.json({
+              status: 'success',
+              data: existingAddresses.data[0]
+            });
+          }
+        } catch (fetchError) {
+          console.error('Error fetching existing address:', fetchError);
+        }
+      }
+
+      // If we get here, something went wrong
+      console.error('Error handling wallet address:', error);
+      return NextResponse.json(
+        { error: error.message || 'Failed to handle wallet address request' },
+        { status: error.message?.includes('Address already generated') ? 409 : 500 }
+      );
     }
   } catch (error: any) {
-    console.error('Error handling wallet address request:', error);
-    return NextResponse.json({ 
-      message: error.message || 'Failed to get wallet address'
-    }, { 
-      status: 500 
-    });
+    console.error('Error in wallet address route:', error);
+    return NextResponse.json(
+      { error: error.message || 'Internal server error' },
+      { status: 500 }
+    );
   }
 } 
+ 

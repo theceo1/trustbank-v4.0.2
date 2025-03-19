@@ -1,215 +1,119 @@
 "use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { useToast } from '@/hooks/use-toast';
-import { Loader2, Phone } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useState, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import * as z from "zod";
-
-const phoneFormSchema = z.object({
-  phone: z.string()
-    .min(10, "Phone number must be at least 10 digits")
-    .regex(/^\+?[1-9]\d{1,14}$/, "Please enter a valid phone number"),
-});
-
-const verificationFormSchema = z.object({
-  code: z.string()
-    .length(6, "Verification code must be 6 digits")
-    .regex(/^\d+$/, "Code must contain only numbers"),
-});
-
-type PhoneFormValues = z.infer<typeof phoneFormSchema>;
-type VerificationFormValues = z.infer<typeof verificationFormSchema>;
+import { useRouter } from 'next/navigation';
+import { useToast } from "@/components/ui/use-toast";
+import { Loader2 } from "lucide-react";
+import type { Database } from '@/types/database';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export default function PhoneVerificationPage() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [showVerification, setShowVerification] = useState(false);
-  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
+  const [phone, setPhone] = useState('');
+  const [isUpdating, setIsUpdating] = useState(false);
+  const supabase = createClientComponentClient<Database>();
   const router = useRouter();
   const { toast } = useToast();
 
-  const phoneForm = useForm<PhoneFormValues>({
-    resolver: zodResolver(phoneFormSchema),
-  });
+  useEffect(() => {
+    const getUser = async () => {
+      try {
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        setUser(currentUser);
+        if (currentUser?.phone) {
+          setPhone(currentUser.phone);
+        }
+      } catch (error) {
+        console.error('Error getting user:', error);
+        toast({
+          title: "Error",
+          description: "Failed to get user information. Please try again.",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const verificationForm = useForm<VerificationFormValues>({
-    resolver: zodResolver(verificationFormSchema),
-  });
+    getUser();
+  }, [supabase.auth, toast]);
 
-  const onPhoneSubmit = async (values: PhoneFormValues) => {
-    setIsLoading(true);
+  const handleUpdatePhone = async () => {
+    if (!user || !phone) return;
+
     try {
-      const supabase = createClientComponentClient();
-      const { error } = await supabase.auth.updateUser({
-        phone: values.phone
-      });
-
+      setIsUpdating(true);
+      const { error } = await supabase.auth.updateUser({ phone });
+      
       if (error) throw error;
 
-      // Send verification SMS
-      const { error: smsError } = await supabase.auth.signInWithOtp({
-        phone: values.phone
-      });
-
-      if (smsError) throw smsError;
-
-      setShowVerification(true);
       toast({
-        title: "Verification code sent",
+        title: "Verification Code Sent",
         description: "Please check your phone for the verification code.",
       });
+
+      router.push('/profile/security');
     } catch (error) {
       console.error('Error updating phone:', error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to update phone number. Please try again.",
-        variant: "destructive",
+        description: error instanceof Error ? error.message : "Failed to update phone number",
+        variant: "destructive"
       });
     } finally {
-      setIsLoading(false);
+      setIsUpdating(false);
     }
   };
 
-  const onVerificationSubmit = async (values: VerificationFormValues) => {
-    setIsLoading(true);
-    try {
-      const supabase = createClientComponentClient();
-      const { error } = await supabase.auth.verifyOtp({
-        phone: phoneForm.getValues().phone,
-        token: values.code,
-        type: 'sms'
-      });
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-[200px]">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
 
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Phone number verified successfully.",
-      });
-      
-      router.push('/profile/security');
-    } catch (error) {
-      console.error('Error verifying phone:', error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to verify phone number. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  if (!user) {
+    router.push('/auth/login');
+    return null;
+  }
 
   return (
-    <div className="min-h-screen flex items-center justify-center py-8 px-4">
-      <div className="w-full max-w-md">
-        <Card className="border-none shadow-lg">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Phone className="h-5 w-5 text-green-600" />
-              Phone Verification
-            </CardTitle>
-            <CardDescription>
-              Add and verify your phone number for enhanced security
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {!showVerification ? (
-              <Form {...phoneForm}>
-                <form onSubmit={phoneForm.handleSubmit(onPhoneSubmit)} className="space-y-4">
-                  <FormField
-                    control={phoneForm.control}
-                    name="phone"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Phone Number</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="+1234567890" 
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <div className="space-y-2">
-                    <Button
-                      type="submit"
-                      disabled={isLoading}
-                      className="w-full bg-green-600 hover:bg-green-500 text-white"
-                    >
-                      {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Send Verification Code
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => router.back()}
-                      className="w-full"
-                    >
-                      Go Back
-                    </Button>
-                  </div>
-                </form>
-              </Form>
-            ) : (
-              <Form {...verificationForm}>
-                <form onSubmit={verificationForm.handleSubmit(onVerificationSubmit)} className="space-y-4">
-                  <FormField
-                    control={verificationForm.control}
-                    name="code"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Verification Code</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="Enter 6-digit code" 
-                            maxLength={6}
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <div className="space-y-2">
-                    <Button
-                      type="submit"
-                      disabled={isLoading}
-                      className="w-full bg-green-600 hover:bg-green-500 text-white"
-                    >
-                      {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Verify Phone Number
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => setShowVerification(false)}
-                      className="w-full"
-                    >
-                      Back to Phone Entry
-                    </Button>
-                  </div>
-                </form>
-              </Form>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+    <div className="container mx-auto px-4 py-8 max-w-lg">
+      <Card>
+        <CardHeader>
+          <CardTitle>Update Phone Number</CardTitle>
+          <CardDescription>
+            Enter your phone number. You'll need to verify it with a code sent via SMS.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="phone">Phone Number</Label>
+            <Input
+              id="phone"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="Enter your phone number"
+            />
+          </div>
+
+          <Button
+            className="w-full"
+            onClick={handleUpdatePhone}
+            disabled={isUpdating || !phone || phone === user.phone}
+          >
+            {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Update Phone
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 } 

@@ -26,6 +26,8 @@ import {
   type NumericValue
 } from '@/lib/format';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useKycStatus } from '@/hooks/useKycStatus';
 
 const SUPPORTED_CURRENCIES = [
   { value: 'USDT', label: 'Tether (USDT)', icon: '💵' },
@@ -111,9 +113,10 @@ export default function TradePage() {
   const [usdRate, setUsdRate] = useState<number>(0);
   const [showRate, setShowRate] = useState(false);
   const [feeConfig, setFeeConfig] = useState<FeeConfig | null>(null);
-  const [hasBasicKyc, setHasBasicKyc] = useState(false);
+  const { hasBasicKyc, loading: kycLoading } = useKycStatus();
   
   const { toast } = useToast();
+  const supabase = createClientComponentClient();
 
   // Add fee constants
   const SERVICE_FEE_PERCENTAGE = 0.5; // 0.5% service fee
@@ -169,24 +172,6 @@ export default function TradePage() {
     fetchFeeConfig();
   }, []);
 
-  useEffect(() => {
-    const checkKyc = async () => {
-      try {
-        const cookies = document.cookie.split(';');
-        const kycCookie = cookies.find(c => c.trim().startsWith('x-kyc-status='));
-        const kycStatus = kycCookie ? kycCookie.split('=')[1] === 'verified' : false;
-        setHasBasicKyc(kycStatus);
-      } catch (error) {
-        console.error('Error checking KYC status:', error);
-        // Default to false if there's an error checking KYC status
-        // This ensures users can't bypass KYC by causing errors
-        setHasBasicKyc(false);
-      }
-    };
-
-    checkKyc();
-  }, []);
-
   const fetchUsdRate = async () => {
     try {
       const response = await fetch('/api/markets/usdtngn/ticker');
@@ -210,9 +195,18 @@ export default function TradePage() {
         throw new Error('Failed to fetch balances');
       }
       const { data } = await response.json();
+      
+      // Ensure data is an array
+      if (!Array.isArray(data)) {
+        console.error('Unexpected response format:', data);
+        throw new Error('Invalid response format');
+      }
+
       const balanceMap: Record<string, string> = {};
       data.forEach((wallet: any) => {
-        balanceMap[wallet.currency] = wallet.balance;
+        if (wallet && typeof wallet.currency === 'string' && typeof wallet.balance === 'string') {
+          balanceMap[wallet.currency] = wallet.balance;
+        }
       });
       setBalances(balanceMap);
     } catch (error) {
