@@ -100,7 +100,7 @@ export function TransactionList({ transactions }: TransactionListProps) {
                       {formatCurrency(transaction.to_amount, transaction.to_currency)}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Rate: {transaction.execution_price}
+                      Rate: {formatCurrency(transaction.execution_price, transaction.to_currency)}
                     </p>
                   </div>
                 ) : (

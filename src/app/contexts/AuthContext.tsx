@@ -7,15 +7,23 @@ import type { Database } from '@/types/database';
 import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from 'next/navigation';
 
-interface AuthContextType {
+export interface AuthContextType {
   user: User | null;
+  profile: {
+    quidax_id: string;
+    kyc_verified: boolean;
+    [key: string]: any;
+  } | null;
   loading: boolean;
+  signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
+  profile: null,
   loading: true,
+  signIn: async () => {},
   signOut: async () => {},
 });
 

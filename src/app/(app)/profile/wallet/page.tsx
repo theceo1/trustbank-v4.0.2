@@ -32,7 +32,7 @@ interface WalletData {
 
 export default function WalletPage() {
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const [walletData, setWalletData] = useState<WalletData | null>(null);
   const [isInstantSwapOpen, setIsInstantSwapOpen] = useState(false);
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
@@ -43,38 +43,91 @@ export default function WalletPage() {
   const [selectedWallet, setSelectedWallet] = useState<any>(null);
   const supabase = createClientComponentClient();
 
+  // Function to fetch wallet data
+  const fetchWalletData = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setError('No session found');
+        return;
+      }
+
+      const response = await fetch('/api/wallet', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch wallet data');
+      }
+
+      const data = await response.json();
+      setWalletData(data);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching wallet data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch wallet data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Initial data fetch
   useEffect(() => {
-    const fetchWalletData = async () => {
+    fetchWalletData();
+  }, []);
+
+  // Set up polling for real-time updates
+  useEffect(() => {
+    // Fetch updates every 10 seconds
+    const interval = setInterval(fetchWalletData, 10000);
+    
+    // Clean up interval on unmount
+    return () => clearInterval(interval);
+  }, []);
+
+  // Set up WebSocket subscription for instant updates
+  useEffect(() => {
+    const setupRealtimeSubscription = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (!session) {
-          setError('Please sign in to view your wallet');
-          setLoading(false);
-          return;
-        }
+        // Subscribe to wallet changes
+        const walletSubscription = supabase
+          .channel('wallet_changes')
+          .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'wallets'
+          }, () => {
+            // Refresh wallet data when changes occur
+            fetchWalletData();
+          })
+          .subscribe();
 
-        const response = await fetch('/api/wallet', {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`
-          }
-        });
-        const data = await response.json();
+        // Subscribe to transaction changes
+        const transactionSubscription = supabase
+          .channel('transaction_changes')
+          .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'transactions'
+          }, () => {
+            // Refresh wallet data when new transactions occur
+            fetchWalletData();
+          })
+          .subscribe();
 
-        if (response.ok) {
-          setWalletData(data);
-        } else {
-          setError(data.message || 'Failed to load wallet data');
-        }
+        // Clean up subscriptions
+        return () => {
+          walletSubscription.unsubscribe();
+          transactionSubscription.unsubscribe();
+        };
       } catch (error) {
-        console.error('Error fetching wallet data:', error);
-        setError('Failed to load wallet data');
-      } finally {
-        setLoading(false);
+        console.error('Error setting up realtime subscriptions:', error);
       }
     };
 
-    fetchWalletData();
+    setupRealtimeSubscription();
   }, []);
 
   if (loading) {

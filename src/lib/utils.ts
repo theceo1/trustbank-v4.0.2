@@ -84,6 +84,14 @@ export function formatCurrency(
   const numValue = typeof value === 'string' ? parseFloat(value) : value;
   if (isNaN(numValue)) return currency === 'NGN' ? '₦0.00' : '$0.00';
   
+  // Handle crypto currencies differently since they're not valid ISO currency codes
+  if (['BTC', 'ETH', 'USDT', 'SOL'].includes(currency)) {
+    return `${formatNumber(numValue, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 8,
+    })} ${currency}`;
+  }
+
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: currency === 'NGN' ? 'NGN' : 'USD',

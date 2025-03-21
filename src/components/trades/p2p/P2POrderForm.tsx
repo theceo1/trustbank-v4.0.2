@@ -77,9 +77,10 @@ const formSchema = z.object({
 interface P2POrderFormProps {
   type: 'buy' | 'sell';
   currency: string;
+  disabled?: boolean;
 }
 
-export function P2POrderForm({ type, currency }: P2POrderFormProps) {
+export function P2POrderForm({ type, currency, disabled = false }: P2POrderFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -192,14 +193,9 @@ export function P2POrderForm({ type, currency }: P2POrderFormProps) {
           name="amount"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Total Amount</FormLabel>
+              <FormLabel>Amount ({currency})</FormLabel>
               <FormControl>
-                <Input 
-                  type="number" 
-                  placeholder="Enter total amount" 
-                  {...field}
-                  onChange={(e) => field.onChange(Number(e.target.value))}
-                />
+                <Input {...field} type="number" disabled={disabled || isSubmitting} />
               </FormControl>
               <FormDescription>
                 Enter the total amount of cryptocurrency you want to trade
@@ -302,7 +298,7 @@ export function P2POrderForm({ type, currency }: P2POrderFormProps) {
           )}
         />
 
-        <Button type="submit" className="w-full bg-green-600 hover:bg-green-700" disabled={isSubmitting}>
+        <Button type="submit" className="w-full bg-green-600 hover:bg-green-700" disabled={disabled || isSubmitting}>
           Create {type === 'buy' ? 'Buy' : 'Sell'} Order
         </Button>
       </form>

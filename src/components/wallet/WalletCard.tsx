@@ -56,8 +56,8 @@ export function WalletCard({
     if (isNaN(numValue)) return '0.00';
     
     return numValue.toLocaleString(undefined, {
-      minimumFractionDigits: currency === 'BTC' ? 8 : 2,
-      maximumFractionDigits: currency === 'BTC' ? 8 : 2
+      minimumFractionDigits: ['BTC', 'SOL'].includes(currency) ? 8 : 2,
+      maximumFractionDigits: ['BTC', 'SOL'].includes(currency) ? 8 : 2
     });
   };
 

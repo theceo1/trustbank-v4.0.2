@@ -112,6 +112,69 @@ export async function POST(request: Request) {
       );
     }
 
+    // Update wallet balances
+    const fromAmount = parseFloat(confirmData.data.from_amount);
+    const toAmount = parseFloat(confirmData.data.received_amount);
+    const fromCurrency = confirmData.data.from_currency.toLowerCase();
+    const toCurrency = confirmData.data.to_currency.toLowerCase();
+
+    // Get current wallet balances
+    const { data: wallets, error: walletsError } = await supabase
+      .from('wallets')
+      .select('*')
+      .eq('user_id', user.id)
+      .in('currency', [fromCurrency, toCurrency]);
+
+    if (walletsError) {
+      console.error('Failed to fetch wallets:', walletsError);
+      return NextResponse.json(
+        { error: 'Failed to update wallet balances' },
+        { status: 500 }
+      );
+    }
+
+    // Update source wallet (deduct from_amount)
+    const fromWallet = wallets.find(w => w.currency === fromCurrency);
+    if (fromWallet) {
+      console.log(`Updating ${fromCurrency} wallet: Current balance=${fromWallet.balance}, Deducting ${fromAmount}`);
+      const { error: fromUpdateError } = await supabase
+        .from('wallets')
+        .update({
+          balance: Math.max(0, parseFloat(fromWallet.balance) - fromAmount),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', fromWallet.id);
+
+      if (fromUpdateError) {
+        console.error('Failed to update source wallet:', fromUpdateError);
+        return NextResponse.json(
+          { error: 'Failed to update source wallet balance' },
+          { status: 500 }
+        );
+      }
+    }
+
+    // Update destination wallet (add to_amount)
+    const toWallet = wallets.find(w => w.currency === toCurrency);
+    if (toWallet) {
+      console.log(`Updating ${toCurrency} wallet: Current balance=${toWallet.balance}, Adding ${toAmount}`);
+      const { error: toUpdateError } = await supabase
+        .from('wallets')
+        .update({
+          balance: parseFloat(toWallet.balance) + toAmount,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', toWallet.id);
+
+      if (toUpdateError) {
+        console.error('Failed to update destination wallet:', toUpdateError);
+        return NextResponse.json(
+          { error: 'Failed to update destination wallet balance' },
+          { status: 500 }
+        );
+      }
+    }
+
     return NextResponse.json({
       status: 'success',
       data: {

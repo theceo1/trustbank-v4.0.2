@@ -124,6 +124,22 @@ create policy "Users can view own security settings" on public.security_settings
   for select using (auth.uid() = user_id);
 create policy "Users can update own security settings" on public.security_settings
   for update using (auth.uid() = user_id);
+create policy "Admins can view all security settings" on public.security_settings
+  for select using (
+    exists (
+      select 1 from user_profiles
+      where user_profiles.user_id = auth.uid()
+      and user_profiles.role = 'admin'
+    )
+  );
+create policy "Admins can update all security settings" on public.security_settings
+  for update using (
+    exists (
+      select 1 from user_profiles
+      where user_profiles.user_id = auth.uid()
+      and user_profiles.role = 'admin'
+    )
+  );
 
 -- Create functions and triggers
 create or replace function public.handle_new_user()

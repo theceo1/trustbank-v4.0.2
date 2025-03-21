@@ -6,12 +6,14 @@ import { useEffect, useState } from "react";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 export function KYCBanner() {
-  const [hasBasicKyc, setHasBasicKyc] = useState(true); // Default to true to prevent flash
+  const [hasBasicKyc, setHasBasicKyc] = useState(false);
+  const [loading, setLoading] = useState(true);
   const supabase = createClientComponentClient();
 
   useEffect(() => {
     const checkKyc = async () => {
       try {
+        setLoading(true);
         // Get session first
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
@@ -21,36 +23,75 @@ export function KYCBanner() {
         }
 
         // Always check database state
-        const { data: profile } = await supabase
+        const { data: profile, error } = await supabase
           .from('user_profiles')
-          .select('verification_history')
+          .select('verification_history, kyc_verified')
           .eq('user_id', session.user.id)
           .single();
 
-        console.log('[KYC Banner] Profile verification history:', profile?.verification_history);
+        if (error) {
+          console.error('[KYC Banner] Error fetching profile:', error);
+          setHasBasicKyc(false);
+          return;
+        }
+
+        console.log('[KYC Banner] Profile data:', profile);
+
+        // If kyc_verified is true, user has completed KYC
+        if (profile?.kyc_verified) {
+          console.log('[KYC Banner] User is KYC verified via kyc_verified flag');
+          setHasBasicKyc(true);
+          return;
+        }
 
         const verificationHistory = profile?.verification_history || {};
-        const isVerified = verificationHistory.email && 
-                          verificationHistory.phone && 
-                          verificationHistory.basic_info;
+        
+        // Check if user has completed basic KYC
+        const isBasicKycVerified = verificationHistory.nin || 
+                                 verificationHistory.bvn ||
+                                 (verificationHistory.email && 
+                                  verificationHistory.phone && 
+                                  verificationHistory.basic_info);
 
         console.log('[KYC Banner] Verification status:', {
+          nin: verificationHistory.nin,
+          bvn: verificationHistory.bvn,
           email: verificationHistory.email,
           phone: verificationHistory.phone,
           basic_info: verificationHistory.basic_info,
-          isVerified
+          isVerified: isBasicKycVerified
         });
 
-        setHasBasicKyc(isVerified);
+        // If user is verified, update their kyc_verified flag
+        if (isBasicKycVerified) {
+          const { error: updateError } = await supabase
+            .from('user_profiles')
+            .update({ kyc_verified: true })
+            .eq('user_id', session.user.id);
+
+          if (updateError) {
+            console.error('[KYC Banner] Error updating kyc_verified flag:', updateError);
+          }
+        }
+
+        setHasBasicKyc(isBasicKycVerified);
       } catch (error) {
-        console.error('Error checking KYC status:', error);
+        console.error('[KYC Banner] Error checking KYC status:', error);
         setHasBasicKyc(false);
+      } finally {
+        setLoading(false);
       }
     };
 
     checkKyc();
   }, [supabase]);
 
+  // Don't show anything while loading
+  if (loading) {
+    return null;
+  }
+
+  // Don't show banner if user has completed KYC
   if (hasBasicKyc) {
     return null;
   }

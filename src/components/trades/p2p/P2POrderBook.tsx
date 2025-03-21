@@ -40,16 +40,15 @@ interface P2POrderBookProps {
   currency: string;
   type: 'buy' | 'sell';
   onSelect: (order: P2POrder) => void;
+  loading?: boolean;
 }
 
-export function P2POrderBook({ currency, type, onSelect }: P2POrderBookProps) {
+export function P2POrderBook({ currency, type, onSelect, loading = false }: P2POrderBookProps) {
   const [orders, setOrders] = useState<P2POrder[]>([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchOrders = async () => {
       try {
-        setLoading(true);
         const response = await fetch(`/api/trades/p2p/orders?currency=${currency}&type=${type}`);
         const data = await response.json();
         if (data.status === 'success') {
@@ -57,8 +56,6 @@ export function P2POrderBook({ currency, type, onSelect }: P2POrderBookProps) {
         }
       } catch (error) {
         console.error('Error fetching P2P orders:', error);
-      } finally {
-        setLoading(false);
       }
     };
 

@@ -313,17 +313,22 @@ const faqs = [
     question: "What are the trading fees?",
     answer: (
       <div className="space-y-2">
-        <p>Our fee structure is transparent and competitive:</p>
+        <p>Our fee structure is transparent and volume-based:</p>
         <ul className="list-disc list-inside space-y-1">
-          <li>Maker fees: 0.1%</li>
-          <li>Taker fees: 0.2%</li>
-          <li>Withdrawal fees vary by cryptocurrency</li>
+          <li>Base trading fee: 4.0%</li>
+          <li>Network fees vary by cryptocurrency</li>
+          <li>Referral discount: 0.1% per referral (up to 0.5%)</li>
         </ul>
-        <p className="mt-2">Volume-based discounts:</p>
+        <p className="mt-2">Volume-based discounts (30-day volume in USD):</p>
         <ul className="list-disc list-inside space-y-1">
-          <li>30-day volume {String.fromCharCode(62)} $100,000: 25% discount</li>
-          <li>30-day volume {String.fromCharCode(62)} $1,000,000: 50% discount</li>
+          <li>$1,000 - $5,000: 3.5% fee</li>
+          <li>$5,000 - $20,000: 3.0% fee</li>
+          <li>$20,000 - $100,000: 2.8% fee</li>
+          <li>$100,000+: 2.5% fee</li>
         </ul>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Visit our Trading Guide for detailed information about fees and limits.
+        </p>
       </div>
     ),
     category: 'trading'

@@ -6,8 +6,8 @@ import { authenticator } from 'otplib';
 // Routes that require 2FA
 const PROTECTED_ROUTES = [
   '/api/wallet/withdraw',
-  '/api/trades/p2p/orders',
   '/api/trades/p2p/trades',
+  '/api/trades/p2p/orders'
 ];
 
 export async function middleware(request: NextRequest) {
@@ -24,8 +24,17 @@ export async function middleware(request: NextRequest) {
   }
 
   try {
-    // Get user session
-    const { data: { user }, error: sessionError } = await supabase.auth.getUser();
+    // Get token from Authorization header
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const token = authHeader.split(' ')[1];
+    const { data: { user }, error: sessionError } = await supabase.auth.getUser(token);
     if (sessionError || !user) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
@@ -71,7 +80,7 @@ export async function middleware(request: NextRequest) {
 
     return res;
   } catch (error) {
-    console.error('2FA Middleware Error:', error);
+    console.error('Error in 2FA middleware:', error);
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }
@@ -79,10 +88,18 @@ export async function middleware(request: NextRequest) {
   }
 }
 
+// Add RLS policy for inserting security settings
+const { data: policyResult, error: policyError } = await supabase
+  .rpc('create_security_settings_insert_policy');
+
+if (policyError) {
+  console.error('Error creating RLS policy:', policyError);
+}
+
 export const config = {
   matcher: [
     '/api/wallet/withdraw/:path*',
-    '/api/trades/p2p/orders/:path*',
     '/api/trades/p2p/trades/:path*',
+    '/api/trades/p2p/orders/:path*'
   ],
 }; 

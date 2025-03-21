@@ -22,9 +22,9 @@ const KYC_TIERS = {
       'Limited trading volume',
       'Basic support'
     ],
-    dailyLimit: 100000, // 100k NGN
-    monthlyLimit: 1000000, // 1M NGN
-    withdrawalLimit: 200000, // 200k NGN
+    dailyLimit: 100, // 100 USD
+    monthlyLimit: 1000, // 1K USD
+    withdrawalLimit: 200, // 200 USD
   },
   TIER_2: {
     name: 'Starter',
@@ -39,9 +39,9 @@ const KYC_TIERS = {
       'Priority support',
       'Access to OTC trading'
     ],
-    dailyLimit: 500000, // 500k NGN
-    monthlyLimit: 5000000, // 5M NGN
-    withdrawalLimit: 1000000, // 1M NGN
+    dailyLimit: 500, // 500 USD
+    monthlyLimit: 5000, // 5K USD
+    withdrawalLimit: 1000, // 1K USD
   },
   TIER_3: {
     name: 'Intermediate',
@@ -55,9 +55,9 @@ const KYC_TIERS = {
       'Lower trading fees',
       'Dedicated support line'
     ],
-    dailyLimit: 2000000, // 2M NGN
-    monthlyLimit: 20000000, // 20M NGN
-    withdrawalLimit: 5000000, // 5M NGN
+    dailyLimit: 2000, // 2K USD
+    monthlyLimit: 20000, // 20K USD
+    withdrawalLimit: 5000, // 5K USD
   },
   TIER_4: {
     name: 'Advanced',
@@ -72,9 +72,9 @@ const KYC_TIERS = {
       'Advanced trading tools',
       'Exclusive market insights'
     ],
-    dailyLimit: 10000000, // 10M NGN
-    monthlyLimit: 100000000, // 100M NGN
-    withdrawalLimit: 20000000, // 20M NGN
+    dailyLimit: 10000, // 10K USD
+    monthlyLimit: 100000, // 100K USD
+    withdrawalLimit: 20000, // 20K USD
   },
   TIER_5: {
     name: 'Premium',
@@ -92,19 +92,19 @@ const KYC_TIERS = {
       'Advanced trading features',
       'Early access to new features'
     ],
-    dailyLimit: 50000000, // 50M NGN
-    monthlyLimit: 500000000, // 500M NGN
-    withdrawalLimit: 100000000, // 100M NGN
+    dailyLimit: 50000, // 50K USD
+    monthlyLimit: 500000, // 500K USD
+    withdrawalLimit: 100000, // 100K USD
   }
 };
 
 // Volume-based fee tiers
 const VOLUME_TIERS = {
-  TIER_1: { min: 0, max: 1000000, fee: 4.0 },        // 0-1M NGN: 4.0%
-  TIER_2: { min: 1000000, max: 5000000, fee: 3.5 },  // 1M-5M NGN: 3.5%
-  TIER_3: { min: 5000000, max: 20000000, fee: 3.0 }, // 5M-20M NGN: 3.0%
-  TIER_4: { min: 20000000, max: 100000000, fee: 2.8 }, // 20M-100M NGN: 2.8%
-  TIER_5: { min: 100000000, max: Infinity, fee: 2.5 }  // 100M+ NGN: 2.5%
+  TIER_1: { min: 0, max: 1000, fee: 4.0 },        // 0-1K USD: 4.0%
+  TIER_2: { min: 1000, max: 5000, fee: 3.5 },     // 1K-5K USD: 3.5%
+  TIER_3: { min: 5000, max: 20000, fee: 3.0 },    // 5K-20K USD: 3.0%
+  TIER_4: { min: 20000, max: 100000, fee: 2.8 },  // 20K-100K USD: 2.8%
+  TIER_5: { min: 100000, max: Infinity, fee: 2.5 }  // 100K+ USD: 2.5%
 };
 
 export default function TradingGuidePage() {
@@ -179,9 +179,9 @@ export default function TradingGuidePage() {
                     <div>
                       <h4 className="font-medium mb-2">Trading Limits</h4>
                       <ul className="text-sm space-y-1 text-muted-foreground">
-                        <li>Daily: {formatCurrency(info.dailyLimit, 'NGN')}</li>
-                        <li>Monthly: {formatCurrency(info.monthlyLimit, 'NGN')}</li>
-                        <li>Withdrawal: {formatCurrency(info.withdrawalLimit, 'NGN')}</li>
+                        <li>Daily: {formatCurrency(info.dailyLimit, 'USD')}</li>
+                        <li>Monthly: {formatCurrency(info.monthlyLimit, 'USD')}</li>
+                        <li>Withdrawal: {formatCurrency(info.withdrawalLimit, 'USD')}</li>
                       </ul>
                     </div>
                   </div>
@@ -214,7 +214,7 @@ export default function TradingGuidePage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Tier Level</TableHead>
-                    <TableHead>30-Day Volume (NGN)</TableHead>
+                    <TableHead>30-Day Volume (USD)</TableHead>
                     <TableHead>Trading Fee</TableHead>
                     <TableHead>Features</TableHead>
                   </TableRow>
@@ -225,8 +225,8 @@ export default function TradingGuidePage() {
                       <TableCell className="font-medium">Tier {index + 1}</TableCell>
                       <TableCell>
                         {tier.max === Infinity
-                          ? `${formatCurrency(tier.min, 'NGN')}+`
-                          : `${formatCurrency(tier.min, 'NGN')} - ${formatCurrency(tier.max, 'NGN')}`}
+                          ? `${formatCurrency(tier.min, 'USD')}+`
+                          : `${formatCurrency(tier.min, 'USD')} - ${formatCurrency(tier.max, 'USD')}`}
                       </TableCell>
                       <TableCell>{tier.fee}%</TableCell>
                       <TableCell>
@@ -249,7 +249,7 @@ export default function TradingGuidePage() {
                   <ul className="list-disc list-inside mt-2">
                     <li>Get 0.1% fee discount for each successful referral (up to 0.5%)</li>
                     <li>Network fees vary by cryptocurrency and are displayed during trading</li>
-                    <li>Volume is calculated based on your 30-day trading activity</li>
+                    <li>Volume is calculated in USD based on your 30-day trading activity</li>
                     <li>All fees are transparent and displayed before each trade</li>
                   </ul>
                 </AlertDescription>
