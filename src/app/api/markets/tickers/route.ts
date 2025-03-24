@@ -3,19 +3,22 @@ import { quidaxService } from '@/lib/quidax';
 
 export async function GET() {
   try {
-    const tickers = await quidaxService.getMarketTickers();
+    const response = await quidaxService.getMarketTickers();
     
+    if (!response?.data) {
+      throw new Error('Invalid response from Quidax API');
+    }
+
     return NextResponse.json({
       status: 'success',
-      data: tickers
+      data: response.data
     });
   } catch (error) {
-    console.error('Error fetching tickers:', error);
+    console.error('Error fetching market tickers:', error);
     return NextResponse.json(
       { 
         status: 'error',
-        message: 'Failed to fetch tickers',
-        error: error instanceof Error ? error.message : 'Unknown error'
+        message: error instanceof Error ? error.message : 'Failed to fetch market data'
       },
       { status: 500 }
     );

@@ -20,7 +20,7 @@ export function PortfolioValue({ value }: PortfolioValueProps) {
   const router = useRouter();
 
   const handleRefresh = () => {
-    router.refresh();
+    window.location.reload();
   };
 
   return (

@@ -50,8 +50,29 @@ const nextConfig = {
     return [
       {
         source: '/:path*',
-        headers: securityHeaders,
-      },
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: `
+              default-src 'self';
+              script-src 'self' 'unsafe-eval' 'unsafe-inline';
+              style-src 'self' 'unsafe-inline';
+              img-src 'self' data: blob: https:;
+              font-src 'self';
+              connect-src 'self' 
+                https://*.supabase.co 
+                wss://*.supabase.co 
+                https://*.vercel.app 
+                https://api.quidax.com 
+                https://api.dojah.io 
+                https://ipinfo.io;
+              frame-src 'self';
+              media-src 'self';
+              object-src 'none';
+            `.replace(/\s+/g, ' ').trim()
+          }
+        ]
+      }
     ];
   },
   
@@ -61,7 +82,9 @@ const nextConfig = {
       'vercel.app', 
       'trustbank.tech',
       'images.unsplash.com',
-      'ui-avatars.com'
+      'ui-avatars.com',
+      'avatars.githubusercontent.com',
+      'lh3.googleusercontent.com'
     ],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],

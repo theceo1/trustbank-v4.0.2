@@ -1,68 +1,94 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card } from '@/components/ui/card';
-import { formatMarketCap, formatCurrency, formatCompactNumber } from '@/lib/utils';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent } from '@/components/ui/card';
+import { formatMarketCap, formatCurrency, formatCompactNumber, formatNumber } from '@/lib/utils';
 import { Banner } from '@/components/Banner';
 import { motion } from 'framer-motion';
 
 interface MarketData {
-  totalMarketCap: number;
-  tradingVolume24h: number;
-  btcDominance: number;
-  lastUpdated: string;
-}
-
-interface PriceData {
-  [key: string]: {
-    price: number;
-    volume: number;
-    change24h: number;
+  total_market_cap: number;
+  trading_volume_24h: number;
+  btc_dominance: number;
+  btc_price: number;
+  eth_price: number;
+  markets: {
+    [key: string]: {
+      last: string;
+      vol: string;
+      buy: string;
+      sell: string;
+      low: string;
+      high: string;
+      open: string;
+    } | null;
   };
 }
 
-type CurrencyKey = 'USDT' | 'BTC' | 'ETH' | 'XRP' | 'SOL' | 'ADA' | 'DOGE' | 'MATIC' | 'DOT';
+// Group currencies by category for better organization
+const CURRENCY_GROUPS = {
+  'Popular': ['USDT', 'BTC', 'ETH', 'BNB', 'SOL'],
+  'DeFi': ['AAVE', 'CAKE', 'LINK'],
+  'Layer 1': ['ADA', 'DOT', 'AVAX', 'FTM', 'NEAR', 'ATOM'],
+  'Meme': ['DOGE', 'SHIB'],
+  'Layer 2': ['MATIC'],
+  'Other': ['XRP']
+} as const;
 
-const CURRENCIES: Record<CurrencyKey, { color: string; name: string }> = {
-  USDT: { color: 'from-green-500/20 to-green-500/5', name: 'Tether' },
-  BTC: { color: 'from-orange-500/20 to-orange-500/5', name: 'Bitcoin' },
-  ETH: { color: 'from-blue-500/20 to-blue-500/5', name: 'Ethereum' },
-  XRP: { color: 'from-indigo-500/20 to-indigo-500/5', name: 'Ripple' },
-  SOL: { color: 'from-purple-500/20 to-purple-500/5', name: 'Solana' },
-  ADA: { color: 'from-cyan-500/20 to-cyan-500/5', name: 'Cardano' },
-  DOGE: { color: 'from-yellow-500/20 to-yellow-500/5', name: 'Dogecoin' },
-  MATIC: { color: 'from-pink-500/20 to-pink-500/5', name: 'Polygon' },
-  DOT: { color: 'from-rose-500/20 to-rose-500/5', name: 'Polkadot' }
+type CurrencyGroup = keyof typeof CURRENCY_GROUPS;
+type Currency = typeof CURRENCY_GROUPS[CurrencyGroup][number];
+
+interface CurrencyInfo {
+  label: string;
+  icon: string;
+}
+
+const CURRENCY_INFO: Record<Currency, CurrencyInfo> = {
+  USDT: { label: 'Tether', icon: '💵' },
+  BTC: { label: 'Bitcoin', icon: '₿' },
+  ETH: { label: 'Ethereum', icon: 'Ξ' },
+  BNB: { label: 'Binance Coin', icon: '🟡' },
+  SOL: { label: 'Solana', icon: '◎' },
+  MATIC: { label: 'Polygon', icon: '⬡' },
+  DOGE: { label: 'Dogecoin', icon: 'Ð' },
+  SHIB: { label: 'Shiba Inu', icon: '🐕' },
+  XRP: { label: 'Ripple', icon: '✕' },
+  ADA: { label: 'Cardano', icon: '₳' },
+  DOT: { label: 'Polkadot', icon: '●' },
+  LINK: { label: 'Chainlink', icon: '⬡' },
+  AAVE: { label: 'Aave', icon: '👻' },
+  CAKE: { label: 'PancakeSwap', icon: '🥞' },
+  FTM: { label: 'Fantom', icon: '👻' },
+  AVAX: { label: 'Avalanche', icon: '🔺' },
+  ATOM: { label: 'Cosmos', icon: '⚛' },
+  NEAR: { label: 'NEAR Protocol', icon: 'Ⓝ' }
 };
 
 const INITIAL_MARKET_DATA: MarketData = {
-  totalMarketCap: 0,
-  tradingVolume24h: 0,
-  btcDominance: 0,
-  lastUpdated: new Date().toISOString()
+  total_market_cap: 0,
+  trading_volume_24h: 0,
+  btc_dominance: 0,
+  btc_price: 0,
+  eth_price: 0,
+  markets: {}
 };
 
-const INITIAL_PRICE_DATA: PriceData = {
-  USDT: { price: 0, volume: 0, change24h: 0 },
-  BTC: { price: 0, volume: 0, change24h: 0 },
-  ETH: { price: 0, volume: 0, change24h: 0 },
-  XRP: { price: 0, volume: 0, change24h: 0 },
-  SOL: { price: 0, volume: 0, change24h: 0 },
-  ADA: { price: 0, volume: 0, change24h: 0 },
-  DOGE: { price: 0, volume: 0, change24h: 0 },
-  MATIC: { price: 0, volume: 0, change24h: 0 },
-  DOT: { price: 0, volume: 0, change24h: 0 }
+const formatPrice = (value: number) => {
+  return new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(value);
 };
 
 export default function MarketOverview() {
   const [marketData, setMarketData] = useState<MarketData>(INITIAL_MARKET_DATA);
-  const [priceData, setPriceData] = useState<PriceData>(INITIAL_PRICE_DATA);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchMarketData = async () => {
     try {
       setIsLoading(true);
+      setError(null);
       
       // Fetch market overview data
       const overviewResponse = await fetch('/api/markets/overview');
@@ -71,76 +97,14 @@ export default function MarketOverview() {
       }
       const overviewData = await overviewResponse.json();
       
-      if (overviewData.status === 'success') {
+      if (overviewData.success) {
         setMarketData(overviewData.data);
+      } else {
+        throw new Error(overviewData.message || 'Failed to fetch market data');
       }
-
-      // Fetch tickers for price data
-      const tickersResponse = await fetch('/api/markets/tickers');
-      if (!tickersResponse.ok) {
-        throw new Error('Failed to fetch tickers');
-      }
-      const tickersData = await tickersResponse.json();
-
-      // Process tickers data
-      const newPriceData: PriceData = {
-        USDT: { price: 0, volume: 0, change24h: 0 },
-        BTC: { price: 0, volume: 0, change24h: 0 },
-        ETH: { price: 0, volume: 0, change24h: 0 },
-        XRP: { price: 0, volume: 0, change24h: 0 },
-        SOL: { price: 0, volume: 0, change24h: 0 },
-        ADA: { price: 0, volume: 0, change24h: 0 },
-        DOGE: { price: 0, volume: 0, change24h: 0 },
-        MATIC: { price: 0, volume: 0, change24h: 0 },
-        DOT: { price: 0, volume: 0, change24h: 0 }
-      };
-
-      if (tickersData.status === 'success') {
-        const tickers = tickersData.data;
-        Object.entries(tickers).forEach(([pair, data]: [string, any]) => {
-          if (pair === 'usdtngn') {
-            newPriceData.USDT.price = parseFloat(data.ticker.last);
-            newPriceData.USDT.volume = parseFloat(data.ticker.vol);
-            newPriceData.USDT.change24h = parseFloat(data.ticker.change || '0');
-          } else if (pair === 'btcngn') {
-            newPriceData.BTC.price = parseFloat(data.ticker.last);
-            newPriceData.BTC.volume = parseFloat(data.ticker.vol);
-            newPriceData.BTC.change24h = parseFloat(data.ticker.change || '0');
-          } else if (pair === 'ethngn') {
-            newPriceData.ETH.price = parseFloat(data.ticker.last);
-            newPriceData.ETH.volume = parseFloat(data.ticker.vol);
-            newPriceData.ETH.change24h = parseFloat(data.ticker.change || '0');
-          } else if (pair === 'xrpngn') {
-            newPriceData.XRP.price = parseFloat(data.ticker.last);
-            newPriceData.XRP.volume = parseFloat(data.ticker.vol);
-            newPriceData.XRP.change24h = parseFloat(data.ticker.change || '0');
-          } else if (pair === 'solngn') {
-            newPriceData.SOL.price = parseFloat(data.ticker.last);
-            newPriceData.SOL.volume = parseFloat(data.ticker.vol);
-            newPriceData.SOL.change24h = parseFloat(data.ticker.change || '0');
-          } else if (pair === 'adangn') {
-            newPriceData.ADA.price = parseFloat(data.ticker.last);
-            newPriceData.ADA.volume = parseFloat(data.ticker.vol);
-            newPriceData.ADA.change24h = parseFloat(data.ticker.change || '0');
-          } else if (pair === 'dogengn') {
-            newPriceData.DOGE.price = parseFloat(data.ticker.last);
-            newPriceData.DOGE.volume = parseFloat(data.ticker.vol);
-            newPriceData.DOGE.change24h = parseFloat(data.ticker.change || '0');
-          } else if (pair === 'maticngn') {
-            newPriceData.MATIC.price = parseFloat(data.ticker.last);
-            newPriceData.MATIC.volume = parseFloat(data.ticker.vol);
-            newPriceData.MATIC.change24h = parseFloat(data.ticker.change || '0');
-          } else if (pair === 'dotngn') {
-            newPriceData.DOT.price = parseFloat(data.ticker.last);
-            newPriceData.DOT.volume = parseFloat(data.ticker.vol);
-            newPriceData.DOT.change24h = parseFloat(data.ticker.change || '0');
-          }
-        });
-      }
-
-      setPriceData(newPriceData);
     } catch (error) {
       console.error('Failed to fetch market data:', error);
+      setError(error instanceof Error ? error.message : 'An error occurred');
     } finally {
       setIsLoading(false);
     }
@@ -152,13 +116,35 @@ export default function MarketOverview() {
     return () => clearInterval(interval);
   }, []);
 
-  // Format the last updated time in a consistent way that won't cause hydration issues
-  const formattedTime = new Date(marketData.lastUpdated).toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-    timeZone: 'UTC'  // Use UTC to ensure consistency between server and client
-  });
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin">
+          <svg className="h-8 w-8 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-red-600 mb-2">Error Loading Market Data</h2>
+          <p className="text-gray-600">{error}</p>
+          <button 
+            onClick={fetchMarketData}
+            className="mt-4 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -176,8 +162,8 @@ export default function MarketOverview() {
               className="rounded-lg p-6 bg-gradient-to-r from-purple-500/20 to-purple-500/5"
             >
               <h3 className="text-sm font-medium text-muted-foreground mb-2">Total Market Cap</h3>
-              <div className="text-2xl font-bold">{formatMarketCap(marketData.totalMarketCap)}</div>
-              <p className="text-xs text-muted-foreground mt-2">Last updated: {formattedTime}</p>
+              <div className="text-2xl font-bold">{formatMarketCap(marketData.total_market_cap)}</div>
+              <p className="text-xs text-muted-foreground mt-2">Last updated: {new Date().toLocaleTimeString()}</p>
             </motion.div>
 
             <motion.div
@@ -185,8 +171,8 @@ export default function MarketOverview() {
               className="rounded-lg p-6 bg-gradient-to-r from-blue-500/20 to-blue-500/5"
             >
               <h3 className="text-sm font-medium text-muted-foreground mb-2">24h Trading Volume</h3>
-              <div className="text-2xl font-bold">{formatMarketCap(marketData.tradingVolume24h)}</div>
-              <p className="text-xs text-muted-foreground mt-2">Last updated: {formattedTime}</p>
+              <div className="text-2xl font-bold">{formatMarketCap(marketData.trading_volume_24h)}</div>
+              <p className="text-xs text-muted-foreground mt-2">Last updated: {new Date().toLocaleTimeString()}</p>
             </motion.div>
 
             <motion.div
@@ -194,8 +180,8 @@ export default function MarketOverview() {
               className="rounded-lg p-6 bg-gradient-to-r from-orange-500/20 to-orange-500/5"
             >
               <h3 className="text-sm font-medium text-muted-foreground mb-2">BTC Dominance</h3>
-              <div className="text-2xl font-bold">{marketData.btcDominance.toFixed(2)}%</div>
-              <p className="text-xs text-muted-foreground mt-2">Last updated: {formattedTime}</p>
+              <div className="text-2xl font-bold">{marketData.btc_dominance.toFixed(2)}%</div>
+              <p className="text-xs text-muted-foreground mt-2">Last updated: {new Date().toLocaleTimeString()}</p>
             </motion.div>
           </div>
         </Card>
@@ -204,47 +190,53 @@ export default function MarketOverview() {
           <div className="space-y-4">
             <div>
               <h2 className="text-xl font-semibold">Price Tracker</h2>
-              <p className="text-muted-foreground">Monitor real-time cryptocurrency prices in NGN</p>
+              <p className="text-muted-foreground">Monitor real-time cryptocurrency prices in USDT</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {(Object.entries(CURRENCIES) as [CurrencyKey, { color: string; name: string }][]).map(([currency, info]) => (
-                <motion.div
-                  key={currency}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}
-                  className={`rounded-lg p-6 bg-gradient-to-r ${info.color}`}
-                >
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="text-lg font-medium">{currency}/NGN</h3>
-                        <p className="text-sm text-muted-foreground">{info.name}</p>
+              {(Object.entries(CURRENCY_INFO) as [Currency, CurrencyInfo][]).map(([currency, info]) => {
+                const marketKey = currency === 'USDT' ? 'USDT/USD' : `${currency}/USDT`;
+                const market = marketData.markets[marketKey.toLowerCase()];
+                
+                return (
+                  <Card
+                    key={currency}
+                    className={`relative overflow-hidden bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-800`}
+                  >
+                    <CardContent className="p-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <span className="text-2xl">{info.icon}</span>
+                        <div>
+                          <h3 className="font-semibold">{currency}</h3>
+                          <p className="text-sm text-muted-foreground">{info.label}</p>
+                        </div>
                       </div>
-                      <span className="text-xs bg-muted px-2 py-1 rounded-full">Live</span>
-                    </div>
-
-                    <div className="flex items-end gap-4">
-                      <div className="text-3xl font-bold">
-                        {formatCurrency(priceData[currency].price, 'NGN')}
-                      </div>
-                      <div className={`text-sm px-2 py-1 rounded ${
-                        priceData[currency].change24h >= 0 
-                          ? 'bg-green-500/10 text-green-500' 
-                          : 'bg-red-500/10 text-red-500'
-                      }`}>
-                        {priceData[currency].change24h >= 0 ? '+' : ''}
-                        {priceData[currency].change24h.toFixed(2)}%
-                      </div>
-                    </div>
-
-                    <div className="text-sm text-muted-foreground">
-                      Vol: {formatCompactNumber(priceData[currency].volume)} {currency}
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
+                      
+                      {market ? (
+                        <div className="space-y-2">
+                          <div className="text-2xl font-bold">
+                            ${formatPrice(parseFloat(market.last))}
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <div className="text-sm">
+                              <span className="text-muted-foreground">Vol: </span>
+                              ${formatPrice(parseFloat(market.vol))}
+                            </div>
+                            <div className="text-sm">
+                              <span className="text-muted-foreground">24h: </span>
+                              <span className={parseFloat(market.last) > parseFloat(market.open) ? 'text-green-600' : 'text-red-600'}>
+                                {formatPrice(((parseFloat(market.last) - parseFloat(market.open)) / parseFloat(market.open)) * 100)}%
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-muted-foreground">No data available</div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </div>
         </Card>

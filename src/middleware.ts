@@ -2,6 +2,7 @@ import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { authenticator } from 'otplib'
+import { adminMiddleware } from './middleware/admin'
 
 // Routes that require 2FA
 const PROTECTED_ROUTES = [
@@ -51,6 +52,9 @@ const PUBLIC_PATHS = [
   '/market'
 ];
 
+// Define admin routes pattern
+const ADMIN_ROUTES = /^\/admin(?:\/.*)?$/;
+
 export async function middleware(request: NextRequest) {
   const res = NextResponse.next()
   const supabase = createMiddlewareClient({ req: request, res })
@@ -93,6 +97,11 @@ export async function middleware(request: NextRequest) {
         headers: requestHeaders,
       },
     })
+  }
+
+  // Check if it's an admin route
+  if (ADMIN_ROUTES.test(request.nextUrl.pathname)) {
+    return adminMiddleware(request);
   }
 
   try {
@@ -231,5 +240,7 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     '/((?!_next/static|_next/image|favicon.ico).*)',
+    // Match all admin routes
+    '/admin/:path*',
   ],
 } 

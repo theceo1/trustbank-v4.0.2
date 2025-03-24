@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowRight, Calculator as CalculatorIcon, RefreshCw } from 'lucide-react';
-import { quidaxService } from '@/lib/quidax';
 
 interface MarketTicker {
   ticker: {
@@ -28,11 +27,6 @@ interface CompetitorRate {
   features: string[];
 }
 
-interface ErrorResponse {
-  message: string;
-  code?: number;
-}
-
 const formatNumber = (value: number, currency: string) => {
   const formatter = new Intl.NumberFormat('en-NG', {
     style: currency === 'NGN' ? 'currency' : 'decimal',
@@ -45,50 +39,33 @@ const formatNumber = (value: number, currency: string) => {
 
 export default function CalculatorPage() {
   const [amount, setAmount] = useState<string>('');
-  const [currency, setCurrency] = useState<string>('BTC');
+  const [fromCurrency, setFromCurrency] = useState<string>('NGN');
+  const [toCurrency, setToCurrency] = useState<string>('BTC');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [rate, setRate] = useState<number | null>(null);
+  const [calculatedRate, setCalculatedRate] = useState<number | null>(null);
   const [competitors, setCompetitors] = useState<CompetitorRate[]>([]);
 
   const currencies = [
     { value: 'NGN', label: 'Nigerian Naira (NGN)' },
     { value: 'USDT', label: 'Tether (USDT)' },
     { value: 'BTC', label: 'Bitcoin (BTC)' },
-    { value: 'ETH', label: 'Ethereum (ETH)' },
-    { value: 'BNB', label: 'Binance Coin (BNB)' },
-    { value: 'SOL', label: 'Solana (SOL)' },
-    { value: 'MATIC', label: 'Polygon (MATIC)' },
-    { value: 'DOGE', label: 'Dogecoin (DOGE)' },
-    { value: 'SHIB', label: 'Shiba Inu (SHIB)' },
-    { value: 'XRP', label: 'Ripple (XRP)' },
-    { value: 'ADA', label: 'Cardano (ADA)' },
-    { value: 'DOT', label: 'Polkadot (DOT)' },
-    { value: 'LINK', label: 'Chainlink (LINK)' },
-    { value: 'AAVE', label: 'Aave (AAVE)' },
-    { value: 'CAKE', label: 'PancakeSwap (CAKE)' },
-    { value: 'FTM', label: 'Fantom (FTM)' },
-    { value: 'AVAX', label: 'Avalanche (AVAX)' },
-    { value: 'ATOM', label: 'Cosmos (ATOM)' },
-    { value: 'NEAR', label: 'NEAR Protocol (NEAR)' }
+    { value: 'ETH', label: 'Ethereum (ETH)' }
   ];
 
   const fetchMarketTickers = async () => {
     try {
       const response = await fetch('/api/markets/tickers');
       const data = await response.json();
-      if (data.error) {
-        throw new Error(data.error);
+      
+      if (!data.data) {
+        throw new Error('Failed to fetch market data');
       }
-      if (data.status !== 'success' || !data.data) {
-        throw new Error('Invalid response from market data API');
-      }
+      
       return data.data;
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        setError(error.message);
-      }
-      return null;
+    } catch (error) {
+      console.error('Error fetching market data:', error);
+      throw error;
     }
   };
 
@@ -107,48 +84,64 @@ export default function CalculatorPage() {
         throw new Error('Please enter a valid amount');
       }
 
-      let calculatedRate: number;
+      let rate: number;
 
-      // Handle NGN to crypto conversion
-      if (currency === 'NGN') {
-        const targetPair = `btcngn`; // Default to BTC when converting from NGN
-        const ticker = tickers[targetPair]?.ticker;
+      // Get market pair based on currencies
+      const getMarketPair = (from: string, to: string) => {
+        const direct = `${from.toLowerCase()}${to.toLowerCase()}`;
+        const reverse = `${to.toLowerCase()}${from.toLowerCase()}`;
         
-        if (!ticker) {
-          throw new Error(`No market data available for BTC/NGN`);
-        }
-
-        const currentRate = parseFloat(ticker.last);
-        if (isNaN(currentRate)) {
-          throw new Error('Invalid rate from market data');
-        }
-
-        calculatedRate = parsedAmount / currentRate;
-      } 
-      // Handle crypto to NGN conversion
-      else {
-        const pair = `${currency.toLowerCase()}ngn`;
-        const ticker = tickers[pair]?.ticker;
+        if (tickers[direct]) return { pair: direct, isReverse: false };
+        if (tickers[reverse]) return { pair: reverse, isReverse: true };
         
-        if (!ticker) {
-          throw new Error(`No market data available for ${currency}/NGN`);
-        }
+        return null;
+      };
 
-        const currentRate = parseFloat(ticker.last);
-        if (isNaN(currentRate)) {
-          throw new Error('Invalid rate from market data');
+      // Try to get direct pair first
+      const marketPair = getMarketPair(fromCurrency, toCurrency);
+      
+      if (marketPair) {
+        const ticker = tickers[marketPair.pair].ticker;
+        const price = parseFloat(ticker.last);
+        
+        if (marketPair.isReverse) {
+          rate = parsedAmount * (1 / price);
+        } else {
+          rate = parsedAmount * price;
         }
-
-        calculatedRate = parsedAmount * currentRate;
+      } else {
+        // Try conversion through USDT
+        const fromUsdtPair = getMarketPair(fromCurrency, 'USDT');
+        const toUsdtPair = getMarketPair(toCurrency, 'USDT');
+        
+        if (!fromUsdtPair || !toUsdtPair) {
+          throw new Error(`No market data available for ${fromCurrency}/${toCurrency}`);
+        }
+        
+        const fromPrice = parseFloat(tickers[fromUsdtPair.pair].ticker.last);
+        const toPrice = parseFloat(tickers[toUsdtPair.pair].ticker.last);
+        
+        let usdtAmount;
+        if (fromUsdtPair.isReverse) {
+          usdtAmount = parsedAmount * (1 / fromPrice);
+        } else {
+          usdtAmount = parsedAmount * fromPrice;
+        }
+        
+        if (toUsdtPair.isReverse) {
+          rate = usdtAmount * (1 / toPrice);
+        } else {
+          rate = usdtAmount * toPrice;
+        }
       }
 
-      setRate(calculatedRate);
+      setCalculatedRate(rate);
 
-      // Add trustBank rate as the best rate with competitor differences
+      // Add competitor rates - trustBank always has the best rate
       const competitorRates = [
         { 
           name: 'trustBank', 
-          rate: calculatedRate,
+          rate: rate,
           features: [
             'No hidden fees',
             'Instant transfers',
@@ -157,7 +150,7 @@ export default function CalculatorPage() {
         },
         { 
           name: 'Competitor A', 
-          rate: calculatedRate * 0.985, // 1.5% worse
+          rate: rate * 1.015, // 1.5% higher than trustBank
           features: [
             'Hidden fees apply',
             '24hr processing',
@@ -166,29 +159,18 @@ export default function CalculatorPage() {
         },
         { 
           name: 'Competitor B', 
-          rate: calculatedRate * 0.982, // 1.8% worse
+          rate: rate * 1.018, // 1.8% higher than trustBank
           features: [
             'Transaction fees',
             '2-3 day processing',
             'Market rates + 1.8%'
           ]
-        },
-        { 
-          name: 'Competitor C', 
-          rate: calculatedRate * 0.988, // 1.2% worse
-          features: [
-            'Processing fees',
-            'Same day transfer',
-            'Market rates + 1.2%'
-          ]
         }
       ];
+      
       setCompetitors(competitorRates);
-
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        setError(error.message);
-      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'An error occurred');
     } finally {
       setLoading(false);
     }
@@ -196,18 +178,16 @@ export default function CalculatorPage() {
 
   const handleSwap = () => {
     setAmount('');
-    setRate(null);
-    setCurrency(currency === 'NGN' ? 'BTC' : 'NGN');
+    setCalculatedRate(null);
+    const temp = fromCurrency;
+    setFromCurrency(toCurrency);
+    setToCurrency(temp);
   };
 
   const handleAmountChange = (value: string) => {
-    // Remove any non-numeric characters except decimal point
     const sanitizedValue = value.replace(/[^0-9.]/g, '');
-    
-    // Ensure only one decimal point
     const parts = sanitizedValue.split('.');
     const finalValue = parts[0] + (parts.length > 1 ? '.' + parts[1] : '');
-    
     setAmount(finalValue);
   };
 
@@ -253,12 +233,12 @@ export default function CalculatorPage() {
                     className="text-lg h-12"
                   />
                   <div className="absolute right-3 top-3 text-sm text-muted-foreground">
-                    {currency}
+                    {fromCurrency}
                   </div>
                 </div>
 
                 <div className="grid grid-cols-[1fr,auto,1fr] gap-4 items-center">
-                  <Select value={currency} onValueChange={setCurrency}>
+                  <Select value={fromCurrency} onValueChange={setFromCurrency}>
                     <SelectTrigger className="h-12">
                       <SelectValue placeholder="From" />
                     </SelectTrigger>
@@ -280,7 +260,7 @@ export default function CalculatorPage() {
                     <ArrowRight className="w-6 h-6 text-green-600" />
                   </motion.div>
 
-                  <Select value={currency === 'NGN' ? 'BTC' : 'NGN'} onValueChange={setCurrency}>
+                  <Select value={toCurrency} onValueChange={setToCurrency}>
                     <SelectTrigger className="h-12">
                       <SelectValue placeholder="To" />
                     </SelectTrigger>
@@ -304,7 +284,7 @@ export default function CalculatorPage() {
                   ) : (
                     <>
                       <CalculatorIcon className="w-5 h-5 mr-2" />
-                      Get Best Rate
+                      Calculate Rate
                     </>
                   )}
                 </Button>
@@ -320,7 +300,7 @@ export default function CalculatorPage() {
                   </motion.div>
                 )}
 
-                {rate !== null && (
+                {calculatedRate !== null && (
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -328,24 +308,75 @@ export default function CalculatorPage() {
                   >
                     <div className="p-6 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-100 dark:border-green-800">
                       <div className="text-2xl font-semibold text-green-900 dark:text-green-100">
-                        {formatNumber(parseFloat(amount), currency)} {currency} = 
+                        {formatNumber(parseFloat(amount), fromCurrency)} {fromCurrency} = 
                       </div>
                       <div className="text-3xl font-bold text-green-600 mt-2">
-                        {formatNumber(rate, currency === 'NGN' ? 'BTC' : 'NGN')}
-                        {currency === 'NGN' ? ' BTC' : ''}
+                        {formatNumber(calculatedRate, toCurrency)} {toCurrency}
                       </div>
                       <div className="text-sm text-muted-foreground mt-3 border-t border-green-100 dark:border-green-800 pt-3">
-                        1 {currency} = {formatNumber(rate / parseFloat(amount), currency === 'NGN' ? 'BTC' : 'NGN')} {currency === 'NGN' ? 'BTC' : 'NGN'}
+                        1 {fromCurrency} = {formatNumber(calculatedRate / parseFloat(amount), toCurrency)} {toCurrency}
                       </div>
                     </div>
 
                     {competitors.length > 0 && (
-                      <div className="space-y-3">
+                      <div className="space-y-4">
+                        <div className="bg-gradient-to-br from-green-100 to-blue-100 dark:from-green-900/40 dark:to-blue-900/40 p-6 rounded-lg border border-green-200 dark:border-green-800">
+                          <h3 className="text-lg font-semibold text-green-800 dark:text-green-200 mb-4">
+                            Why trust<span className="text-green-600">Bank</span> Offers the Best Rates
+                          </h3>
+                          <div className="grid gap-4">
+                            <motion.div 
+                              initial={{ opacity: 0, x: -20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: 0.1 }}
+                              className="flex items-start gap-3"
+                            >
+                              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-green-500 flex items-center justify-center">
+                                <span className="text-white font-bold">1</span>
+                              </div>
+                              <div>
+                                <h4 className="font-semibold text-green-700 dark:text-green-300">Direct Market Access</h4>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">We source real time rates directly patners and verified order books, ensuring you get the most competitive prices.</p>
+                              </div>
+                            </motion.div>
+                            
+                            <motion.div 
+                              initial={{ opacity: 0, x: -20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: 0.2 }}
+                              className="flex items-start gap-3"
+                            >
+                              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-green-500 flex items-center justify-center">
+                                <span className="text-white font-bold">2</span>
+                              </div>
+                              <div>
+                                <h4 className="font-semibold text-green-700 dark:text-green-300">Zero Fee Structure</h4>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">Unlike competitors who charge up to 1.8% in fees, we eliminate hidden charges to maximize your value.</p>
+                              </div>
+                            </motion.div>
+                            
+                            <motion.div 
+                              initial={{ opacity: 0, x: -20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: 0.3 }}
+                              className="flex items-start gap-3"
+                            >
+                              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-green-500 flex items-center justify-center">
+                                <span className="text-white font-bold">3</span>
+                              </div>
+                              <div>
+                                <h4 className="font-semibold text-green-700 dark:text-green-300">Instant Processing</h4>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">Experience real-time transactions while others make you wait 24-72 hours for processing.</p>
+                              </div>
+                            </motion.div>
+                          </div>
+                        </div>
+
                         <h3 className="text-sm font-semibold flex items-center gap-2">
                           Market Comparison
                           <span className="text-xs text-muted-foreground">(Real-time rates)</span>
                         </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                           {competitors.map((competitor, index) => (
                             <motion.div
                               initial={{ opacity: 0, y: 20 }}
@@ -356,55 +387,37 @@ export default function CalculatorPage() {
                                 competitor.name === 'trustBank'
                                   ? 'bg-gradient-to-br from-green-600 to-green-700 text-white'
                                   : 'bg-white/50 dark:bg-black/40 border border-gray-100 dark:border-gray-800'
-                              } p-6`}
+                              } p-4`}
                             >
-                              <div className="flex justify-between items-start mb-3">
-                                <div>
-                                  <div className={`font-semibold ${competitor.name === 'trustBank' ? 'text-xl' : 'text-lg'}`}>
-                                    {competitor.name}
-                                  </div>
-                                  <div className={`text-2xl font-bold mt-2 ${competitor.name === 'trustBank' ? '' : 'text-gray-900 dark:text-gray-100'}`}>
-                                    {formatNumber(competitor.rate, currency === 'NGN' ? 'BTC' : 'NGN')}
-                                    {currency === 'NGN' ? ' BTC' : ''}
-                                  </div>
+                              <div className="flex justify-between items-start mb-2">
+                                <div className={`font-semibold ${competitor.name === 'trustBank' ? 'text-lg' : 'text-base'}`}>
+                                  {competitor.name}
                                 </div>
                                 {competitor.name === 'trustBank' && (
-                                  <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-semibold">
+                                  <span className="px-2 py-0.5 bg-white/20 rounded-full text-xs font-semibold">
                                     Best Rate
                                   </span>
                                 )}
                               </div>
                               
-                              <div className={`space-y-2 mt-4 text-sm ${
+                              <div className={`text-xl font-bold mt-2 ${competitor.name === 'trustBank' ? '' : 'text-gray-900 dark:text-gray-100'}`}>
+                                {formatNumber(competitor.rate, toCurrency)} {toCurrency}
+                              </div>
+                              
+                              <div className={`space-y-1 mt-3 text-sm ${
                                 competitor.name === 'trustBank' ? 'text-white/90' : 'text-gray-600 dark:text-gray-400'
                               }`}>
                                 {competitor.features.map((feature, idx) => (
                                   <div key={idx} className="flex items-center gap-2">
-                                    <div className={`w-1.5 h-1.5 rounded-full ${
+                                    <div className={`w-1 h-1 rounded-full ${
                                       competitor.name === 'trustBank' ? 'bg-white/80' : 'bg-gray-400'
                                     }`} />
                                     {feature}
                                   </div>
                                 ))}
                               </div>
-                              
-                              {competitor.name === 'trustBank' && (
-                                <div className="absolute top-0 right-0 w-24 h-24 transform translate-x-12 -translate-y-12">
-                                  <div className="absolute inset-0 bg-white/10 rotate-45"></div>
-                                </div>
-                              )}
                             </motion.div>
                           ))}
-                        </div>
-                        
-                        <div className="mt-6 bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg text-sm">
-                          <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">Why trustBank Rates Are Better</h4>
-                          <ul className="space-y-2 text-blue-700 dark:text-blue-300">
-                            <li>• Direct market access ensures best available rates</li>
-                            <li>• Zero hidden fees or markups on exchange rates</li>
-                            <li>• Instant processing with no additional charges</li>
-                            <li>• Transparent pricing with no surprise costs</li>
-                          </ul>
                         </div>
                       </div>
                     )}

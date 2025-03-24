@@ -41,17 +41,26 @@ export function AssetDistribution({ wallets, marketData }: AssetDistributionProp
       const price = marketInfo?.price || 0;
       const value = balance * price;
 
+      // Only include if balance is greater than 0
+      if (balance <= 0) return null;
+
       return {
         name: wallet.currency.toUpperCase(),
         value: value,
         balance: balance,
-        price: price
+        price: price,
+        percentage: 0 // Will be calculated after filtering
       };
     })
-    .filter(item => item.value > 0) // Only show assets with value
+    .filter((item): item is NonNullable<typeof item> => item !== null)
     .sort((a, b) => b.value - a.value); // Sort by value descending
 
   const totalValue = data.reduce((sum, item) => sum + item.value, 0);
+
+  // Calculate percentages
+  data.forEach(item => {
+    item.percentage = totalValue > 0 ? (item.value / totalValue) * 100 : 0;
+  });
 
   // If no assets have value, show empty state
   if (totalValue === 0) {

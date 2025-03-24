@@ -7,58 +7,105 @@ const CIRCULATING_SUPPLIES = {
   ETH: 120_000_000, // ~120M ETH in circulation
 };
 
+interface QuidaxTicker {
+  ticker: {
+    last: string;
+    vol: string;
+    buy: string;
+    sell: string;
+    low: string;
+    high: string;
+    open: string;
+  };
+}
+
+interface QuidaxMarketTickers {
+  [key: string]: QuidaxTicker;
+}
+
 export async function GET() {
   try {
-    const tickers = await quidaxService.getMarketTickers();
-    
-    let totalMarketCap = 0;
-    let tradingVolume24h = 0;
-    let btcMarketCap = 0;
+    // Fetch market tickers
+    const response = await quidaxService.getMarketTickers();
+    console.log('Raw API Response:', response);
 
-    // Get USDT/NGN price for USD conversion
-    const usdtNgnPrice = parseFloat(tickers['usdtngn']?.ticker?.last || '0');
-    
-    if (!usdtNgnPrice) {
-      throw new Error('Unable to get USDT/NGN price for conversion');
+    // Ensure we have data and it's in the expected format
+    if (!response?.data || typeof response.data !== 'object') {
+      throw new Error('Invalid response format from Quidax API');
     }
 
-    // Calculate market caps and volumes
-    Object.entries(tickers).forEach(([pair, data]) => {
-      const price = parseFloat(data.ticker.last || '0');
-      const volume = parseFloat(data.ticker.vol || '0');
-      
-      // Only process NGN pairs for now
-      if (pair.endsWith('ngn')) {
-        // Calculate trading volume in USD
-        const volumeInNGN = price * volume;
-        const volumeInUSD = volumeInNGN / usdtNgnPrice;
-        tradingVolume24h += volumeInUSD;
+    const tickers = response.data as QuidaxMarketTickers;
+    const markets = Object.keys(tickers);
+    console.log('Available markets:', markets);
 
-        // Calculate market caps using circulating supply
-        if (pair === 'btcngn') {
-          const priceInUSD = price / usdtNgnPrice;
-          btcMarketCap = priceInUSD * CIRCULATING_SUPPLIES.BTC;
-          totalMarketCap += btcMarketCap;
-        } else if (pair === 'ethngn') {
-          const priceInUSD = price / usdtNgnPrice;
-          const ethMarketCap = priceInUSD * CIRCULATING_SUPPLIES.ETH;
-          totalMarketCap += ethMarketCap;
+    // Get BTC/USDT and ETH/USDT prices
+    const btcTicker = tickers['btcusdt']?.ticker;
+    const ethTicker = tickers['ethusdt']?.ticker;
+    const usdtUsdTicker = tickers['usdtusd']?.ticker;
+
+    console.log('BTC Ticker:', btcTicker);
+    console.log('ETH Ticker:', ethTicker);
+    console.log('USDT/USD Ticker:', usdtUsdTicker);
+
+    if (!btcTicker || !ethTicker) {
+      throw new Error('Unable to get BTC/USDT or ETH/USDT tickers');
+    }
+
+    const btcPrice = parseFloat(btcTicker.last);
+    const ethPrice = parseFloat(ethTicker.last);
+
+    if (isNaN(btcPrice) || isNaN(ethPrice)) {
+      throw new Error('Invalid price data received');
+    }
+
+    console.log('BTC Price:', btcPrice);
+    console.log('ETH Price:', ethPrice);
+
+    // Calculate trading volume (24h)
+    let tradingVolume24h = 0;
+    Object.entries(tickers).forEach(([pair, data]) => {
+      if (pair.endsWith('usdt')) {
+        const price = parseFloat(data.ticker.last);
+        const volume = parseFloat(data.ticker.vol);
+        if (!isNaN(price) && !isNaN(volume)) {
+          tradingVolume24h += price * volume;
         }
       }
     });
 
+    // Calculate market caps
+    const btcMarketCap = btcPrice * CIRCULATING_SUPPLIES.BTC;
+    const ethMarketCap = ethPrice * CIRCULATING_SUPPLIES.ETH;
+    const totalMarketCap = btcMarketCap + ethMarketCap;
+
     // Calculate BTC dominance
     const btcDominance = totalMarketCap > 0 ? (btcMarketCap / totalMarketCap) * 100 : 0;
 
-    return NextResponse.json({
-      status: 'success',
+    const result = {
+      success: true,
       data: {
-        totalMarketCap,
-        tradingVolume24h,
-        btcDominance: parseFloat(btcDominance.toFixed(2)),
-        lastUpdated: new Date().toISOString()
+        total_market_cap: totalMarketCap,
+        trading_volume_24h: tradingVolume24h,
+        btc_dominance: btcDominance,
+        btc_price: btcPrice,
+        eth_price: ethPrice,
+        // Include individual market data for the UI
+        markets: {
+          'usdt/usd': usdtUsdTicker || null,
+          'btc/usdt': btcTicker || null,
+          'eth/usdt': ethTicker || null,
+          'xrp/usdt': tickers['xrpusdt']?.ticker || null,
+          'sol/usdt': tickers['solusdt']?.ticker || null,
+          'ada/usdt': tickers['adausdt']?.ticker || null,
+          'doge/usdt': tickers['dogeusdt']?.ticker || null,
+          'matic/usdt': tickers['maticusdt']?.ticker || null,
+          'dot/usdt': tickers['dotusdt']?.ticker || null
+        }
       }
-    });
+    };
+
+    console.log('Final response:', JSON.stringify(result, null, 2));
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Error fetching market overview:', error);
     return NextResponse.json(
