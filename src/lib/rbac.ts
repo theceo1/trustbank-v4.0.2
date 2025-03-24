@@ -1,5 +1,6 @@
 import { User } from '@supabase/auth-helpers-nextjs';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { Permission } from '@/types/admin';
 
 export enum UserRole {
   USER = 'user',
@@ -110,4 +111,6 @@ export const getRoutePermissions = (path: string): Permission[] => {
   );
 
   return matchingRoute ? routePermissions[matchingRoute] : [];
+};
+
 }; 

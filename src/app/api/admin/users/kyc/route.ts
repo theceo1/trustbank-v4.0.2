@@ -1,112 +1,129 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
+import { Permission } from '@/lib/rbac';
+import { hasPermission } from '@/lib/rbac';
 
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    const supabase = createRouteHandlerClient({ cookies });
+    const status = request.nextUrl.searchParams.get('status') || 'pending';
 
-    // Get the current user (admin)
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    // Get the current user's session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Verify admin status
-    const { data: adminProfile } = await supabase
-      .from('user_profiles')
-      .select('role')
-      .eq('user_id', user.id)
-      .single();
-
-    if (adminProfile?.role !== 'admin') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Check if user has permission to view KYC submissions
+    const hasAccess = await hasPermission(session.user.id, Permission.APPROVE_KYC);
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Get target user's email from query params
-    const { searchParams } = new URL(request.url);
-    const email = searchParams.get('email');
-
-    if (!email) {
-      return NextResponse.json(
-        { error: 'Email parameter is required' },
-        { status: 400 }
-      );
-    }
-
-    // Get target user's ID
-    const { data: targetUser } = await supabase
-      .from('auth.users')
-      .select('id')
-      .eq('email', email)
-      .single();
-
-    if (!targetUser) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
-    }
-
-    // Get user's profile and verification status
-    const { data: profile, error: profileError } = await supabase
-      .from('user_profiles')
+    // Fetch KYC submissions with user profiles
+    const { data: submissions, error: submissionsError } = await supabase
+      .from('kyc_submissions')
       .select(`
-        id,
-        user_id,
-        kyc_tier,
-        risk_score,
-        verification_history,
-        last_verification_at,
-        failed_verification_attempts
+        *,
+        user_profiles (
+          id,
+          user_id,
+          full_name,
+          email
+        )
       `)
-      .eq('user_id', targetUser.id)
+      .eq('status', status)
+      .order('created_at', { ascending: false });
+
+    if (submissionsError) {
+      console.error('Error fetching KYC submissions:', submissionsError);
+      return NextResponse.json({ error: 'Failed to fetch KYC submissions' }, { status: 500 });
+    }
+
+    return NextResponse.json({ submissions });
+  } catch (error) {
+    console.error('Error in KYC submissions route:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const supabase = createRouteHandlerClient({ cookies });
+
+    // Get the current user's session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check if user has permission to approve KYC
+    const hasAccess = await hasPermission(session.user.id, Permission.APPROVE_KYC);
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    // Get request body
+    const { submissionId, action, reason } = await request.json();
+    if (!submissionId || !action || !['approved', 'rejected'].includes(action)) {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
+
+    // Start a transaction
+    const { data: submission, error: submissionError } = await supabase
+      .from('kyc_submissions')
+      .update({
+        status: action,
+        reviewed_by: session.user.id,
+        reviewed_at: new Date().toISOString(),
+        review_notes: reason || null,
+      })
+      .eq('id', submissionId)
+      .eq('status', 'pending')
+      .select('user_profile_id')
       .single();
 
-    if (profileError) {
-      console.error('Error fetching profile:', profileError);
-      return NextResponse.json(
-        { error: 'Failed to fetch KYC status' },
-        { status: 500 }
-      );
+    if (submissionError) {
+      console.error('Error updating KYC submission:', submissionError);
+      return NextResponse.json({ error: 'Failed to update KYC submission' }, { status: 500 });
     }
 
-    // Get verification requests history
-    const { data: verificationRequests, error: requestsError } = await supabase
-      .from('verification_requests')
-      .select('*')
-      .eq('user_id', targetUser.id)
-      .order('created_at', { ascending: false });
+    if (action === 'approved') {
+      // Update user profile verification status
+      const { error: profileError } = await supabase
+        .from('user_profiles')
+        .update({
+          is_verified: true,
+          verified_at: new Date().toISOString(),
+          verified_by: session.user.id,
+        })
+        .eq('id', submission.user_profile_id);
 
-    if (requestsError) {
-      console.error('Error fetching requests:', requestsError);
-    }
-
-    // Get risk factors
-    const { data: riskFactors, error: riskError } = await supabase
-      .from('risk_factors')
-      .select('*')
-      .eq('user_id', targetUser.id)
-      .order('created_at', { ascending: false });
-
-    if (riskError) {
-      console.error('Error fetching risk factors:', riskError);
-    }
-
-    return NextResponse.json({
-      status: 'success',
-      data: {
-        profile,
-        verification_requests: verificationRequests || [],
-        risk_factors: riskFactors || []
+      if (profileError) {
+        console.error('Error updating user profile:', profileError);
+        return NextResponse.json({ error: 'Failed to update user profile' }, { status: 500 });
       }
-    });
+
+      // Update user role to verified_user
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .update({
+          role: 'verified_user',
+          updated_at: new Date().toISOString(),
+          updated_by: session.user.id,
+        })
+        .eq('user_profile_id', submission.user_profile_id);
+
+      if (roleError) {
+        console.error('Error updating user role:', roleError);
+        return NextResponse.json({ error: 'Failed to update user role' }, { status: 500 });
+      }
+    }
+
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error in admin KYC status endpoint:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    console.error('Error in KYC action route:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-} 
+}

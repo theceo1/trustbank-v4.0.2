@@ -1,15 +1,22 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  Activity,
+  UserCheck,
+  FileText,
+  Key,
+  LogIn,
+  AlertCircle,
+  CheckCircle,
+  Clock,
+} from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 
 interface Activity {
   id: string;
@@ -24,131 +31,130 @@ interface UserActivityProps {
   userId: string;
 }
 
-// Mock data - replace with actual API call
-const mockActivities: Activity[] = [
-  {
-    id: '1',
-    type: 'login',
-    description: 'Successful login from Chrome on Windows',
-    timestamp: '2024-03-20T10:00:00Z',
-    ipAddress: '192.168.1.1',
-    status: 'success',
-  },
-  {
-    id: '2',
-    type: 'transaction',
-    description: 'Initiated transfer of $1,000 to Jane Smith',
-    timestamp: '2024-03-19T15:30:00Z',
-    status: 'pending',
-  },
-  {
-    id: '3',
-    type: 'kyc',
-    description: 'Submitted KYC documents for verification',
-    timestamp: '2024-03-18T09:15:00Z',
-    status: 'success',
-  },
-];
-
 export function UserActivity({ userId }: UserActivityProps) {
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(false);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchActivities();
+  }, [userId]);
+
+  const fetchActivities = async () => {
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/activity`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch activity data');
+      }
+      const data = await response.json();
+      setActivities(data.activities);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to load activities');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getActivityIcon = (type: Activity['type']) => {
     switch (type) {
       case 'login':
-        return '🔐';
+        return <LogIn className="h-4 w-4" />;
       case 'transaction':
-        return '💸';
+        return <Activity className="h-4 w-4" />;
       case 'kyc':
-        return '📄';
+        return <UserCheck className="h-4 w-4" />;
       case 'profile_update':
-        return '👤';
+        return <FileText className="h-4 w-4" />;
       case 'password_change':
-        return '🔑';
-      default:
-        return '📝';
+        return <Key className="h-4 w-4" />;
     }
   };
 
   const getStatusBadge = (status: Activity['status']) => {
+    const baseClasses = "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium";
     switch (status) {
       case 'success':
-        return <Badge className="bg-green-500">Success</Badge>;
+        return (
+          <span className={`${baseClasses} bg-green-100 text-green-800`}>
+            <CheckCircle className="w-3 h-3 mr-1" />
+            Success
+          </span>
+        );
       case 'failed':
-        return <Badge variant="destructive">Failed</Badge>;
-      default:
-        return <Badge variant="secondary">Pending</Badge>;
+        return (
+          <span className={`${baseClasses} bg-red-100 text-red-800`}>
+            <AlertCircle className="w-3 h-3 mr-1" />
+            Failed
+          </span>
+        );
+      case 'pending':
+        return (
+          <span className={`${baseClasses} bg-yellow-100 text-yellow-800`}>
+            <Clock className="w-3 h-3 mr-1" />
+            Pending
+          </span>
+        );
     }
   };
 
-  const loadMore = async () => {
-    setLoading(true);
-    // TODO: Implement pagination
-    setLoading(false);
-  };
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center text-red-600">{error}</div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Activity</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead>Time</TableHead>
-              <TableHead>Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {mockActivities.map((activity) => (
-              <TableRow key={activity.id}>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">{getActivityIcon(activity.type)}</span>
-                    <span className="capitalize">{activity.type.replace('_', ' ')}</span>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div>
-                    <p>{activity.description}</p>
+    <Card>
+      <CardHeader>
+        <CardTitle>Activity Log</CardTitle>
+        <CardDescription>Recent user activities and system events</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {activities.length === 0 ? (
+            <p className="text-center text-gray-500">No activities found</p>
+          ) : (
+            activities.map((activity) => (
+              <div
+                key={activity.id}
+                className="flex items-start space-x-4 border-b border-gray-100 dark:border-gray-800 pb-4 last:border-0 last:pb-0"
+              >
+                <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full">
+                  {getActivityIcon(activity.type)}
+                </div>
+                <div className="flex-1 space-y-1">
+                  <p className="text-sm font-medium">{activity.description}</p>
+                  <div className="flex items-center space-x-2">
+                    <p className="text-xs text-gray-500">
+                      {formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true })}
+                    </p>
                     {activity.ipAddress && (
-                      <p className="text-sm text-muted-foreground">
-                        IP: {activity.ipAddress}
-                      </p>
+                      <p className="text-xs text-gray-500">from {activity.ipAddress}</p>
                     )}
+                    {getStatusBadge(activity.status)}
                   </div>
-                </TableCell>
-                <TableCell>
-                  {new Date(activity.timestamp).toLocaleString()}
-                </TableCell>
-                <TableCell>{getStatusBadge(activity.status)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-
-      <div className="flex items-center justify-between">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-          disabled={page === 1 || loading}
-        >
-          <ChevronLeft className="mr-2 h-4 w-4" />
-          Previous
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={loadMore}
-          disabled={loading}
-        >
-          Next
-          <ChevronRight className="ml-2 h-4 w-4" />
-        </Button>
-      </div>
-    </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 } 
