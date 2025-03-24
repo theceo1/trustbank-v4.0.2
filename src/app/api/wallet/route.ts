@@ -1,7 +1,8 @@
-import { cookies } from 'next/headers'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { createQuidaxServer } from '@/lib/quidax'
-import { NextResponse } from 'next/server'
+import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { QuidaxService } from '@/lib/quidax';
+import type { Database } from '@/lib/database.types';
 
 interface MarketData {
   currency: string;
@@ -18,246 +19,63 @@ interface Transaction {
   created_at: string;
 }
 
-interface SwapTransaction {
-  id: string;
-  type: 'swap';
-  amount: number;
-  currency: string;
-  from_currency: string;
-  to_currency: string;
-  to_amount: number;
-  execution_price: number;
-  status: string;
-  created_at: string;
+interface UserProfile {
+  quidax_id: string;
 }
 
 export async function GET(request: Request) {
   try {
-    // Create a new cookie store and supabase client
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ 
-      cookies: () => cookieStore
-    }, {
-      supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY
-    });
+    const supabase = createRouteHandlerClient<Database>({ cookies });
 
-    console.log('Checking authentication...');
-    let user;
-
-    // Check Authorization header first
-    const authHeader = request.headers.get('Authorization');
-    if (authHeader?.startsWith('Bearer ')) {
-      const token = authHeader.split(' ')[1];
-      const { data: { user: tokenUser }, error: tokenError } = await supabase.auth.getUser(token);
-      if (tokenError) {
-        console.error('Token auth error:', tokenError);
-      } else {
-        user = tokenUser;
-      }
+    // Get session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !session) {
+      console.error('Session error:', sessionError);
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // If no valid token, try cookie-based session
-    if (!user) {
-      const { data: { user: sessionUser }, error: sessionError } = await supabase.auth.getUser();
-      if (sessionError) {
-        console.error('Session auth error:', sessionError);
-        return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-      }
-      user = sessionUser;
-    }
-
-    if (!user) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-    }
-
-    console.log('User authenticated:', user.id);
-
-    // First check if user exists in users table
-    const { data: dbUser, error: userError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', user.id)
-      .single();
-
-    if (userError) {
-      // Create user record if it doesn't exist
-      const { error: createUserError } = await supabase
-        .from('users')
-        .insert([{ 
-          id: user.id, 
-          email: user.email,
-          first_name: user.user_metadata?.first_name || null,
-          last_name: user.user_metadata?.last_name || null,
-          kyc_level: 0,
-          kyc_status: 'pending',
-          kyc_verified: false
-        }]);
-
-      if (createUserError) {
-        console.error('Error creating user:', createUserError);
-        return NextResponse.json({ message: 'Failed to create user record' }, { status: 500 });
-      }
-    }
-
-    // Get or create user profile
-    let userProfile;
-    const { data: existingProfile, error: profileError } = await supabase
+    // Get user profile with proper type assertion
+    const { data: profileData, error: profileError } = await supabase
       .from('user_profiles')
-      .select('*')
-      .eq('user_id', user.id)
+      .select('quidax_id')
+      .eq('user_id', session.user.id)
       .single();
 
-    if (profileError) {
-      // Create user profile if it doesn't exist
-      const { data: newProfile, error: createProfileError } = await supabase
-        .from('user_profiles')
-        .insert([{ 
-          user_id: user.id,
-          full_name: [user.user_metadata?.first_name, user.user_metadata?.last_name].filter(Boolean).join(' ') || null,
-          email: user.email,
-          kyc_status: 'pending',
-          kyc_level: 0,
-          kyc_verified: false,
-          is_test: false,
-          daily_limit: 0,
-          monthly_limit: 0,
-          role: 'user',
-          security_level: 'BASIC',
-          two_factor_enabled: false,
-          completed_trades: 0,
-          completion_rate: 0,
-          is_verified: false
-        }])
-        .select()
-        .single();
-
-      if (createProfileError) {
-        console.error('Error creating user profile:', createProfileError);
-        return NextResponse.json({ message: 'Failed to create user profile' }, { status: 500 });
-      }
-
-      userProfile = newProfile;
-    } else {
-      userProfile = existingProfile;
+    if (profileError || !profileData) {
+      console.error('Error fetching profile:', profileError);
+      return NextResponse.json({ error: 'Failed to fetch user profile' }, { status: 500 });
     }
 
-    console.log('User profile loaded:', userProfile);
-
-    if (!userProfile?.quidax_id) {
-      console.log('No Quidax ID found');
-      return NextResponse.json({ message: 'Quidax ID not found' }, { status: 400 });
+    const profile = profileData as UserProfile;
+    if (!profile.quidax_id) {
+      return NextResponse.json({ error: 'User has no Quidax ID' }, { status: 400 });
     }
 
-    // Initialize Quidax server service
-    const quidaxServer = createQuidaxServer(process.env.QUIDAX_SECRET_KEY!);
+    // Initialize Quidax service
+    const quidax = new QuidaxService(
+      process.env.NEXT_PUBLIC_QUIDAX_API_URL!,
+      process.env.QUIDAX_SECRET_KEY!
+    );
 
-    // Fetch data from Quidax using the Quidax ID
-    console.log('Fetching Quidax data for user:', userProfile.quidax_id);
-    
-    const [walletsResponse, marketTickersResponse, regularTxsResult, swapTxsResult] = await Promise.all([
-      quidaxServer.getWallets(userProfile.quidax_id).catch((error: Error) => {
-        console.error('Error fetching wallets:', error);
-        return { data: [] };
-      }),
-      quidaxServer.getMarketTickers().catch((error: Error) => {
-        console.error('Error fetching market data:', error);
-        return { data: {} };
-      }),
-      (async () => {
-        try {
-          const { data } = await supabase
-            .from('transactions')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false })
-            .limit(10);
-          return data || [];
-        } catch (error) {
-          console.error('Error fetching regular transactions:', error);
-          return [];
-        }
-      })(),
-      (async () => {
-        try {
-          const { data } = await supabase
-            .from('swap_transactions')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false })
-            .limit(10);
-          return data || [];
-        } catch (error) {
-          console.error('Error fetching swap transactions:', error);
-          return [];
-        }
-      })()
+    // Fetch data in parallel for better performance
+    const [walletsResponse, marketDataResponse, transactionsResponse] = await Promise.all([
+      quidax.getWallets(profile.quidax_id),
+      quidax.getOrderBook('btcngn'),
+      quidax.getSwapTransactions(profile.quidax_id)
     ]);
 
-    console.log('API responses received');
-
-    // Format regular transactions
-    const formattedRegularTxs = regularTxsResult.map((tx: any): Transaction => ({
-      id: tx.id,
-      type: tx.type,
-      amount: parseFloat(tx.amount),
-      currency: tx.currency,
-      status: tx.status,
-      created_at: tx.created_at
-    }));
-
-    // Format swap transactions
-    const formattedSwapTxs = swapTxsResult.map((tx: any): SwapTransaction => ({
-      id: tx.id,
-      type: 'swap',
-      amount: parseFloat(tx.from_amount),
-      currency: tx.from_currency,
-      from_currency: tx.from_currency,
-      to_currency: tx.to_currency,
-      to_amount: parseFloat(tx.to_amount),
-      execution_price: parseFloat(tx.execution_price),
-      status: tx.status,
-      created_at: tx.created_at
-    }));
-
-    // Combine and sort all transactions by date
-    const allTransactions = [...formattedRegularTxs, ...formattedSwapTxs]
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      .slice(0, 10); // Keep only the 10 most recent
-
-    // Process market data
-    const processedMarketData = Object.entries(marketTickersResponse.data || {})
-      .filter(([key]) => key.toLowerCase().endsWith('ngn'))
-      .map(([key, value]: [string, any]) => {
-        if (!value || !value.ticker) return null;
-        const currency = key.replace(/ngn$/i, '').toUpperCase();
-        return {
-          currency,
-          price: value.ticker.last ? parseFloat(value.ticker.last) : 0,
-          change_24h: value.ticker.price_change_percent ? 
-            parseFloat(value.ticker.price_change_percent) : 0
-        };
-      })
-      .filter((item): item is MarketData => item !== null);
-
-    // Add NGN as a market data entry with price of 1
-    processedMarketData.push({
-      currency: 'NGN',
-      price: 1,
-      change_24h: 0
-    });
-
     return NextResponse.json({
-      wallets: walletsResponse.data || [],
-      marketData: processedMarketData,
-      transactions: allTransactions,
-      userId: userProfile.quidax_id
+      wallets: walletsResponse?.data || [],
+      marketData: marketDataResponse?.data || [],
+      transactions: transactionsResponse?.data || [],
+      userId: profile.quidax_id
     });
-  } catch (error: any) {
-    console.error('API error:', error)
-    return NextResponse.json({ 
-      message: error.message?.includes('unavailable') 
-        ? 'Service temporarily unavailable' 
-        : 'Failed to load wallet data'
-    }, { status: 500 });
+
+  } catch (error) {
+    console.error('Error in wallet endpoint:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 } 

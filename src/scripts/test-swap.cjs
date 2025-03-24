@@ -7,17 +7,75 @@ config({ path: resolve(process.cwd(), '.env.local') });
 
 const QUIDAX_API_URL = process.env.NEXT_PUBLIC_QUIDAX_API_URL || 'https://www.quidax.com/api/v1';
 const QUIDAX_SECRET_KEY = process.env.QUIDAX_SECRET_KEY;
-const TEST_USER_ID = '157fa815-214e-4ecd-8a25-448fe4815ff1';
 
 if (!QUIDAX_SECRET_KEY) {
-  console.error('Missing required environment variables');
+  console.error('Missing QUIDAX_SECRET_KEY environment variable');
   process.exit(1);
+}
+
+// Test user credentials
+const TEST_USER_ID = '157fa815-214e-4ecd-8a25-448fe4815ff1';
+const fromAmount = 0.2; // Reduced from 10 to 0.2 USDT
+
+async function checkBalance(userId, currency) {
+  try {
+    console.log(`Checking ${currency} balance for user ${userId}...`);
+    const response = await fetch(`${QUIDAX_API_URL}/users/${userId}/wallets/${currency.toLowerCase()}`, {
+      headers: {
+        'Authorization': `Bearer ${QUIDAX_SECRET_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Failed to get balance: ${errorData.message || response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log(`${currency} Balance:`, data.data.balance);
+    return data.data;
+  } catch (error) {
+    console.error(`Error checking ${currency} balance:`, error);
+    return null;
+  }
+}
+
+async function getTemporarySwapQuote(userId, fromCurrency, toCurrency, fromAmount) {
+  try {
+    console.log(`Getting temporary swap quote for ${fromAmount} ${fromCurrency} to ${toCurrency}...`);
+    const response = await fetch(`${QUIDAX_API_URL}/users/${userId}/instant_orders`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${QUIDAX_SECRET_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        bid: toCurrency.toLowerCase(),
+        ask: fromCurrency.toLowerCase(),
+        type: 'buy',
+        total: fromAmount.toString(),
+        unit: 'quote'
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Failed to get temporary swap quote: ${errorData.message || response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log('Temporary Quote:', data.data);
+    return data.data;
+  } catch (error) {
+    console.error('Error getting temporary swap quote:', error);
+    return null;
+  }
 }
 
 async function getSwapQuote(userId, fromCurrency, toCurrency, fromAmount) {
   try {
-    console.log(`Getting quote for swapping ${fromAmount} ${fromCurrency} to ${toCurrency}...`);
-    
+    console.log(`Getting swap quote for ${fromAmount} ${fromCurrency} to ${toCurrency}...`);
     const response = await fetch(`${QUIDAX_API_URL}/users/${userId}/swap_quotation`, {
       method: 'POST',
       headers: {
@@ -32,10 +90,12 @@ async function getSwapQuote(userId, fromCurrency, toCurrency, fromAmount) {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to get swap quote: ${response.statusText}`);
+      const errorData = await response.json();
+      throw new Error(`Failed to get swap quote: ${errorData.message || response.statusText}`);
     }
 
     const data = await response.json();
+    console.log('Swap Quote:', data.data);
     return data.data;
   } catch (error) {
     console.error('Error getting swap quote:', error);
@@ -46,7 +106,6 @@ async function getSwapQuote(userId, fromCurrency, toCurrency, fromAmount) {
 async function confirmSwap(userId, quotationId) {
   try {
     console.log(`Confirming swap with quotation ID: ${quotationId}...`);
-    
     const response = await fetch(`${QUIDAX_API_URL}/users/${userId}/swap_quotation/${quotationId}/confirm`, {
       method: 'POST',
       headers: {
@@ -56,10 +115,12 @@ async function confirmSwap(userId, quotationId) {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to confirm swap: ${response.statusText}`);
+      const errorData = await response.json();
+      throw new Error(`Failed to confirm swap: ${errorData.message || response.statusText}`);
     }
 
     const data = await response.json();
+    console.log('Swap Confirmation:', data.data);
     return data.data;
   } catch (error) {
     console.error('Error confirming swap:', error);
@@ -67,52 +128,9 @@ async function confirmSwap(userId, quotationId) {
   }
 }
 
-async function checkBalance(userId, currency) {
-  try {
-    const response = await fetch(`${QUIDAX_API_URL}/users/${userId}/wallets/${currency}`, {
-      headers: {
-        'Authorization': `Bearer ${QUIDAX_SECRET_KEY}`,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch wallet: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data.data;
-  } catch (error) {
-    console.error(`Error fetching ${currency} balance:`, error);
-    return null;
-  }
-}
-
-async function getSwapTransactions(userId) {
-  try {
-    console.log('\nFetching swap transaction history...');
-    const response = await fetch(`${QUIDAX_API_URL}/users/${userId}/swap_transactions`, {
-      headers: {
-        'Authorization': `Bearer ${QUIDAX_SECRET_KEY}`,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch swap transactions: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data.data;
-  } catch (error) {
-    console.error('Error fetching swap transactions:', error);
-    return null;
-  }
-}
-
 async function getSwapTransactionDetails(userId, swapTransactionId) {
   try {
-    console.log(`\nFetching details for swap transaction: ${swapTransactionId}`);
+    console.log(`Getting swap transaction details for ID: ${swapTransactionId}...`);
     const response = await fetch(`${QUIDAX_API_URL}/users/${userId}/swap_transactions/${swapTransactionId}`, {
       headers: {
         'Authorization': `Bearer ${QUIDAX_SECRET_KEY}`,
@@ -121,92 +139,109 @@ async function getSwapTransactionDetails(userId, swapTransactionId) {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch swap transaction details: ${response.statusText}`);
+      const errorData = await response.json();
+      throw new Error(`Failed to get transaction details: ${errorData.message || response.statusText}`);
     }
 
     const data = await response.json();
+    console.log('Transaction Details:', data.data);
     return data.data;
   } catch (error) {
-    console.error('Error fetching swap transaction details:', error);
+    console.error('Error getting transaction details:', error);
+    return null;
+  }
+}
+
+async function getSwapHistory(userId) {
+  try {
+    console.log(`Getting swap history for user ${userId}...`);
+    const response = await fetch(`${QUIDAX_API_URL}/users/${userId}/swap_transactions`, {
+      headers: {
+        'Authorization': `Bearer ${QUIDAX_SECRET_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Failed to get swap history: ${errorData.message || response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log('Recent Swap History:', data.data);
+    return data.data;
+  } catch (error) {
+    console.error('Error getting swap history:', error);
     return null;
   }
 }
 
 async function testSwap() {
   try {
-    // Step 1: Check initial USDT balance
-    console.log('\nChecking initial USDT balance...');
-    const initialUsdtBalance = await checkBalance(TEST_USER_ID, 'usdt');
-    console.log('Initial USDT Balance:', initialUsdtBalance?.balance);
+    console.log('\n=== Starting Swap Test ===\n');
 
-    // Step 2: Get swap quote for USDT to SOL
-    const fromAmount = '0.1'; // Swap 0.1 USDT to test
-    const quote = await getSwapQuote(TEST_USER_ID, 'USDT', 'SOL', fromAmount);
-    
+    // Check initial USDT balance
+    const initialUsdtBalance = await checkBalance(TEST_USER_ID, 'USDT');
+    if (!initialUsdtBalance || parseFloat(initialUsdtBalance.balance) < fromAmount) {
+      throw new Error(`Insufficient USDT balance. Required: ${fromAmount}, Available: ${initialUsdtBalance?.balance || 0}`);
+    }
+
+    // Check initial BTC balance
+    const initialBtcBalance = await checkBalance(TEST_USER_ID, 'BTC');
+    console.log('\nInitial Balances:', {
+      USDT: initialUsdtBalance.balance,
+      BTC: initialBtcBalance.balance
+    });
+
+    // Get swap quote
+    console.log('\nGetting swap quote...');
+    const quote = await getSwapQuote(TEST_USER_ID, 'USDT', 'BTC', fromAmount);
     if (!quote) {
-      console.log('Failed to get swap quote. Aborting test.');
-      return;
+      throw new Error('Failed to get swap quote');
     }
 
-    console.log('\nSwap Quote Details:');
-    console.log('From Amount:', quote.from_amount, quote.from_currency);
-    console.log('To Amount:', quote.to_amount, quote.to_currency);
-    console.log('Quote Expires At:', quote.expires_at);
-
-    // Step 3: Confirm the swap
-    const swapResult = await confirmSwap(TEST_USER_ID, quote.id);
-    
-    if (!swapResult) {
-      console.log('Failed to confirm swap. Aborting test.');
-      return;
+    // Confirm the swap
+    console.log('\nConfirming swap...');
+    const confirmation = await confirmSwap(TEST_USER_ID, quote.id);
+    if (!confirmation) {
+      throw new Error('Failed to confirm swap');
     }
 
-    console.log('\nSwap Confirmation Details:');
-    console.log('Status:', swapResult.status);
-    console.log('Transaction ID:', swapResult.id);
+    // Get transaction details
+    console.log('\nGetting transaction details...');
+    const transactionDetails = await getSwapTransactionDetails(TEST_USER_ID, confirmation.id);
+    if (!transactionDetails) {
+      throw new Error('Failed to get transaction details');
+    }
 
-    // Step 4: Check final balances
+    // Check final balances
     console.log('\nChecking final balances...');
-    const finalUsdtBalance = await checkBalance(TEST_USER_ID, 'usdt');
-    const solBalance = await checkBalance(TEST_USER_ID, 'sol');
-
-    console.log('Final USDT Balance:', finalUsdtBalance?.balance);
-    console.log('SOL Balance:', solBalance?.balance);
-
-    // Step 5: Get transaction details
-    if (swapResult.id) {
-      const transactionDetails = await getSwapTransactionDetails(TEST_USER_ID, swapResult.id);
-      if (transactionDetails) {
-        console.log('\nDetailed Swap Transaction:');
-        console.log('Status:', transactionDetails.status);
-        console.log('From:', transactionDetails.from_amount, transactionDetails.from_currency);
-        console.log('To:', transactionDetails.received_amount, transactionDetails.to_currency);
-        console.log('Execution Price:', transactionDetails.execution_price);
-        console.log('Created At:', transactionDetails.created_at);
-        console.log('Updated At:', transactionDetails.updated_at);
+    const finalUsdtBalance = await checkBalance(TEST_USER_ID, 'USDT');
+    const finalBtcBalance = await checkBalance(TEST_USER_ID, 'BTC');
+    
+    console.log('\nBalance Changes:', {
+      USDT: {
+        before: initialUsdtBalance.balance,
+        after: finalUsdtBalance.balance,
+        change: parseFloat(finalUsdtBalance.balance) - parseFloat(initialUsdtBalance.balance)
+      },
+      BTC: {
+        before: initialBtcBalance.balance,
+        after: finalBtcBalance.balance,
+        change: parseFloat(finalBtcBalance.balance) - parseFloat(initialBtcBalance.balance)
       }
-    }
+    });
 
-    // Step 6: Get recent swap history
-    const swapHistory = await getSwapTransactions(TEST_USER_ID);
-    if (swapHistory && swapHistory.length > 0) {
-      console.log('\nRecent Swap History:');
-      swapHistory.slice(0, 5).forEach((swap, index) => {
-        console.log(`\nTransaction ${index + 1}:`);
-        console.log('ID:', swap.id);
-        console.log('From:', swap.from_amount, swap.from_currency);
-        console.log('To:', swap.received_amount, swap.to_currency);
-        console.log('Status:', swap.status);
-        console.log('Date:', swap.created_at);
-      });
-    } else {
-      console.log('\nNo recent swap history found.');
-    }
+    // Get recent swap history
+    console.log('\nGetting swap history...');
+    await getSwapHistory(TEST_USER_ID);
 
+    console.log('\n=== Swap Test Completed Successfully ===\n');
   } catch (error) {
-    console.error('Test failed:', error);
+    console.error('\nSwap Test Failed:', error.message);
+    process.exit(1);
   }
 }
 
 // Run the test
-testSwap(); 
+testSwap();

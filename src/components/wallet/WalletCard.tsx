@@ -55,9 +55,34 @@ export function WalletCard({
     const numValue = typeof value === 'string' ? parseFloat(value) : value;
     if (isNaN(numValue)) return '0.00';
     
+    // Special handling for BTC to show 8 decimal places
+    if (currency.toUpperCase() === 'BTC') {
+      // For very small amounts, use scientific notation
+      if (numValue < 0.00000001) {
+        return numValue.toExponential(8);
+      }
+      // Otherwise show full 8 decimal places
+      return numValue.toLocaleString(undefined, {
+        minimumFractionDigits: 8,
+        maximumFractionDigits: 8,
+        useGrouping: true
+      });
+    }
+    
+    // For other cryptocurrencies (except NGN), show 6 decimal places
+    if (['ETH', 'SOL', 'USDT', 'USDC'].includes(currency.toUpperCase())) {
+      return numValue.toLocaleString(undefined, {
+        minimumFractionDigits: 6,
+        maximumFractionDigits: 6,
+        useGrouping: true
+      });
+    }
+    
+    // For NGN and others, show 2 decimal places
     return numValue.toLocaleString(undefined, {
-      minimumFractionDigits: ['BTC', 'SOL'].includes(currency) ? 8 : 2,
-      maximumFractionDigits: ['BTC', 'SOL'].includes(currency) ? 8 : 2
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+      useGrouping: true
     });
   };
 

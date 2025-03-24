@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { KYCBanner } from '@/components/trades/KYCBanner';
+import { Label } from '@/components/ui/label';
 
 const SUPPORTED_CURRENCIES = [
   { value: 'NGN', label: 'Nigerian Naira (NGN)' },
@@ -59,18 +60,19 @@ interface SwapFormProps {
 
 export function SwapForm({ disabled }: SwapFormProps) {
   const [amount, setAmount] = useState('');
+  const [inputCurrency, setInputCurrency] = useState<'CRYPTO' | 'NGN' | 'USD'>('CRYPTO');
+  const [fromCurrency, setFromCurrency] = useState('');
+  const [toCurrency, setToCurrency] = useState('');
   const [ngnEquivalent, setNgnEquivalent] = useState('');
-  const [fromCurrency, setFromCurrency] = useState('BTC');
-  const [toCurrency, setToCurrency] = useState('NGN');
-  const [balances, setBalances] = useState<Record<string, string>>({});
+  const [usdEquivalent, setUsdEquivalent] = useState('');
+  const [rate, setRate] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [quoting, setQuoting] = useState(false);
-  const [rate, setRate] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [quotation, setQuotation] = useState<SwapQuotation | null>(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const [countdown, setCountdown] = useState(14);
-  const [quotation, setQuotation] = useState<any>(null);
-  
+  const [countdown, setCountdown] = useState(15);
+  const [error, setError] = useState<string | null>(null);
+  const [balances, setBalances] = useState<Record<string, string>>({});
   const { toast } = useToast();
   const supabase = createClientComponentClient<Database>();
 
@@ -224,25 +226,40 @@ export function SwapForm({ disabled }: SwapFormProps) {
     return null;
   };
 
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
+  const handleAmountChange = (value: string) => {
     setAmount(value);
+    const numValue = parseFloat(value);
     
-    if (!value) {
-      setError(null);
+    if (isNaN(numValue)) {
       setNgnEquivalent('');
-      setRate(null);
+      setUsdEquivalent('');
       return;
     }
 
-    const error = validateAmount(value);
-    if (error) {
-      setError(error);
-      setNgnEquivalent('');
-      setRate(null);
+    // Convert based on input currency
+    if (inputCurrency === 'NGN') {
+      // Convert NGN to crypto
+      if (rate) {
+        const cryptoAmount = numValue / rate;
+        setAmount(cryptoAmount.toString());
+        setNgnEquivalent(value);
+        setUsdEquivalent((numValue / 1585).toFixed(2)); // Using approximate NGN/USD rate
+      }
+    } else if (inputCurrency === 'USD') {
+      // Convert USD to crypto
+      if (rate) {
+        const ngnAmount = numValue * 1585; // Using approximate NGN/USD rate
+        const cryptoAmount = ngnAmount / rate;
+        setAmount(cryptoAmount.toString());
+        setNgnEquivalent(ngnAmount.toString());
+        setUsdEquivalent(value);
+      }
     } else {
-      setError(null);
-      getQuote();
+      // Input is in crypto
+      if (rate) {
+        setNgnEquivalent((numValue * rate).toString());
+        setUsdEquivalent(((numValue * rate) / 1585).toFixed(2)); // Using approximate NGN/USD rate
+      }
     }
   };
 
@@ -252,138 +269,167 @@ export function SwapForm({ disabled }: SwapFormProps) {
     setCountdown(14);
   };
 
+  const handleMaxAmount = () => {
+    if (!fromCurrency || !balances[fromCurrency]) return;
+    
+    const maxBalance = parseFloat(balances[fromCurrency]);
+    if (isNaN(maxBalance)) return;
+
+    if (inputCurrency === 'CRYPTO') {
+      handleAmountChange(maxBalance.toString());
+    } else if (inputCurrency === 'NGN' && rate) {
+      handleAmountChange((maxBalance * rate).toString());
+    } else if (inputCurrency === 'USD' && rate) {
+      handleAmountChange(((maxBalance * rate) / 1585).toString()); // Using approximate NGN/USD rate
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <div className="space-y-4">
-        {/* From Currency */}
+      {/* Currency Selection */}
+      <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <label className="text-sm font-medium">You Pay</label>
-          <div className="flex space-x-2">
-            <Input
-              type="number"
-              placeholder="0.00"
-              value={amount}
-              onChange={handleAmountChange}
-              className={cn("flex-1", error && "border-red-500")}
-              disabled={disabled}
-            />
-            <Select 
-              value={fromCurrency} 
-              onValueChange={(value) => {
-                setFromCurrency(value);
-                setAmount('');
-                setNgnEquivalent('');
-                setRate(null);
-              }}
-              disabled={disabled}
+          <Label>From</Label>
+          <Select value={fromCurrency} onValueChange={setFromCurrency}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select currency" />
+            </SelectTrigger>
+            <SelectContent>
+              {SUPPORTED_CURRENCIES.map((currency) => (
+                <SelectItem 
+                  key={currency.value} 
+                  value={currency.value}
+                  disabled={currency.value === toCurrency}
+                >
+                  {currency.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label>To</Label>
+          <Select value={toCurrency} onValueChange={setToCurrency}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select currency" />
+            </SelectTrigger>
+            <SelectContent>
+              {SUPPORTED_CURRENCIES.map((currency) => (
+                <SelectItem 
+                  key={currency.value} 
+                  value={currency.value}
+                  disabled={currency.value === fromCurrency}
+                >
+                  {currency.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Amount Input with Currency Toggle */}
+      <div className="space-y-2">
+        <div className="flex justify-between items-center">
+          <Label>Amount</Label>
+          <div className="flex items-center gap-2">
+            <Button
+              variant={inputCurrency === 'CRYPTO' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setInputCurrency('CRYPTO')}
+              className="text-xs"
             >
-              <SelectTrigger className="w-[140px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {SUPPORTED_CURRENCIES.filter(c => c.value !== 'NGN' && c.value !== toCurrency).map((currency) => (
-                  <SelectItem key={currency.value} value={currency.value}>
-                    {currency.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              {fromCurrency}
+            </Button>
+            <Button
+              variant={inputCurrency === 'NGN' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setInputCurrency('NGN')}
+              className="text-xs"
+            >
+              NGN
+            </Button>
+            <Button
+              variant={inputCurrency === 'USD' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setInputCurrency('USD')}
+              className="text-xs"
+            >
+              USD
+            </Button>
           </div>
-          <div className="flex justify-between items-center">
-            <div className="text-sm text-muted-foreground">
-              Available: {formatNumber(parseFloat(balances[fromCurrency] || '0'), { minimumFractionDigits: 2, maximumFractionDigits: 8 })} {fromCurrency}
+        </div>
+
+        <div className="flex gap-2">
+          <Input
+            type="text"
+            placeholder={`Enter amount in ${inputCurrency === 'CRYPTO' ? fromCurrency : inputCurrency}`}
+            value={inputCurrency === 'CRYPTO' ? 
+              amount ? formatNumber(parseFloat(amount)) : '' : 
+              inputCurrency === 'NGN' ? 
+                ngnEquivalent ? formatNumber(parseFloat(ngnEquivalent)) : '' :
+                usdEquivalent ? formatNumber(parseFloat(usdEquivalent)) : ''
+            }
+            onChange={(e) => {
+              const value = e.target.value.replace(/,/g, '');
+              handleAmountChange(value);
+            }}
+            disabled={disabled || !fromCurrency || !toCurrency}
+          />
+          <Button
+            variant="outline"
+            onClick={handleMaxAmount}
+            disabled={disabled || !fromCurrency || !toCurrency}
+          >
+            Max
+          </Button>
+        </div>
+
+        {/* Show balance and limits */}
+        {fromCurrency && (
+          <div className="text-sm space-y-1">
+            <div className="text-green-600 font-medium">
+              Balance: {formatNumber(parseFloat(balances[fromCurrency] || '0'))} {fromCurrency}
             </div>
-            {error && (
-              <div className="text-sm text-red-500">
-                {error}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Swap Button */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleSwapCurrencies}
-          className="mx-auto"
-          disabled={toCurrency === 'NGN' || disabled}
-        >
-          <ArrowUpDown className="h-4 w-4" />
-        </Button>
-
-        {/* To Currency */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium">You Receive</label>
-          <div className="flex space-x-2">
-            <Input
-              type="text"
-              placeholder="0.00"
-              value={ngnEquivalent}
-              readOnly
-              className="flex-1"
-              disabled={disabled}
-            />
-            <Select 
-              value={toCurrency} 
-              onValueChange={(value) => {
-                setToCurrency(value);
-                setAmount('');
-                setNgnEquivalent('');
-                setRate(null);
-              }}
-              disabled={disabled}
-            >
-              <SelectTrigger className="w-[140px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {SUPPORTED_CURRENCIES.filter(c => c.value !== fromCurrency).map((currency) => (
-                  <SelectItem key={currency.value} value={currency.value}>
-                    {currency.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        {/* Rate Display */}
-        {rate && (
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Rate</span>
-            <div className="flex items-center gap-2">
-              <span>1 {fromCurrency} = {formatNumber(rate)} {toCurrency}</span>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={getQuote}
-                disabled={quoting}
-              >
-                <Loader2 className={cn("h-3 w-3", quoting && "animate-spin")} />
-              </Button>
+            <div className="text-muted-foreground">
+              Limit: {formatNumber(AMOUNT_LIMITS[fromCurrency as keyof typeof AMOUNT_LIMITS]?.min || 0)} - {formatNumber(AMOUNT_LIMITS[fromCurrency as keyof typeof AMOUNT_LIMITS]?.max || 0)} {fromCurrency}
             </div>
           </div>
         )}
 
-        {/* Proceed Button */}
-        <Button
-          className="w-full"
-          size="lg"
-          onClick={handleProceed}
-          disabled={loading || quoting || !amount || !rate || !!error || disabled}
-        >
-          {loading ? (
-            <span className="flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Processing Swap...
-            </span>
-          ) : (
-            'Proceed with Swap'
-          )}
-        </Button>
+        {/* Show equivalents */}
+        {amount && rate && (
+          <div className="text-sm text-muted-foreground space-y-1">
+            {inputCurrency !== 'CRYPTO' && (
+              <div>≈ {formatNumber(parseFloat(amount))} {fromCurrency}</div>
+            )}
+            {inputCurrency !== 'NGN' && (
+              <div>≈ ₦{formatNumber(parseFloat(ngnEquivalent))}</div>
+            )}
+            {inputCurrency !== 'USD' && (
+              <div>≈ ${formatNumber(parseFloat(usdEquivalent))}</div>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* Proceed Button */}
+      <Button
+        className="w-full"
+        size="lg"
+        onClick={handleProceed}
+        disabled={loading || quoting || !amount || !rate || !!error || disabled}
+      >
+        {loading ? (
+          <span className="flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Processing Swap...
+          </span>
+        ) : (
+          'Proceed with Swap'
+        )}
+      </Button>
 
       {/* Confirmation Modal */}
       <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>

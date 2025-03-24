@@ -2,250 +2,148 @@
 
 ## Prerequisites
 
-- Vercel account
-- Supabase account
-- Upstash Redis account
-- Domain name (optional)
-- GitHub account
+- Node.js >= 18.0.0
+- npm >= 9.0.0
+- Access to deployment environment (AWS/GCP/Azure)
+- Required environment variables configured
+- Database access credentials
+- Sentry DSN for error tracking
 
-## Environment Setup
+## Environment Variables
 
-1. **Production Environment Variables**
-
-Create a `.env.production` file with the following variables:
-```bash
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=your_production_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_production_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_production_service_role_key
-
-# Quidax API
-QUIDAX_SECRET_KEY=your_production_quidax_secret_key
-QUIDAX_PUBLIC_KEY=your_production_quidax_public_key
-
-# Dojah API
-DOJAH_API_KEY=your_production_dojah_api_key
-DOJAH_APP_ID=your_production_dojah_app_id
-
-# Redis
-UPSTASH_REDIS_REST_URL=your_production_redis_url
-UPSTASH_REDIS_REST_TOKEN=your_production_redis_token
-
-# Security
-JWT_SECRET=your_production_jwt_secret
-ENCRYPTION_KEY=your_production_encryption_key
-
-# Monitoring
-SENTRY_DSN=your_sentry_dsn
-```
-
-2. **Database Setup**
+Ensure the following environment variables are set:
 
 ```bash
-# Run production migrations
-npm run db:migrate:prod
+# Supabase Configuration
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
-# Verify database setup
-npm run db:verify
+# Sentry Configuration
+NEXT_PUBLIC_SENTRY_DSN=your_sentry_dsn
+
+# API Keys
+QUIDAX_API_KEY=your_quidax_api_key
+DOJAH_API_KEY=your_dojah_api_key
+
+# Deployment Configuration
+DEPLOYMENT_REGION=us-east-1
+INSTANCE_COUNT=2
 ```
 
-## Vercel Deployment
+## Deployment Process
 
-1. **Connect Repository**
-   - Fork the repository to your GitHub account
-   - Create a new project in Vercel
-   - Connect to your GitHub repository
-
-2. **Configure Build Settings**
+1. **Pre-deployment Checks**
    ```bash
-   Build Command: npm run build
-   Output Directory: .next
-   Install Command: npm install
+   # Verify environment variables
+   source scripts/check-env.sh
+   
+   # Run tests
+   npm run test
+   
+   # Check for security vulnerabilities
+   npm audit
    ```
 
-3. **Environment Variables**
-   - Add all production environment variables to Vercel project settings
-   - Enable "Production Only" for sensitive variables
+2. **Database Migration**
+   ```bash
+   # Run migrations
+   npm run migrate
+   
+   # Verify migration status
+   npm run migrate:status
+   ```
 
-4. **Domain Setup**
-   - Add custom domain in Vercel project settings
-   - Configure DNS settings
-   - Enable HTTPS
+3. **Deployment**
+   ```bash
+   # Deploy to staging
+   ./scripts/deploy.sh staging
+   
+   # Deploy to production
+   ./scripts/deploy.sh production
+   ```
 
-## CI/CD Pipeline
+4. **Post-deployment Verification**
+   - Check application health endpoint
+   - Verify database connections
+   - Monitor error rates in Sentry
+   - Check API response times
 
-1. **GitHub Actions Setup**
+## Rollback Procedure
 
-Create `.github/workflows/main.yml`:
-```yaml
-name: CI/CD
+In case of deployment issues:
 
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+1. **Immediate Rollback**
+   ```bash
+   npm run rollback
+   ```
 
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Setup Node.js
-        uses: actions/setup-node@v2
-        with:
-          node-version: '18'
-      - name: Install dependencies
-        run: npm ci
-      - name: Run tests
-        run: npm test
-      - name: Run linting
-        run: npm run lint
+2. **Manual Rollback Steps**
+   - Restore database from latest backup
+   - Deploy previous version of application
+   - Verify system functionality
 
-  deploy:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - uses: actions/checkout@v2
-      - name: Deploy to Vercel
-        uses: amondnet/vercel-action@v20
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.ORG_ID}}
-          vercel-project-id: ${{ secrets.PROJECT_ID}}
-          vercel-args: '--prod'
-```
+## Monitoring
 
-2. **Vercel Integration**
-   - Generate Vercel token
-   - Add secrets to GitHub repository
-   - Configure webhook for automatic deployments
+1. **Application Monitoring**
+   - Sentry for error tracking
+   - Custom metrics dashboard
+   - API health checks
 
-## Monitoring Setup
-
-1. **Sentry Integration**
-```bash
-npm install @sentry/nextjs
-```
-
-2. **Configure Sentry**
-Create `sentry.client.config.js`:
-```javascript
-import * as Sentry from "@sentry/nextjs";
-
-Sentry.init({
-  dsn: process.env.SENTRY_DSN,
-  environment: process.env.NODE_ENV,
-  tracesSampleRate: 1.0,
-});
-```
-
-3. **Error Tracking**
-   - Set up error boundaries
-   - Configure performance monitoring
-   - Set up alerts
+2. **Infrastructure Monitoring**
+   - Server metrics (CPU, Memory, Disk)
+   - Database performance
+   - Network metrics
 
 ## Backup Strategy
 
 1. **Database Backups**
-   - Enable daily automated backups in Supabase
-   - Configure backup retention period
-   - Test backup restoration process
+   - Daily automated backups
+   - 30-day retention period
+   - Stored in secure S3 bucket
 
-2. **File Storage Backups**
-   - Configure S3 bucket versioning
-   - Set up cross-region replication
-   - Implement backup rotation
+2. **Application State**
+   - Configuration backups
+   - User uploads
+   - System logs
 
 ## Security Measures
 
-1. **SSL Configuration**
-   - Enable HTTPS only
-   - Configure HSTS
-   - Set up CSP headers
+1. **Access Control**
+   - Role-based access control
+   - API key rotation
+   - Session management
 
-2. **Rate Limiting**
-   - Configure Redis rate limiting
-   - Set up IP blocking
-   - Monitor abuse patterns
+2. **Data Protection**
+   - Data encryption at rest
+   - SSL/TLS for data in transit
+   - Regular security audits
 
-3. **Security Headers**
-Configure `next.config.js`:
-```javascript
-const securityHeaders = [
-  {
-    key: 'X-DNS-Prefetch-Control',
-    value: 'on'
-  },
-  {
-    key: 'Strict-Transport-Security',
-    value: 'max-age=63072000; includeSubDomains; preload'
-  },
-  {
-    key: 'X-Frame-Options',
-    value: 'SAMEORIGIN'
-  },
-  // Add more security headers
-];
-```
+## Incident Response
 
-## Performance Optimization
+1. **Detection**
+   - Automated monitoring alerts
+   - Error rate thresholds
+   - Performance degradation alerts
 
-1. **Build Optimization**
-```bash
-# Analyze bundle size
-npm run analyze
+2. **Response**
+   - Incident classification
+   - Communication protocols
+   - Escalation procedures
 
-# Optimize images
-npm run optimize-images
-```
+3. **Recovery**
+   - Service restoration
+   - Root cause analysis
+   - Preventive measures
 
-2. **Cache Configuration**
-   - Configure CDN caching
-   - Set up Redis caching
-   - Implement service worker
+## Maintenance Windows
 
-## Rollback Procedure
+- Scheduled maintenance: Sundays 00:00-02:00 UTC
+- Emergency maintenance: As required with minimum 1-hour notice
+- Database maintenance: First Sunday of each month
 
-1. **Quick Rollback**
-```bash
-# Revert to previous deployment
-vercel rollback
+## Contact Information
 
-# Verify rollback
-vercel logs
-```
-
-2. **Database Rollback**
-   - Keep migration versions
-   - Document rollback procedures
-   - Test rollback process
-
-## Health Checks
-
-1. **Monitoring Endpoints**
-   - Set up /health endpoint
-   - Configure uptime monitoring
-   - Set up status page
-
-2. **Alerts**
-   - Configure error alerts
-   - Set up performance alerts
-   - Define incident response
-
-## Production Checklist
-
-- [ ] Environment variables configured
-- [ ] Database migrations run
-- [ ] SSL certificates installed
-- [ ] DNS configured
-- [ ] Monitoring set up
-- [ ] Backups configured
-- [ ] Security headers enabled
-- [ ] Rate limiting active
-- [ ] Error tracking working
-- [ ] Performance optimized
-- [ ] Health checks running
-- [ ] Alerts configured
-- [ ] Documentation updated 
+- DevOps Team: devops@trustbank.tech
+- Security Team: security@trustbank.tech
+- Emergency Contact: emergency@trustbank.tech 

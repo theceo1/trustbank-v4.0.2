@@ -98,8 +98,8 @@ export default function WalletPage() {
             event: '*',
             schema: 'public',
             table: 'wallets'
-          }, () => {
-            // Refresh wallet data when changes occur
+          }, (payload) => {
+            console.log('Wallet change detected:', payload);
             fetchWalletData();
           })
           .subscribe();
@@ -111,9 +111,25 @@ export default function WalletPage() {
             event: '*',
             schema: 'public',
             table: 'transactions'
-          }, () => {
-            // Refresh wallet data when new transactions occur
+          }, (payload) => {
+            console.log('Transaction change detected:', payload);
             fetchWalletData();
+          })
+          .subscribe();
+
+        // Subscribe to swap transaction changes
+        const swapSubscription = supabase
+          .channel('swap_changes')
+          .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'swap_transactions'
+          }, (payload: { new: { status?: string } }) => {
+            console.log('Swap change detected:', payload);
+            if (payload.new?.status === 'completed') {
+              console.log('Swap completed, refreshing wallet data');
+              fetchWalletData();
+            }
           })
           .subscribe();
 
@@ -121,6 +137,7 @@ export default function WalletPage() {
         return () => {
           walletSubscription.unsubscribe();
           transactionSubscription.unsubscribe();
+          swapSubscription.unsubscribe();
         };
       } catch (error) {
         console.error('Error setting up realtime subscriptions:', error);

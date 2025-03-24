@@ -10,6 +10,8 @@ import { Header } from "@/components/layout/Header"
 import { Footer } from "@/components/layout/Footer"
 import { cn } from "@/lib/utils"
 import { LanguageProvider } from "@/providers/LanguageProvider"
+import { GlobalErrorBoundary } from '@/components/error/GlobalErrorBoundary'
+import { AuthProvider } from '@/contexts/AuthContext'
 
 export const metadata: Metadata = {
   title: {
@@ -54,16 +56,20 @@ export default function RootLayout({ children }: RootLayoutProps) {
           enableSystem
           disableTransitionOnChange
         >
-          <SupabaseProvider>
-            <ProfileProvider>
-              <LanguageProvider>
-                <Header />
-                {children}
-                <Footer />
-                <Toaster />
-              </LanguageProvider>
-            </ProfileProvider>
-          </SupabaseProvider>
+          <GlobalErrorBoundary>
+            <AuthProvider initialSession={null}>
+              <SupabaseProvider>
+                <ProfileProvider>
+                  <LanguageProvider>
+                    <Header />
+                    {children}
+                    <Footer />
+                    <Toaster />
+                  </LanguageProvider>
+                </ProfileProvider>
+              </SupabaseProvider>
+            </AuthProvider>
+          </GlobalErrorBoundary>
         </ThemeProvider>
       </body>
     </html>

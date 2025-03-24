@@ -1,20 +1,19 @@
-name: CI/CD
+name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, staging ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, staging ]
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    continue-on-error: true  # Allow job to continue even if tests fail
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       
       - name: Setup Node.js
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
           node-version: '18'
           cache: 'npm'
@@ -23,54 +22,129 @@ jobs:
         run: npm ci
         
       - name: Run linting
-        continue-on-error: true  # Continue if linting fails
         run: npm run lint
         
-      - name: Run type checking
-        continue-on-error: true  # Continue if type checking fails
-        run: npm run type-check
-        
       - name: Run tests
-        continue-on-error: true  # Continue if tests fail
-        run: npm test
+        run: npm run test
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           
-      - name: Run build
+      - name: Run type checking
+        run: npm run type-check
+
+  security:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Run security audit
+        run: npm audit
+        
+      - name: Run SAST scan
+        uses: github/codeql-action/init@v2
+        with:
+          languages: javascript
+          
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+
+  build:
+    needs: [test, security]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Build application
         run: npm run build
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-
-  deploy:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    
-    steps:
-      - uses: actions/checkout@v2
-      
-      - name: Deploy to Vercel
-        uses: amondnet/vercel-action@v20
+          NEXT_PUBLIC_SENTRY_DSN: ${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}
+          
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
         with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.ORG_ID}}
-          vercel-project-id: ${{ secrets.PROJECT_ID}}
-          vercel-args: '--prod'
+          name: build-output
+          path: .next
+
+  deploy-staging:
+    needs: build
+    if: github.ref == 'refs/heads/staging'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: build-output
+          path: .next
           
-      - name: Run Database Migrations
-        run: npm run db:migrate:prod
+      - name: Deploy to staging
+        run: ./scripts/deploy.sh staging
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_SENTRY_DSN: ${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}
+          QUIDAX_API_KEY: ${{ secrets.QUIDAX_API_KEY }}
+          DOJAH_API_KEY: ${{ secrets.DOJAH_API_KEY }}
+
+  deploy-production:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: build-output
+          path: .next
           
-      - name: Notify Deployment Status
-        if: always()
-        uses: rtCamp/action-slack-notify@v2
+      - name: Deploy to production
+        run: ./scripts/deploy.sh production
         env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_COLOR: ${{ job.status }}
-          SLACK_MESSAGE: |
-            Production deployment ${{ job.status }}
-            Note: Tests were run but not enforced. Please check test results in GitHub Actions.
-          SLACK_TITLE: Deployment Status 
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_SENTRY_DSN: ${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}
+          QUIDAX_API_KEY: ${{ secrets.QUIDAX_API_KEY }}
+          DOJAH_API_KEY: ${{ secrets.DOJAH_API_KEY }}
+
+  post-deploy:
+    needs: [deploy-staging, deploy-production]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run health checks
+        run: |
+          curl -f https://staging.trustbank.tech/api/health || exit 1
+          curl -f https://trustbank.tech/api/health || exit 1
+          
+      - name: Notify team
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const message = `Deployment completed successfully!
+            Environment: ${process.env.GITHUB_REF}
+            Commit: ${process.env.GITHUB_SHA}
+            Workflow: ${process.env.GITHUB_WORKFLOW}`
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: message
+            }) 
