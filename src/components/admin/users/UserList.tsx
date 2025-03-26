@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Table,
   TableBody,
@@ -15,10 +15,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Edit, Trash2, Ban, Eye } from 'lucide-react';
+import { MoreHorizontal, Eye } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { UserDetailsModal } from './UserDetailsModal';
+import { UserActions } from './UserActions';
 import { User } from '@/types/user';
+import { toast } from '@/components/ui/use-toast';
 
 interface UserListProps {
   filters: {
@@ -28,35 +30,49 @@ interface UserListProps {
   };
 }
 
-// Mock data - replace with actual API call
-const mockUsers: User[] = [
-  {
-    id: '1',
-    name: 'John Doe',
-    email: 'john@example.com',
-    role: 'admin',
-    status: 'active',
-    lastLogin: '2024-03-20T10:00:00Z',
-    avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=John',
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-03-20T10:00:00Z',
-  },
-  {
-    id: '2',
-    name: 'Jane Smith',
-    email: 'jane@example.com',
-    role: 'user',
-    status: 'active',
-    lastLogin: '2024-03-19T15:30:00Z',
-    avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Jane',
-    createdAt: '2024-02-01T00:00:00Z',
-    updatedAt: '2024-03-19T15:30:00Z',
-  },
-];
-
 export function UserList({ filters }: UserListProps) {
+  const [users, setUsers] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [filters, refreshTrigger]);
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Build query parameters
+      const params = new URLSearchParams();
+      if (filters.role !== 'all') params.append('role', filters.role);
+      if (filters.status !== 'all') params.append('status', filters.status);
+      if (filters.search) params.append('search', filters.search);
+
+      const response = await fetch(`/api/admin/users?${params.toString()}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch users');
+      }
+
+      setUsers(data.users);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'An error occurred while fetching users';
+      setError(message);
+      toast({
+        title: "Error",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getStatusColor = (status: User['status']) => {
     switch (status) {
@@ -81,6 +97,27 @@ export function UserList({ filters }: UserListProps) {
     setSelectedUser(null);
   };
 
+  const handleActionComplete = () => {
+    setRefreshTrigger(prev => prev + 1);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 space-y-4">
+        <p className="text-red-500">{error}</p>
+        <Button onClick={fetchUsers}>Retry</Button>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="rounded-md border">
@@ -95,70 +132,71 @@ export function UserList({ filters }: UserListProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {mockUsers.map((user) => (
-              <TableRow key={user.id}>
-                <TableCell>
-                  <div className="flex items-center gap-3">
-                    <Avatar>
-                      <AvatarImage src={user.avatarUrl} alt={user.name} />
-                      <AvatarFallback>{user.name.slice(0, 2)}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <div className="font-medium">{user.name}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {user.email}
-                      </div>
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
-                    {user.role}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <div
-                      className={`h-2 w-2 rounded-full ${getStatusColor(
-                        user.status
-                      )}`}
-                    />
-                    <span className="capitalize">{user.status}</span>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  {new Date(user.lastLogin).toLocaleDateString()}
-                </TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <MoreHorizontal className="h-4 w-4" />
-                        <span className="sr-only">Open menu</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleViewDetails(user)}>
-                        <Eye className="mr-2 h-4 w-4" />
-                        View Details
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <Ban className="mr-2 h-4 w-4" />
-                        Suspend
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="text-red-600">
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+            {users.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center py-8">
+                  No users found
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              users.map((user) => (
+                <TableRow key={user.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <Avatar>
+                        <AvatarImage src={user.avatarUrl} alt={user.name} />
+                        <AvatarFallback>{user.name.slice(0, 2)}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="font-medium">{user.name}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {user.email}
+                        </div>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
+                      {user.role}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className={`h-2 w-2 rounded-full ${getStatusColor(
+                          user.status
+                        )}`}
+                      />
+                      <span className="capitalize">{user.status}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {new Date(user.lastLogin).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreHorizontal className="h-4 w-4" />
+                          <span className="sr-only">Open menu</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleViewDetails(user)}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          View Details
+                        </DropdownMenuItem>
+                        <UserActions 
+                          userId={user.id} 
+                          userStatus={user.status} 
+                          onActionComplete={handleActionComplete}
+                        />
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>

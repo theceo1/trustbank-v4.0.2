@@ -1,0 +1,167 @@
+import { NextRequest, NextResponse } from "next/server"
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
+import { z } from "zod"
+
+const transactionSchema = z.object({
+  type: z.enum(["DEPOSIT", "WITHDRAWAL", "TRANSFER"]),
+  amount: z.number().positive(),
+  description: z.string().optional(),
+  recipientId: z.string().optional(), // For transfers
+})
+
+export async function GET(req: NextRequest) {
+  try {
+    const cookieStore = cookies()
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+
+    // Get current session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    if (!session) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      )
+    }
+
+    const userId = session.user.id
+
+    // Fetch transactions where user is either sender or recipient
+    const { data: transactions, error: transactionsError } = await supabase
+      .from('transactions')
+      .select(`
+        *,
+        sender:user_id (
+          id,
+          email,
+          user_metadata->full_name
+        ),
+        recipient:recipient_id (
+          id,
+          email,
+          user_metadata->full_name
+        )
+      `)
+      .or(`user_id.eq.${userId},recipient_id.eq.${userId}`)
+      .order('created_at', { ascending: false })
+
+    if (transactionsError) {
+      console.error("Error fetching transactions:", transactionsError)
+      return NextResponse.json(
+        { error: "Failed to fetch transactions" },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json(transactions)
+  } catch (error) {
+    console.error("Error fetching transactions:", error)
+    return NextResponse.json(
+      { error: "Failed to fetch transactions" },
+      { status: 500 }
+    )
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const cookieStore = cookies()
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+
+    // Get current session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    if (!session) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      )
+    }
+
+    const body = await req.json()
+    const validatedData = transactionSchema.parse(body)
+    const userId = session.user.id
+
+    // Get user's current balance
+    const { data: user, error: userError } = await supabase
+      .from('user_profiles')
+      .select('balance')
+      .eq('user_id', userId)
+      .single()
+
+    if (userError || !user) {
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      )
+    }
+
+    // Check if user has sufficient balance for withdrawal or transfer
+    if (
+      (validatedData.type === "WITHDRAWAL" || validatedData.type === "TRANSFER") &&
+      user.balance < validatedData.amount
+    ) {
+      return NextResponse.json(
+        { error: "Insufficient balance" },
+        { status: 400 }
+      )
+    }
+
+    // For transfers, verify recipient exists
+    if (validatedData.type === "TRANSFER") {
+      if (!validatedData.recipientId) {
+        return NextResponse.json(
+          { error: "Recipient ID is required for transfers" },
+          { status: 400 }
+        )
+      }
+
+      const { data: recipient, error: recipientError } = await supabase
+        .from('user_profiles')
+        .select('user_id')
+        .eq('user_id', validatedData.recipientId)
+        .single()
+
+      if (recipientError || !recipient) {
+        return NextResponse.json(
+          { error: "Recipient not found" },
+          { status: 404 }
+        )
+      }
+    }
+
+    // Start a Supabase transaction using RPC
+    const { data: transaction, error: transactionError } = await supabase.rpc(
+      'create_transaction',
+      {
+        p_type: validatedData.type,
+        p_amount: validatedData.amount,
+        p_description: validatedData.description,
+        p_user_id: userId,
+        p_recipient_id: validatedData.recipientId
+      }
+    )
+
+    if (transactionError) {
+      console.error("Transaction error:", transactionError)
+      return NextResponse.json(
+        { error: "Failed to create transaction" },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json(transaction)
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: "Invalid transaction data", details: error.errors },
+        { status: 400 }
+      )
+    }
+
+    console.error("Error creating transaction:", error)
+    return NextResponse.json(
+      { error: "Failed to create transaction" },
+      { status: 500 }
+    )
+  }
+}
