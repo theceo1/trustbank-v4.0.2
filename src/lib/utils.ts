@@ -79,25 +79,18 @@ export function formatCryptoAmount(
  */
 export function formatCurrency(
   value: number | string,
-  currency: string = 'USD'
+  currency: string = 'USD',
+  options: Intl.NumberFormatOptions = {}
 ): string {
-  const numValue = typeof value === 'string' ? parseFloat(value) : value;
-  if (isNaN(numValue)) return currency === 'NGN' ? '₦0.00' : '$0.00';
+  const numericValue = typeof value === 'string' ? parseFloat(value) : value;
   
-  // Handle crypto currencies differently since they're not valid ISO currency codes
-  if (['BTC', 'ETH', 'USDT', 'SOL'].includes(currency)) {
-    return `${formatNumber(numValue, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 8,
-    })} ${currency}`;
-  }
-
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: currency === 'NGN' ? 'NGN' : 'USD',
+    currency,
     minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(numValue);
+    maximumFractionDigits: 2,
+    ...options
+  }).format(numericValue);
 }
 
 export function formatMarketCap(value: number): string {
@@ -158,11 +151,4 @@ export function formatDate(date: string): string {
     hour: '2-digit',
     minute: '2-digit'
   });
-}
-
-export function formatCurrency(amount: number, currency: string): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: currency
-  }).format(amount);
 }

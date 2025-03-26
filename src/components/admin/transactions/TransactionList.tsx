@@ -27,6 +27,7 @@ import {
 import { toast } from '@/components/ui/use-toast';
 import { TransactionFilters } from './TransactionFilters';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import { DateRange } from 'react-day-picker';
 
 interface Transaction {
   id: string;
@@ -50,10 +51,7 @@ interface TransactionFiltersState {
   type: string;
   status: string;
   search: string;
-  dateRange?: {
-    from: Date | null;
-    to: Date | null;
-  };
+  dateRange?: DateRange;
 }
 
 export function TransactionList() {
@@ -66,6 +64,7 @@ export function TransactionList() {
     type: 'all',
     status: 'all',
     search: '',
+    dateRange: undefined
   });
 
   useEffect(() => {
@@ -77,23 +76,21 @@ export function TransactionList() {
       setLoading(true);
       setError(null);
 
-      // Build query params
-      const params = new URLSearchParams();
-      if (filters.type !== 'all') params.append('type', filters.type);
-      if (filters.status !== 'all') params.append('status', filters.status);
-      if (filters.search) params.append('search', filters.search);
-      if (filters.dateRange?.from) params.append('from', filters.dateRange.from.toISOString());
-      if (filters.dateRange?.to) params.append('to', filters.dateRange.to.toISOString());
+      const searchParams = new URLSearchParams();
+      if (filters.type !== 'all') searchParams.append('type', filters.type);
+      if (filters.status !== 'all') searchParams.append('status', filters.status);
+      if (filters.search) searchParams.append('search', filters.search);
+      if (filters.dateRange?.from) searchParams.append('from', filters.dateRange.from.toISOString());
+      if (filters.dateRange?.to) searchParams.append('to', filters.dateRange.to.toISOString());
 
-      const response = await fetch(`/api/admin/transactions?${params.toString()}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch transactions');
-      }
-
+      const response = await fetch(`/api/admin/transactions?${searchParams}`);
       const data = await response.json();
+      
+      if (!response.ok) throw new Error(data.error);
       setTransactions(data.transactions);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+      setError(error instanceof Error ? error.message : 'An error occurred');
     } finally {
       setLoading(false);
     }
@@ -122,19 +119,14 @@ export function TransactionList() {
 
   const handleAction = async (transactionId: string, action: 'approve' | 'reject') => {
     try {
-      const response = await fetch(`/api/admin/transactions/${transactionId}/action`, {
+      const response = await fetch(`/api/admin/transactions/${transactionId}/actions`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ action }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action })
       });
 
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || `Failed to ${action} transaction`);
-      }
+      if (!response.ok) throw new Error(data.error);
 
       toast({
         title: "Success",
@@ -142,8 +134,9 @@ export function TransactionList() {
       });
 
       fetchTransactions();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : `An error occurred while ${action}ing transaction`;
+    } catch (error) {
+      console.error('Error performing transaction action:', error);
+      const message = error instanceof Error ? error.message : 'An error occurred';
       toast({
         title: "Error",
         description: message,

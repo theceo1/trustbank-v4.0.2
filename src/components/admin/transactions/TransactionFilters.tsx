@@ -8,16 +8,14 @@ import {
 } from '@/components/ui/select';
 import { Search } from 'lucide-react';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
+import { DateRange } from 'react-day-picker';
 
 interface TransactionFiltersProps {
   filters: {
     type: string;
     status: string;
     search: string;
-    dateRange?: {
-      from: Date;
-      to: Date;
-    };
+    dateRange?: DateRange;
   };
   onFilterChange: (filters: TransactionFiltersProps['filters']) => void;
 }
