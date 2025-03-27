@@ -1,6 +1,5 @@
 import { User } from '@supabase/auth-helpers-nextjs';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { Permission } from '@/types/admin';
 
 export enum UserRole {
   USER = 'user',
@@ -84,33 +83,24 @@ export const hasPermission = async (userId: string, permission: Permission): Pro
 // Function to check if user has any of the required permissions
 export const hasAnyPermission = async (userId: string, requiredPermissions: Permission[]): Promise<boolean> => {
   const { permissions } = await getUserRoleAndPermissions(userId);
-  return requiredPermissions.some(permission => permissions.includes(permission));
+  return requiredPermissions.some(p => permissions.includes(p));
 };
 
 // Function to check if user has all of the required permissions
 export const hasAllPermissions = async (userId: string, requiredPermissions: Permission[]): Promise<boolean> => {
   const { permissions } = await getUserRoleAndPermissions(userId);
-  return requiredPermissions.every(permission => permissions.includes(permission));
+  return requiredPermissions.every(p => permissions.includes(p));
 };
 
 // Function to get permissions required for a route
 export const getRoutePermissions = (path: string): Permission[] => {
-  const routePermissions: Record<string, Permission[]> = {
+  const adminRoutes: Record<string, Permission[]> = {
     '/admin': [Permission.VIEW_ADMIN_DASHBOARD],
     '/admin/users': [Permission.VIEW_USERS],
-    '/admin/transactions': [Permission.VIEW_TRANSACTIONS, Permission.APPROVE_TRANSACTION],
-    '/admin/kyc': [Permission.APPROVE_KYC],
+    '/admin/transactions': [Permission.VIEW_TRANSACTIONS],
+    '/admin/wallets': [Permission.MANAGE_WALLET],
     '/admin/settings': [Permission.MANAGE_SETTINGS],
-    '/admin/logs': [Permission.VIEW_LOGS],
-    '/wallet/withdraw': [Permission.WITHDRAW],
-    '/transactions': [Permission.VIEW_TRANSACTIONS],
   };
 
-  const matchingRoute = Object.keys(routePermissions).find(route => 
-    path.startsWith(route)
-  );
-
-  return matchingRoute ? routePermissions[matchingRoute] : [];
-};
-
+  return adminRoutes[path] || [];
 }; 
