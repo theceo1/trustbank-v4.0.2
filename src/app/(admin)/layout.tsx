@@ -1,16 +1,20 @@
 'use client'
-import { useEffect } from 'react';
+
+import React, { useEffect, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sidebar } from '@/components/admin/Sidebar';
 import { Header } from '@/components/admin/Header';
 import { usePermissions } from '@/hooks/usePermissions';
+import { NotificationWrapper } from '@/components/notifications/NotificationWrapper';
+
+interface AdminLayoutProps {
+  children: ReactNode;
+}
 
 export default function AdminLayout({
   children,
-}: {
-  children: React.ReactNode;
-}) {
+}: AdminLayoutProps) {
   const router = useRouter();
   const { user, loading } = useAuth();
   const { isAdmin, loading: permissionsLoading } = usePermissions();
@@ -45,8 +49,17 @@ export default function AdminLayout({
       <Header />
       <div className="flex">
         <Sidebar />
-        <main className="flex-1 p-8">
-          {children}
+        <main className="flex-1">
+          <div className="border-b p-4 flex justify-between items-center">
+            <h1 className="text-xl font-bold">Admin Dashboard</h1>
+            <div className="flex items-center space-x-4">
+              <NotificationWrapper />
+              {/* Other header items */}
+            </div>
+          </div>
+          <div className="p-8">
+            {children}
+          </div>
         </main>
       </div>
     </div>

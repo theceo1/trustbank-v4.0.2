@@ -19,7 +19,9 @@ import { GeneralSwapModal } from '@/components/wallet/GeneralSwapModal'
 
 interface MarketData {
   currency: string;
+  quote_currency: string;
   price: number;
+  raw_price: number;
   change_24h: number;
 }
 
@@ -203,11 +205,58 @@ export default function WalletPage() {
 
   const { wallets, marketData, transactions, userId } = walletData;
 
+  // Helper function to get market price
+  const getMarketPrice = (currency: string) => {
+    if (currency.toLowerCase() === 'ngn') {
+      return 1;
+    }
+
+    // First try direct NGN pair
+    const ngnPair = marketData.find(
+      m => m.currency.toLowerCase() === currency.toLowerCase() && 
+           m.quote_currency === 'NGN'
+    );
+
+    if (ngnPair?.raw_price) {
+      return ngnPair.raw_price;
+    }
+
+    // Try USDT pair
+    const usdtPair = marketData.find(
+      m => m.currency.toLowerCase() === currency.toLowerCase() && 
+           m.quote_currency === 'USDT'
+    );
+    
+    const usdtNgnPair = marketData.find(
+      m => m.currency === 'USDT' && m.quote_currency === 'NGN'
+    );
+
+    if (usdtPair?.raw_price && usdtNgnPair?.raw_price) {
+      return usdtPair.raw_price * usdtNgnPair.raw_price;
+    }
+
+    // Try BTC pair as last resort
+    const btcPair = marketData.find(
+      m => m.currency.toLowerCase() === currency.toLowerCase() && 
+           m.quote_currency === 'BTC'
+    );
+    
+    const btcUsdtPair = marketData.find(
+      m => m.currency === 'BTC' && m.quote_currency === 'USDT'
+    );
+
+    if (btcPair?.raw_price && btcUsdtPair?.raw_price && usdtNgnPair?.raw_price) {
+      return btcPair.raw_price * btcUsdtPair.raw_price * usdtNgnPair.raw_price;
+    }
+
+    return 0;
+  };
+
   // Calculate total portfolio value
   const totalValue = wallets.reduce((total: number, wallet: any) => {
-    const marketInfo = marketData.find(m => m.currency === wallet.currency?.toUpperCase());
-    const value = (parseFloat(wallet.balance || '0') * (marketInfo?.price || 0));
-    return total + value;
+    const balance = parseFloat(wallet.balance || '0');
+    const price = getMarketPrice(wallet.currency);
+    return total + (balance * price);
   }, 0);
 
   const handleDepositClick = (specificWallet?: any) => {
@@ -286,19 +335,6 @@ export default function WalletPage() {
           </Button>
         </div>
 
-        {/* Upgrade Card */}
-        <div className="rounded-lg bg-gradient-to-r from-yellow-500 to-orange-500 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-medium text-white">Upgrade Your Trading Experience</h2>
-              <p className="text-sm text-white/80 mt-1">Get access to advanced trading features and lower fees</p>
-            </div>
-            <Button variant="secondary" size="sm" className="bg-white text-orange-600 hover:bg-white/90">
-              Learn More
-            </Button>
-          </div>
-        </div>
-
         {/* Portfolio Value */}
         <PortfolioValue value={totalValue} />
 
@@ -331,7 +367,7 @@ export default function WalletPage() {
         </div>
       </BalanceProvider>
 
-      {/* Wallet-specific Modals */}
+      {/* Modals */}
       <DepositModal
         isOpen={isDepositOpen}
         onClose={() => {
@@ -340,7 +376,6 @@ export default function WalletPage() {
         }}
         wallet={selectedWallet}
       />
-
       <WithdrawModal
         isOpen={isWithdrawOpen && selectedWallet !== null}
         onClose={() => {
@@ -350,7 +385,6 @@ export default function WalletPage() {
         wallet={selectedWallet!}
         userId={userId}
       />
-
       <InstantSwapModal
         isOpen={isInstantSwapOpen}
         onClose={() => {
@@ -359,18 +393,14 @@ export default function WalletPage() {
         }}
         wallet={selectedWallet}
       />
-
-      {/* General Action Modals */}
       <GeneralDepositModal
         isOpen={isGeneralDepositOpen}
         onClose={() => setIsGeneralDepositOpen(false)}
       />
-
       <GeneralWithdrawModal
         isOpen={isGeneralWithdrawOpen}
         onClose={() => setIsGeneralWithdrawOpen(false)}
       />
-
       <GeneralSwapModal
         isOpen={isGeneralSwapOpen}
         onClose={() => setIsGeneralSwapOpen(false)}

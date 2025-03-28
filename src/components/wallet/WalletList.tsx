@@ -78,12 +78,58 @@ export function WalletList({
     );
 
   const getMarketPrice = (currency: string) => {
-    // For NGN, return 1 as it's the base currency
-    if (currency.toUpperCase() === 'NGN') return 1;
+    console.log(`Getting market price for ${currency}`);
+    console.log('Market data:', marketData);
 
-    // Find the market data for this currency
-    const market = marketData.find(m => m.currency === currency.toUpperCase());
-    return market?.price || 0;
+    if (currency.toLowerCase() === 'ngn') {
+      return 1;
+    }
+
+    // First try direct NGN pair
+    const ngnPair = marketData.find(
+      m => m.currency.toLowerCase() === currency.toLowerCase() && 
+           m.quote_currency === 'NGN'
+    );
+
+    if (ngnPair?.raw_price) {
+      console.log(`Found NGN pair for ${currency}:`, ngnPair.raw_price);
+      return ngnPair.raw_price;
+    }
+
+    // Try USDT pair
+    const usdtPair = marketData.find(
+      m => m.currency.toLowerCase() === currency.toLowerCase() && 
+           m.quote_currency === 'USDT'
+    );
+    
+    const usdtNgnPair = marketData.find(
+      m => m.currency === 'USDT' && m.quote_currency === 'NGN'
+    );
+
+    if (usdtPair?.raw_price && usdtNgnPair?.raw_price) {
+      const price = usdtPair.raw_price * usdtNgnPair.raw_price;
+      console.log(`Calculated ${currency} price via USDT:`, price);
+      return price;
+    }
+
+    // Try BTC pair as last resort
+    const btcPair = marketData.find(
+      m => m.currency.toLowerCase() === currency.toLowerCase() && 
+           m.quote_currency === 'BTC'
+    );
+    
+    const btcUsdtPair = marketData.find(
+      m => m.currency === 'BTC' && m.quote_currency === 'USDT'
+    );
+
+    if (btcPair?.raw_price && btcUsdtPair?.raw_price && usdtNgnPair?.raw_price) {
+      const price = btcPair.raw_price * btcUsdtPair.raw_price * usdtNgnPair.raw_price;
+      console.log(`Calculated ${currency} price via BTC:`, price);
+      return price;
+    }
+
+    console.log(`No market data found for ${currency}`);
+    return 0;
   };
 
   return (
@@ -101,16 +147,17 @@ export function WalletList({
               aria-label="Search wallets"
             />
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-3 bg-card/50 border rounded-lg px-3 py-2">
             <Switch
               id="show-all-wallets"
               checked={showAllWallets}
               onCheckedChange={setShowAllWallets}
+              className="data-[state=checked]:bg-green-600"
               aria-label="Toggle all wallets"
             />
             <label
               htmlFor="show-all-wallets"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              className="text-sm font-medium leading-none cursor-pointer select-none"
             >
               Show all wallets
             </label>
@@ -124,8 +171,11 @@ export function WalletList({
                   variant={view === 'grid' ? 'default' : 'ghost'}
                   size="icon"
                   onClick={() => setView('grid')}
-                  className="rounded-none rounded-l-md"
+                  className={`rounded-none rounded-l-md ${
+                    view === 'grid' ? 'bg-green-600 hover:bg-green-700 text-white' : ''
+                  }`}
                   aria-label="Grid view"
+                  aria-pressed={view === 'grid'}
                 >
                   <Icons.grid className="h-4 w-4" />
                 </Button>
@@ -141,8 +191,11 @@ export function WalletList({
                   variant={view === 'list' ? 'default' : 'ghost'}
                   size="icon"
                   onClick={() => setView('list')}
-                  className="rounded-none rounded-r-md"
+                  className={`rounded-none rounded-r-md ${
+                    view === 'list' ? 'bg-green-600 hover:bg-green-700 text-white' : ''
+                  }`}
                   aria-label="List view"
+                  aria-pressed={view === 'list'}
                 >
                   <Icons.list className="h-4 w-4" />
                 </Button>
@@ -153,7 +206,6 @@ export function WalletList({
         </div>
       </div>
 
-      {/* Wallets */}
       <ScrollArea className="h-[calc(100vh-20rem)]">
         <div
           className={

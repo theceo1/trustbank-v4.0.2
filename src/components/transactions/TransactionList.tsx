@@ -1,4 +1,4 @@
-import { formatCurrency } from '@/lib/utils';
+import { formatAmount } from '@/lib/utils';
 import { Icons } from '@/components/ui/icons';
 import { format, isValid, parseISO } from 'date-fns';
 import type { AnyTransaction } from '@/types/transactions';
@@ -96,17 +96,17 @@ export function TransactionList({ transactions }: TransactionListProps) {
                 {'from_currency' in transaction ? (
                   <div>
                     <p className="text-sm font-medium text-foreground">
-                      {formatCurrency(transaction.from_amount, transaction.from_currency)} →{' '}
-                      {formatCurrency(transaction.to_amount, transaction.to_currency)}
+                      {formatAmount(transaction.from_amount, transaction.from_currency)} →{' '}
+                      {formatAmount(transaction.to_amount, transaction.to_currency)}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Rate: {formatCurrency(transaction.execution_price, transaction.to_currency)}
+                      Rate: {formatAmount(transaction.execution_price, transaction.to_currency)}
                     </p>
                   </div>
                 ) : (
                   <p className="text-sm font-medium text-foreground">
                     {transaction.type === 'withdrawal' ? '-' : '+'}
-                    {formatCurrency(transaction.amount, transaction.currency)}
+                    {formatAmount(transaction.amount, transaction.currency)}
                   </p>
                 )}
                 <span

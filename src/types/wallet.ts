@@ -6,10 +6,14 @@ export interface Wallet {
   balance: string;
   address: string | null;
   icon: keyof typeof Icons;
+  estimated_value?: number;
+  market_price?: number;
 }
 
 export interface MarketData {
   currency: string;
+  quote_currency: string;
   price: number;
+  raw_price: number;
   change_24h: number;
 } 

@@ -26,6 +26,7 @@ import {
   Users
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 
 interface ClientDashboardProps {
   user: any;
@@ -54,35 +55,77 @@ export default function ClientDashboard({
   const [isBalanceHidden, setIsBalanceHidden] = useState(false);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [isSwapModalOpen, setIsSwapModalOpen] = useState(false);
+  const [walletData, setWalletData] = useState<{
+    wallets: any[];
+    marketData: any[];
+    totalValue: number;
+  }>({
+    wallets: [],
+    marketData: [],
+    totalValue: 0
+  });
+
+  useEffect(() => {
+    const fetchWalletData = async () => {
+      try {
+        const response = await fetch('/api/wallet');
+        const data = await response.json();
+        
+        if (response.ok) {
+          // Calculate total value from non-zero wallets
+          const nonZeroWallets = data.wallets.filter((w: any) => w.estimated_value > 0);
+          const totalValue = nonZeroWallets.reduce((sum: number, w: any) => sum + w.estimated_value, 0);
+          
+          setWalletData({
+            wallets: data.wallets,
+            marketData: data.marketData,
+            totalValue
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching wallet data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchWalletData();
+  }, []);
 
   const toggleBalanceVisibility = () => {
     setIsBalanceHidden(!isBalanceHidden);
   };
 
-  // Simulate loading state
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 1000);
-
-    return () => clearTimeout(timer);
-  }, []);
-
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[80vh]">
-        <div className="flex flex-col items-center gap-2">
-          <div className="animate-spin">
-            <RefreshCcw className="h-8 w-8 text-green-600" />
-          </div>
-          <p className="text-sm text-muted-foreground">Loading your dashboard...</p>
-        </div>
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <svg
+          className="animate-spin h-8 w-8 text-green-500"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <circle
+            className="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="4"
+          />
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+          />
+        </svg>
+        <p className="text-muted-foreground">Loading your dashboard...</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-8">
+    <div className="space-y-6">
       {/* Dashboard Header */}
       <div className="space-y-2">
         <h1 className="text-lg font-bold tracking-tight">Dashboard</h1>
@@ -98,7 +141,7 @@ export default function ClientDashboard({
             <div>
               <p className="text-sm font-medium text-muted-foreground">Total Balance</p>
               <h2 className="text-2xl font-bold mt-2">
-                {isBalanceHidden ? '•••••••' : formatAmount(0, 'NGN')}
+                {isBalanceHidden ? '•••••••' : formatAmount(walletData.totalValue, 'NGN')}
               </h2>
             </div>
             <Button
@@ -110,6 +153,13 @@ export default function ClientDashboard({
               {isBalanceHidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
             </Button>
           </div>
+          <Button
+            variant="link"
+            className="absolute bottom-2 right-2 text-xs text-muted-foreground hover:text-primary"
+            asChild
+          >
+            <Link href="/profile/wallet">View Details <ChevronRight className="h-3 w-3 ml-1" /></Link>
+          </Button>
         </Card>
 
         <Card className="bg-gradient-to-br from-blue-500/5 via-indigo-500/5 to-purple-500/5 border border-gray-800/10 p-6">
@@ -207,9 +257,21 @@ export default function ClientDashboard({
       </div>
 
       {/* Quick Actions */}
-      <Card className="p-6 bg-white dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800">
-        <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+      <Card className="p-6">
+        <h3 className="font-semibold mb-4">Quick Actions</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Button
+            variant="outline"
+            className="relative h-auto py-8 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 hover:from-green-500 hover:to-emerald-600 text-gray-900 dark:text-white hover:text-white border border-green-100 dark:border-green-900/50 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg"
+            onClick={() => setIsDepositModalOpen(true)}
+          >
+            <ArrowDownRight className="h-6 w-6" />
+            <div className="text-center">
+              <p className="font-medium">Deposit</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Add funds</p>
+            </div>
+          </Button>
+
           <Button
             variant="outline"
             className="relative h-auto py-8 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 hover:from-green-500 hover:to-emerald-600 text-gray-900 dark:text-white hover:text-white border border-green-100 dark:border-green-900/50 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg"
@@ -232,20 +294,6 @@ export default function ClientDashboard({
               <div className="text-center">
                 <p className="font-medium">Trade</p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">Buy and sell crypto</p>
-              </div>
-            </Link>
-          </Button>
-
-          <Button
-            variant="outline"
-            className="relative h-auto py-8 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 hover:from-green-500 hover:to-emerald-600 text-gray-900 dark:text-white hover:text-white border border-green-100 dark:border-green-900/50 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg"
-            asChild
-          >
-            <Link href="/profile/wallet">
-              <Wallet className="h-6 w-6" />
-              <div className="text-center">
-                <p className="font-medium">Manage Funds</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Deposit and withdraw funds</p>
               </div>
             </Link>
           </Button>
@@ -280,133 +328,95 @@ export default function ClientDashboard({
         </div>
       </Card>
 
-      {/* Transactions and Limits Grid */}
+      {/* Quick Links */}
       <div className="grid gap-4 md:grid-cols-2">
-        {/* Recent Transactions */}
-        <Card className="bg-gradient-to-br from-gray-50 to-gray-100/50 dark:from-gray-900 dark:to-gray-800/50 border-0 p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-bold">Recent Transactions</h3>
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/transactions" className="flex items-center">
-                View All <ChevronRight className="ml-1 h-4 w-4" />
+        <Card className="p-6">
+          <h3 className="font-semibold mb-4">Quick Links</h3>
+          <div className="space-y-4">
+            <Button variant="outline" className="w-full justify-start" asChild>
+              <Link href="/profile/wallet">
+                <Wallet className="h-4 w-4 mr-2" />
+                View Full Portfolio
+              </Link>
+            </Button>
+            <Button variant="outline" className="w-full justify-start" asChild>
+              <Link href="/trades">
+                <ArrowRightLeft className="h-4 w-4 mr-2" />
+                Trade Crypto
+              </Link>
+            </Button>
+            <Button variant="outline" className="w-full justify-start" asChild>
+              <Link href="/trades/p2p">
+                <Users className="h-4 w-4 mr-2" />
+                P2P Trading
               </Link>
             </Button>
           </div>
-          {transactions && transactions.length > 0 ? (
+        </Card>
+        
+        {/* Recent Transactions */}
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold">Recent Transactions</h3>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/transactions">
+                View All
+                <ChevronRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+          {transactions.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <History className="h-12 w-12 text-muted-foreground/50 mb-4" />
+              <p className="text-muted-foreground">No transactions yet</p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-4"
+                onClick={() => setIsSwapModalOpen(true)}
+              >
+                Make Your First Trade
+              </Button>
+            </div>
+          ) : (
             <div className="space-y-4">
-              {transactions.map((tx) => (
-                <div
-                  key={tx.id}
-                  className="flex items-center justify-between p-4 rounded-lg bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-200"
-                >
+              {transactions.slice(0, 5).map((tx: any) => (
+                <div key={tx.id} className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className={cn(
                       "p-2 rounded-full",
-                      tx.type === 'deposit' ? 'bg-green-100 dark:bg-green-900/20' :
-                      tx.type === 'withdrawal' ? 'bg-red-100 dark:bg-red-900/20' :
-                      tx.type === 'swap' ? 'bg-purple-100 dark:bg-purple-900/20' :
-                      'bg-blue-100 dark:bg-blue-900/20'
+                      tx.type === 'deposit' ? "bg-green-500/10 text-green-600" :
+                      tx.type === 'withdrawal' ? "bg-red-500/10 text-red-600" :
+                      "bg-purple-500/10 text-purple-600"
                     )}>
-                      {tx.type === 'deposit' && <ArrowDownRight className="h-4 w-4 text-green-600 dark:text-green-400" />}
-                      {tx.type === 'withdrawal' && <ArrowUpRight className="h-4 w-4 text-red-600 dark:text-red-400" />}
-                      {tx.type === 'swap' && <RefreshCcw className="h-4 w-4 text-purple-600 dark:text-purple-400" />}
+                      {tx.type === 'deposit' ? <ArrowDownRight className="h-4 w-4" /> :
+                       tx.type === 'withdrawal' ? <ArrowUpRight className="h-4 w-4" /> :
+                       <ArrowRightLeft className="h-4 w-4" />}
                     </div>
                     <div>
-                      <p className="font-medium capitalize">{tx.type}</p>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-sm font-medium capitalize">{tx.type}</p>
+                      <p className="text-xs text-muted-foreground">
                         {new Date(tx.created_at).toLocaleDateString()}
                       </p>
                     </div>
                   </div>
                   <div className="text-right">
-                    {tx.type === 'swap' ? (
-                      <>
-                        <p className="font-medium text-red-600">-{formatAmount(tx.amount, tx.currency)}</p>
-                        <p className="text-sm text-green-600">+{formatAmount(tx.to_amount, tx.to_currency)}</p>
-                      </>
-                    ) : (
-                      <p className={cn(
-                        "font-medium",
-                        tx.type === 'deposit' ? 'text-green-600' :
-                        'text-red-600'
-                      )}>
-                        {tx.type === 'deposit' ? '+' : '-'}{formatAmount(tx.amount, tx.currency)}
-                      </p>
-                    )}
-                    <span className={cn(
-                      "inline-block px-2 py-1 text-xs rounded-full mt-1",
-                      tx.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400' :
-                      tx.status === 'pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400' :
-                      'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400'
+                    <p className="text-sm font-medium">
+                      {formatAmount(parseFloat(tx.amount), tx.currency)}
+                    </p>
+                    <p className={cn(
+                      "text-xs",
+                      tx.status === 'completed' ? "text-green-600" :
+                      tx.status === 'pending' ? "text-yellow-600" :
+                      "text-red-600"
                     )}>
                       {tx.status}
-                    </span>
+                    </p>
                   </div>
                 </div>
               ))}
             </div>
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              No recent transactions
-            </div>
           )}
-        </Card>
-
-        {/* Trading Limits */}
-        <Card className="bg-gradient-to-br from-blue-50/50 to-indigo-50/50 dark:from-blue-950/20 dark:to-indigo-950/20 border border-blue-100 dark:border-blue-800/50 p-6">
-          <h3 className="text-lg font-semibold mb-6">Trading Limits</h3>
-          <div className="space-y-6">
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm text-muted-foreground">Trading Volume</span>
-                <span className="text-sm font-medium">
-                  {formatAmount(limits.trading_used || 0, 'NGN')} / {formatAmount(limits.trading_limit || 10000000, 'NGN')}
-                </span>
-              </div>
-              <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-blue-500 rounded-full transition-all"
-                  style={{ width: `${Math.min(((limits.trading_used || 0) / (limits.trading_limit || 10000000)) * 100, 100)}%` }}
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm text-muted-foreground">Deposit Limit</span>
-                <span className="text-sm font-medium">
-                  {formatAmount(0, 'NGN')} / {formatAmount(5000000, 'NGN')}
-                </span>
-              </div>
-              <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-green-500 rounded-full transition-all"
-                  style={{ width: '0%' }}
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm text-muted-foreground">Withdrawal Limit</span>
-                <span className="text-sm font-medium">
-                  {formatAmount(limits.withdrawal_used || 0, 'NGN')} / {formatAmount(limits.withdrawal_limit || 1000000, 'NGN')}
-                </span>
-              </div>
-              <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-orange-500 rounded-full transition-all"
-                  style={{ width: `${Math.min(((limits.withdrawal_used || 0) / (limits.withdrawal_limit || 1000000)) * 100, 100)}%` }}
-                />
-              </div>
-            </div>
-
-            <div className="mt-4 p-4 bg-blue-50/50 dark:bg-blue-950/20 rounded-lg">
-              <p className="text-sm text-muted-foreground">
-                Your trading limits are based on your KYC tier and 30-day trading volume. Higher trading volume and KYC tier unlock better fees and higher limits. Visit the <Link href="/trade/guide" className="text-primary hover:underline">Trading Guide</Link> to learn more.
-              </p>
-            </div>
-          </div>
         </Card>
       </div>
 
@@ -414,7 +424,7 @@ export default function ClientDashboard({
         isOpen={isDepositModalOpen}
         onClose={() => setIsDepositModalOpen(false)}
       />
-
+      
       <InstantSwapModal
         isOpen={isSwapModalOpen}
         onClose={() => setIsSwapModalOpen(false)}

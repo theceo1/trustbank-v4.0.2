@@ -11,6 +11,17 @@ const PROTECTED_ROUTES = [
   '/api/trades/p2p/orders'
 ];
 
+// Routes that require authentication
+const AUTH_REQUIRED_PATHS = [
+  '/dashboard',
+  '/profile',
+  '/wallet',
+  '/trades',
+  '/settings',
+  '/kyc',
+  '/transactions'
+];
+
 // Public paths that don't require authentication
 const PUBLIC_PATHS = [
   // API routes
@@ -18,9 +29,22 @@ const PUBLIC_PATHS = [
   '/api/auth/callback',
   '/api/auth/sign-in',
   '/api/auth/sign-up',
+  '/api/markets/overview',
+  '/api/markets/tickers',
+  '/api/markets/rates',
+  '/api/markets/usdtngn/ticker',
+  '/api/markets/usdtngn/order-book',
+  '/api/config/fees',
+  '/api/user/wallets',
+  '/api/swap/quotation',
   
-  // Home
+  // Home and Marketing
   '/',
+  '/home',
+  '/blog',
+  '/features',
+  '/pricing',
+  '/contact',
   
   // Auth routes
   '/auth/login',
@@ -56,6 +80,8 @@ const PUBLIC_PATHS = [
 const ADMIN_ROUTES = /^\/admin(?:\/.*)?$/;
 
 export async function middleware(request: NextRequest) {
+  console.log(`[Middleware] Handling request for path: ${request.nextUrl.pathname}`);
+  
   const res = NextResponse.next()
   const supabase = createMiddlewareClient({ req: request, res })
 
@@ -90,8 +116,17 @@ export async function middleware(request: NextRequest) {
   requestHeaders.set('Referrer-Policy', 'strict-origin-when-cross-origin')
   requestHeaders.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
 
-  // Check if the current path is public
-  if (PUBLIC_PATHS.some(path => request.nextUrl.pathname.startsWith(path))) {
+  const pathname = request.nextUrl.pathname
+
+  // Always return for static files and public paths
+  if (
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/static') ||
+    pathname.includes('.') ||
+    pathname === '/' ||
+    PUBLIC_PATHS.includes(pathname)
+  ) {
+    console.log(`[Middleware] Allowing public path: ${pathname}`);
     return NextResponse.next({
       request: {
         headers: requestHeaders,
@@ -100,15 +135,29 @@ export async function middleware(request: NextRequest) {
   }
 
   // Check if it's an admin route
-  if (ADMIN_ROUTES.test(request.nextUrl.pathname)) {
+  if (ADMIN_ROUTES.test(pathname)) {
+    console.log(`[Middleware] Admin route detected: ${pathname}`);
     return adminMiddleware(request);
   }
 
   try {
-    // For API routes, check Authorization header
-    if (request.nextUrl.pathname.startsWith('/api/')) {
+    // For protected API routes
+    if (pathname.startsWith('/api/')) {
+      console.log(`[Middleware] API route detected: ${pathname}`);
+      
+      // Skip auth check for public API routes
+      if (pathname.startsWith('/api/auth/')) {
+        console.log(`[Middleware] Public API route detected: ${pathname}`);
+        return NextResponse.next({
+          request: {
+            headers: requestHeaders,
+          },
+        })
+      }
+
       const authHeader = request.headers.get('Authorization')
       if (!authHeader?.startsWith('Bearer ')) {
+        console.log(`[Middleware] Missing or invalid Authorization header`);
         return NextResponse.json(
           { error: 'Unauthorized' },
           { status: 401 }
@@ -125,25 +174,8 @@ export async function middleware(request: NextRequest) {
         )
       }
 
-      // Verify token expiration
-      const tokenExpiry = session.expires_at
-      const currentTime = Math.floor(Date.now() / 1000)
-      
-      if (tokenExpiry && tokenExpiry < currentTime) {
-        // Token has expired, try to refresh
-        const { data: { session: refreshedSession }, error: refreshError } = 
-          await supabase.auth.refreshSession()
-
-        if (refreshError || !refreshedSession) {
-          return NextResponse.json(
-            { error: 'Session expired' },
-            { status: 401 }
-          )
-        }
-      }
-
       // Check if the route requires 2FA
-      if (PROTECTED_ROUTES.some(route => request.nextUrl.pathname.startsWith(route))) {
+      if (PROTECTED_ROUTES.some(route => pathname.startsWith(route))) {
         const { data: securitySettings, error: settingsError } = await supabase
           .from('security_settings')
           .select('two_factor_enabled, two_factor_secret')
@@ -179,68 +211,55 @@ export async function middleware(request: NextRequest) {
           )
         }
       }
+    }
 
-      // Return response with headers
-      return NextResponse.next({
-        request: {
-          headers: requestHeaders,
-        },
-      })
-    } else {
-      // For non-API routes, check session cookie
+    // For protected routes that require authentication
+    if (AUTH_REQUIRED_PATHS.some(path => pathname.startsWith(path))) {
+      console.log(`[Middleware] Protected route detected: ${pathname}`);
       const { data: { session }, error: sessionError } = await supabase.auth.getSession()
       
       if (sessionError || !session) {
+        console.log(`[Middleware] No valid session found, redirecting to login`);
         const redirectUrl = request.nextUrl.clone()
         redirectUrl.pathname = '/auth/login'
-        redirectUrl.searchParams.set('redirect', request.nextUrl.pathname)
+        redirectUrl.searchParams.set('redirect', pathname)
         return NextResponse.redirect(redirectUrl)
       }
-
-      // Check token expiration
-      const tokenExpiry = session.expires_at
-      const currentTime = Math.floor(Date.now() / 1000)
-      
-      if (tokenExpiry && tokenExpiry < currentTime) {
-        // Token has expired, try to refresh
-        const { data: { session: refreshedSession }, error: refreshError } = 
-          await supabase.auth.refreshSession()
-
-        if (refreshError || !refreshedSession) {
-          const redirectUrl = request.nextUrl.clone()
-          redirectUrl.pathname = '/auth/login'
-          redirectUrl.searchParams.set('redirect', request.nextUrl.pathname)
-          return NextResponse.redirect(redirectUrl)
-        }
-      }
-
-      // Return response with headers
-      return NextResponse.next({
-        request: {
-          headers: requestHeaders,
-        },
-      })
     }
+
+    console.log(`[Middleware] Allowing access to: ${pathname}`);
+    // For all other routes, allow access with headers
+    return NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    })
   } catch (error) {
-    console.error('Auth error:', error)
-    if (request.nextUrl.pathname.startsWith('/api/')) {
+    console.error('[Middleware] Error:', error);
+    // For API routes return JSON error
+    if (pathname.startsWith('/api/')) {
       return NextResponse.json(
         { error: 'Internal server error' },
         { status: 500 }
       )
-    } else {
-      const redirectUrl = request.nextUrl.clone()
-      redirectUrl.pathname = '/auth/login'
-      redirectUrl.searchParams.set('redirect', request.nextUrl.pathname)
-      return NextResponse.redirect(redirectUrl)
     }
+    // For other routes, redirect to login
+    const redirectUrl = request.nextUrl.clone()
+    redirectUrl.pathname = '/auth/login'
+    redirectUrl.searchParams.set('redirect', pathname)
+    return NextResponse.redirect(redirectUrl)
   }
 }
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico).*)',
-    // Match all admin routes
-    '/admin/:path*',
-  ],
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public folder
+     */
+    '/((?!_next/static|_next/image|favicon.ico|public/).*)',
+  ]
 } 

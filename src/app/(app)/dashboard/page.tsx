@@ -1,9 +1,9 @@
-'use server';
-
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import ClientDashboard from './ClientDashboard';
+
+export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
   const cookieStore = cookies();
@@ -12,7 +12,7 @@ export default async function DashboardPage() {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   
   if (!user || userError) {
-    return redirect('/auth/login');
+    redirect('/auth/login');
   }
 
   // Fetch user profile and verification history

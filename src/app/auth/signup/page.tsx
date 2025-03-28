@@ -1,7 +1,7 @@
 // src/app/auth/signup/page.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";

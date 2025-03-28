@@ -15,9 +15,17 @@ interface Notification {
   read: boolean;
   createdAt: string;
   metadata?: Record<string, any>;
+  is_admin_notification?: boolean;
 }
 
-export function NotificationCenter() {
+interface NotificationCenterProps {
+  isAdmin?: boolean;
+  queryParams?: {
+    is_admin_notification?: boolean;
+  };
+}
+
+export function NotificationCenter({ isAdmin = false, queryParams = {} }: NotificationCenterProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -37,6 +45,9 @@ export function NotificationCenter() {
           event: 'INSERT',
           schema: 'public',
           table: 'notifications',
+          filter: queryParams.is_admin_notification !== undefined 
+            ? `is_admin_notification=eq.${queryParams.is_admin_notification}`
+            : undefined
         },
         (payload) => {
           setNotifications(prev => [payload.new as Notification, ...prev]);
@@ -59,12 +70,19 @@ export function NotificationCenter() {
       
       if (!session) return;
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('notifications')
         .select('*')
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: false })
         .limit(50);
+
+      // Add admin notification filter if specified
+      if (queryParams.is_admin_notification !== undefined) {
+        query = query.eq('is_admin_notification', queryParams.is_admin_notification);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -99,10 +117,23 @@ export function NotificationCenter() {
 
   const markAllAsRead = async () => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) return;
+
+      // Build match conditions for the update
+      const match = {
+        user_id: session.user.id,
+        read: false,
+        ...(queryParams.is_admin_notification !== undefined && {
+          is_admin_notification: queryParams.is_admin_notification
+        })
+      };
+
       const { error } = await supabase
         .from('notifications')
         .update({ read: true })
-        .eq('read', false);
+        .match(match);
 
       if (error) throw error;
 
@@ -154,7 +185,7 @@ export function NotificationCenter() {
     <Card className="w-full max-w-md">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">
-          Notifications
+          {isAdmin ? 'Admin Notifications' : 'Notifications'}
           {unreadCount > 0 && (
             <Badge variant="destructive" className="ml-2">
               {unreadCount}

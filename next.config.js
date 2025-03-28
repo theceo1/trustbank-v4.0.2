@@ -35,6 +35,8 @@ const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   compress: true,
+  distDir: '.next',
+  output: 'standalone',
   typescript: {
     // !! WARN !!
     // This allows production builds to successfully complete even if

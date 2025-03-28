@@ -13,6 +13,7 @@ import { quidaxService } from '@/lib/quidax';
 import { Icons } from '@/components/ui/icons';
 import { useToast } from '@/components/ui/use-toast';
 import Link from 'next/link';
+import { createUserAccount } from '@/app/actions/auth'
 
 const signUpSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -61,38 +62,10 @@ export function SignUpForm() {
     try {
       setIsLoading(true);
 
-      // 1. Create Supabase user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: data.email,
-        password: data.password,
-        options: {
-          data: {
-            first_name: data.firstName,
-            last_name: data.lastName,
-          },
-        },
-      });
+      const result = await createUserAccount(data);
 
-      if (authError) throw authError;
-
-      // 2. Create Quidax sub-account
-      const quidaxUser = await quidaxService.createSubAccount({
-        email: data.email,
-        first_name: data.firstName,
-        last_name: data.lastName,
-      });
-
-      // 3. Update user profile with Quidax ID
-      if (authData.user) {
-        const { error: profileError } = await supabase
-          .from('user_profiles')
-          .update({
-            quidax_id: quidaxUser.id,
-            quidax_sn: quidaxUser.sn,
-          })
-          .eq('user_id', authData.user.id);
-
-        if (profileError) throw profileError;
+      if (!result.success) {
+        throw new Error(result.error);
       }
 
       toast({

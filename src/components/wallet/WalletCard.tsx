@@ -33,64 +33,56 @@ export function WalletCard({
   const { isHidden } = useBalance();
   
   // Calculate fiat value
-  const calculateFiatValue = () => {
-    try {
-      const balanceNum = parseFloat(balance || '0');
-      if (isNaN(balanceNum)) return 0;
-      
-      // If currency is NGN, return the balance as is
-      if (currency.toUpperCase() === 'NGN') return balanceNum;
-      
-      // For other currencies, multiply by price
-      const priceNum = price || 0;
-      return balanceNum * priceNum;
-    } catch (error) {
-      return 0;
+  const calculateFiatValue = (balance: number, price: number, currency: string) => {
+    console.log(`Calculating fiat value for ${currency}:`, { balance, price });
+    
+    if (currency.toUpperCase() === 'NGN') {
+      return balance;
     }
+
+    // Ensure we have valid numbers and multiply
+    const numericBalance = parseFloat(String(balance)) || 0;
+    const numericPrice = parseFloat(String(price)) || 0;
+    const value = numericBalance * numericPrice;
+    
+    console.log(`Calculated value: ${value}`);
+    return value;
   };
 
-  const fiatValue = calculateFiatValue();
+  const fiatValue = calculateFiatValue(parseFloat(balance || '0'), price || 0, currency);
+  console.log(`Final fiat value for ${currency}: ${fiatValue}`);
 
-  const formatBalance = (value: string | number, currency: string) => {
-    const numValue = typeof value === 'string' ? parseFloat(value) : value;
-    if (isNaN(numValue)) return '0.00';
+  const formatBalance = (balance: number, currency: string) => {
+    const numericBalance = parseFloat(String(balance)) || 0;
     
-    // Special handling for BTC to show 8 decimal places
+    if (currency.toUpperCase() === 'NGN') {
+      return `₦${numericBalance.toLocaleString('en-NG', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      })}`;
+    }
+
+    // For BTC, show more decimal places
     if (currency.toUpperCase() === 'BTC') {
-      // For very small amounts, use scientific notation
-      if (numValue < 0.00000001) {
-        return numValue.toExponential(8);
-      }
-      // Otherwise show full 8 decimal places
-      return numValue.toLocaleString(undefined, {
+      return numericBalance.toLocaleString('en-US', {
         minimumFractionDigits: 8,
-        maximumFractionDigits: 8,
-        useGrouping: true
+        maximumFractionDigits: 8
       });
     }
-    
-    // For other cryptocurrencies (except NGN), show 6 decimal places
-    if (['ETH', 'SOL', 'USDT', 'USDC'].includes(currency.toUpperCase())) {
-      return numValue.toLocaleString(undefined, {
-        minimumFractionDigits: 6,
-        maximumFractionDigits: 6,
-        useGrouping: true
-      });
-    }
-    
-    // For NGN and others, show 2 decimal places
-    return numValue.toLocaleString(undefined, {
+
+    // For other cryptocurrencies
+    return numericBalance.toLocaleString('en-US', {
       minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-      useGrouping: true
+      maximumFractionDigits: 6
     });
   };
 
   const formatFiatValue = (value: number) => {
-    return value.toLocaleString(undefined, {
+    const numericValue = parseFloat(String(value)) || 0;
+    return `₦${numericValue.toLocaleString('en-NG', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
-    });
+    })}`;
   };
 
   return (
@@ -100,14 +92,14 @@ export function WalletCard({
           {currency.toUpperCase()}
         </h3>
         <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-          {isHidden ? '••••••' : formatBalance(balance, currency)}
+          {isHidden ? '••••••' : formatBalance(parseFloat(balance || '0'), currency)}
         </p>
       </div>
       
       <div className="space-y-1">
         <p className="text-sm text-gray-500 dark:text-gray-400">Estimated Value</p>
         <p className="text-base font-medium text-gray-900 dark:text-gray-100">
-          {isHidden ? '••••••' : `₦${formatFiatValue(fiatValue)}`}
+          {isHidden ? '••••••' : formatFiatValue(fiatValue)}
         </p>
       </div>
 

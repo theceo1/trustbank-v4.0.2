@@ -1,3 +1,4 @@
+import React from 'react';
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import "./globals.css"
@@ -36,6 +37,12 @@ export const metadata: Metadata = {
     },
   ],
   creator: "trustBank",
+  icons: {
+    icon: '/favicon.ico',
+    shortcut: '/favicon.ico',
+    apple: '/apple-touch-icon.png',
+  },
+  manifest: '/site.webmanifest'
 }
 
 interface RootLayoutProps {
@@ -45,6 +52,10 @@ interface RootLayoutProps {
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+      </head>
       <body className={cn(
         'min-h-screen bg-background font-sans antialiased',
         GeistSans.variable,

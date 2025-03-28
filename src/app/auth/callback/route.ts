@@ -40,6 +40,7 @@ export async function GET(request: Request) {
   }
 
   console.log('➡️ Redirecting to dashboard');
-  // URL to redirect to after sign in process completes
-  return NextResponse.redirect(new URL('/app/dashboard', requestUrl.origin))
+  // Get the redirect URL from the query params or use default
+  const redirectTo = requestUrl.searchParams.get('redirect') || '/dashboard';
+  return NextResponse.redirect(new URL(redirectTo, requestUrl.origin));
 } 

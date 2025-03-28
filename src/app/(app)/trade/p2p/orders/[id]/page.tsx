@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { P2POrderDetails } from '@/components/trades/p2p/P2POrderDetails';
+import P2POrderDetails from '@/components/trades/p2p/P2POrderDetails';
 
 // Wrapper component to handle the page props
 function P2POrderDetailsWrapper({ orderId }: { orderId: string }) {

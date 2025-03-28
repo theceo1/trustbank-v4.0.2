@@ -8,7 +8,7 @@ import { CallToAction } from '@/components/home/CallToAction';
 
 export default function HomePage() {
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen w-full">
       <HeroSection />
       <VisionBoard />
       <FeatureShowcase />

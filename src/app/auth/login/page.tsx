@@ -181,7 +181,7 @@ export default function LoginPage() {
             <div className="space-y-2">
               <h2 className="text-2xl font-semibold text-foreground">Welcome Back</h2>
               <p className="text-sm text-muted-foreground">
-                Continue your journey with <span className="text-green-500">trustBank</span>
+                Continue your journey with <span className="text-green-600">trustBank</span>
               </p>
             </div>
 

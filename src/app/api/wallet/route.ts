@@ -3,12 +3,7 @@ import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { QuidaxServerService } from '@/lib/quidax';
 import type { Database } from '@/lib/database.types';
-
-interface MarketData {
-  currency: string;
-  price: number;
-  change_24h: number;
-}
+import type { MarketData } from '@/types/wallet';
 
 interface Transaction {
   id: string;
@@ -72,70 +67,79 @@ export async function GET(request: Request) {
 
     try {
       // Fetch data in parallel
+      console.log('Fetching wallet and market data...');
       const [walletsResponse, marketDataResponse] = await Promise.all([
         quidax.request(`/users/${profile.quidax_id}/wallets`),
         quidax.getMarketTickers()
       ]);
 
+      // Log raw responses for debugging
+      console.log('Wallets Response:', {
+        status: walletsResponse?.status,
+        walletCount: walletsResponse?.data?.length || 0
+      });
+
+      console.log('Market Data Response:', {
+        status: marketDataResponse?.status,
+        markets: marketDataResponse?.data ? Object.keys(marketDataResponse.data) : []
+      });
+
       // Get recent swap transactions
       const transactionsResponse = await quidax.request(`/users/${profile.quidax_id}/swap_transactions`);
 
-      // First, get the USDT/NGN rate
-      const usdtNgnMarket = marketDataResponse?.data['usdt_ngn'];
-      const usdtNgnRate = usdtNgnMarket?.ticker ? parseFloat(usdtNgnMarket.ticker.last) || 0 : 0;
-
-      console.log('USDT/NGN Rate:', usdtNgnRate);
-
-      // Transform market data into expected format with null checks
-      const transformedMarketData = Object.entries(marketDataResponse?.data || {})
-        .map(([market, data]: [string, any]) => {
-          if (!market || !data?.ticker) return null;
-          
-          // Handle market pairs safely
-          const [baseCurrency, quoteCurrency] = market.toLowerCase().split('_');
-          if (!baseCurrency || !quoteCurrency) return null;
-
-          const lastPrice = parseFloat(data.ticker.last) || 0;
-          const openPrice = parseFloat(data.ticker.open) || lastPrice;
-
-          // Calculate price in NGN with proper null checks
-          let priceInNGN = 0;
-          if (quoteCurrency === 'ngn') {
-            priceInNGN = lastPrice;
-          } else if (quoteCurrency === 'usdt' && usdtNgnRate > 0) {
-            priceInNGN = lastPrice * usdtNgnRate;
+      // Transform market data
+      const transformedMarketData: MarketData[] = [];
+      
+      if (marketDataResponse?.data && typeof marketDataResponse.data === 'object') {
+        // Process each market pair from the response
+        for (const [market, data] of Object.entries<any>(marketDataResponse.data)) {
+          // Skip if data is not in expected format
+          if (!data?.ticker) {
+            console.log(`Skipping market ${market} - no ticker data`);
+            continue;
           }
 
-          // Only include pairs we can price in NGN
-          if (priceInNGN <= 0) return null;
+          // Market pairs are in format base_quote (e.g., btc_ngn)
+          const [baseCurrency, quoteCurrency] = market.split('_');
+          if (!baseCurrency || !quoteCurrency) {
+            console.log(`Skipping market ${market} - invalid pair format`);
+            continue;
+          }
 
-          console.log(`Market: ${baseCurrency}/${quoteCurrency}, Price: ${lastPrice}, NGN Price: ${priceInNGN}`);
-          
-          return {
+          const ticker = data.ticker;
+          const lastPrice = parseFloat(ticker.last) || 0;
+          const openPrice = parseFloat(ticker.open) || lastPrice;
+          const change24h = openPrice ? ((lastPrice - openPrice) / openPrice) * 100 : 0;
+
+          console.log(`Processing market ${market}:`, {
+            baseCurrency: baseCurrency.toUpperCase(),
+            quoteCurrency: quoteCurrency.toUpperCase(),
+            lastPrice,
+            openPrice,
+            change24h
+          });
+
+          transformedMarketData.push({
             currency: baseCurrency.toUpperCase(),
-            price: priceInNGN,
-            change_24h: ((lastPrice - openPrice) / openPrice) * 100,
+            quote_currency: quoteCurrency.toUpperCase(),
+            price: lastPrice,
             raw_price: lastPrice,
-            quote_currency: quoteCurrency.toUpperCase()
-          };
-        })
-        .filter((item): item is NonNullable<typeof item> => item !== null);
-
-      // Add USDT/NGN market data if available
-      if (usdtNgnRate > 0 && !transformedMarketData.some(m => m.currency === 'USDT')) {
-        transformedMarketData.push({
-          currency: 'USDT',
-          price: usdtNgnRate,
-          change_24h: usdtNgnMarket?.ticker ? 
-            ((parseFloat(usdtNgnMarket.ticker.last) - parseFloat(usdtNgnMarket.ticker.open)) / parseFloat(usdtNgnMarket.ticker.open)) * 100 : 
-            0,
-          raw_price: usdtNgnRate,
-          quote_currency: 'NGN'
-        });
+            change_24h: change24h
+          });
+        }
+      } else {
+        console.error('Invalid market data response:', marketDataResponse);
       }
 
-      // Calculate wallet values with proper types
-      const walletsWithValues = (walletsResponse?.data || []).map((wallet: any): WalletWithValue => {
+      // Get USDT/NGN rate from transformed data
+      const usdtNgnMarket = transformedMarketData.find(m => 
+        m.currency === 'USDT' && m.quote_currency === 'NGN'
+      );
+      const usdtNgnRate = usdtNgnMarket?.price || 0;
+      console.log('USDT/NGN Rate:', usdtNgnRate);
+
+      // Calculate wallet values
+      const walletsWithValues = (walletsResponse?.data || []).map((wallet: any) => {
         const balance = parseFloat(wallet.balance || '0');
         const currency = wallet.currency?.toUpperCase();
         let valueInNGN = 0;
@@ -143,36 +147,55 @@ export async function GET(request: Request) {
         if (currency === 'NGN') {
           valueInNGN = balance;
         } else {
-          // First try direct NGN pair
-          let marketInfo = transformedMarketData.find(m => 
+          // Try direct NGN pair first
+          const ngnPair = transformedMarketData.find(m => 
             m.currency === currency && m.quote_currency === 'NGN'
           );
           
-          // If no direct NGN pair, try USDT pair
-          if (!marketInfo) {
-            marketInfo = transformedMarketData.find(m => 
+          if (ngnPair?.price) {
+            valueInNGN = balance * ngnPair.price;
+          } else {
+            // Try USDT pair with conversion to NGN
+            const usdtPair = transformedMarketData.find(m => 
               m.currency === currency && m.quote_currency === 'USDT'
             );
-            if (marketInfo && usdtNgnRate > 0) {
-              valueInNGN = balance * marketInfo.raw_price * usdtNgnRate;
+            
+            if (usdtPair?.price && usdtNgnRate > 0) {
+              valueInNGN = balance * usdtPair.price * usdtNgnRate;
+            } else {
+              // Try BTC pair as last resort
+              const btcPair = transformedMarketData.find(m => 
+                m.currency === currency && m.quote_currency === 'BTC'
+              );
+              const btcNgnPair = transformedMarketData.find(m => 
+                m.currency === 'BTC' && m.quote_currency === 'NGN'
+              );
+              
+              if (btcPair?.price && btcNgnPair?.price) {
+                valueInNGN = balance * btcPair.price * btcNgnPair.price;
+              }
             }
-          } else {
-            valueInNGN = balance * marketInfo.price;
           }
         }
 
-        console.log(`Processing wallet: ${currency}, Balance: ${balance}, Value in NGN: ${valueInNGN}`);
+        console.log(`Processing wallet ${currency}:`, {
+          balance,
+          valueInNGN,
+          marketPrice: valueInNGN / (balance || 1)
+        });
 
         return {
           ...wallet,
           estimated_value: valueInNGN,
-          market_price: valueInNGN / (balance || 1) // Avoid division by zero
+          market_price: valueInNGN / (balance || 1)
         };
       });
 
-      // Filter out zero balance wallets and calculate total value
-      const nonZeroWallets = walletsWithValues.filter((wallet: WalletWithValue) => wallet.estimated_value > 0);
-      const totalValue = nonZeroWallets.reduce((sum: number, wallet: WalletWithValue) => sum + wallet.estimated_value, 0);
+      // Calculate total portfolio value
+      const totalValue = walletsWithValues.reduce((sum: number, wallet: WalletWithValue) => 
+        sum + (wallet.estimated_value || 0), 
+        0
+      );
       
       console.log('Total portfolio value in NGN:', totalValue);
 
