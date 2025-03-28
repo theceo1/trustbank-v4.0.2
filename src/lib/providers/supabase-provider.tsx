@@ -4,6 +4,8 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { SupabaseClient } from '@supabase/auth-helpers-nextjs';
 import type { Database } from '@/lib/database.types';
+import { useRouter } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast';
 
 type SupabaseContext = {
   supabase: SupabaseClient<Database>;
@@ -17,26 +19,52 @@ export default function SupabaseProvider({
   children: React.ReactNode;
 }) {
   const [supabase] = useState(() => createClientComponentClient<Database>());
+  const router = useRouter();
+  const { toast } = useToast();
 
   useEffect(() => {
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'TOKEN_REFRESHED') {
+        router.refresh();
+      }
+      
+      if (event === 'SIGNED_OUT') {
+        router.push('/auth/login');
+      }
+
       if (session?.access_token !== undefined) {
-        // Set the auth cookie when the session changes
-        fetch('/api/auth/cookie', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        });
+        try {
+          // Set the auth cookie when the session changes
+          const response = await fetch('/api/auth/cookie', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to set auth cookie');
+          }
+        } catch (error) {
+          console.error('Error setting auth cookie:', error);
+          // Only show error toast if it's not a network error (which might be due to page navigation)
+          if (!(error instanceof TypeError && error.message === 'Failed to fetch')) {
+            toast({
+              title: 'Authentication Error',
+              description: 'Please try refreshing the page.',
+              variant: 'destructive',
+            });
+          }
+        }
       }
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [supabase]);
+  }, [supabase, router, toast]);
 
   return (
     <Context.Provider value={{ supabase }}>

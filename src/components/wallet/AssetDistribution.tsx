@@ -36,10 +36,8 @@ export function AssetDistribution({ wallets, marketData }: AssetDistributionProp
   // Calculate asset values and prepare data for the pie chart
   const data = wallets
     .map(wallet => {
-      const marketInfo = marketData.find(m => m.currency === wallet.currency.toUpperCase());
       const balance = parseFloat(wallet.balance || '0');
-      const price = marketInfo?.price || 0;
-      const value = balance * price;
+      const value = wallet.estimated_value || 0;
 
       // Only include if balance is greater than 0
       if (balance <= 0) return null;
@@ -48,7 +46,7 @@ export function AssetDistribution({ wallets, marketData }: AssetDistributionProp
         name: wallet.currency.toUpperCase(),
         value: value,
         balance: balance,
-        price: price,
+        price: wallet.market_price || 0,
         percentage: 0 // Will be calculated after filtering
       };
     })

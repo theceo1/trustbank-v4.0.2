@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, ReactNode, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, ArrowDownUp, Repeat, Wallet } from "lucide-react";
+import { Loader2, ArrowDownUp, Repeat, Wallet, AlertCircle } from "lucide-react";
 import { useQuidaxAPI } from '@/hooks/useQuidaxAPI';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatCryptoAmount, formatNairaAmount } from "@/lib/utils";
@@ -21,14 +21,11 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Icons } from "@/components/ui/icons";
 
-interface InstantSwapModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  wallet?: {
-    id: string;
-    currency: string;
-    balance: string;
-  };
+interface WalletType {
+  id: string;
+  currency: string;
+  balance: string;
+  estimated_value?: number;
 }
 
 interface TradeDetails {
@@ -59,6 +56,12 @@ interface QuoteState {
   network_fee: number;
   total: number;
   quote_amount: string;
+}
+
+interface InstantSwapModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  wallet?: WalletType;
 }
 
 const TRADE_LIMITS = {
@@ -191,37 +194,42 @@ function TradePreviewModal({
 }
 
 export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalProps) {
-  const [fromCurrency, setFromCurrency] = useState(wallet?.currency || '');
-  const [toCurrency, setToCurrency] = useState('');
-  const [amount, setAmount] = useState('');
+  const [amount, setAmount] = useState<string>('');
+  const [fromCurrency, setFromCurrency] = useState<string>(wallet?.currency || '');
+  const [toCurrency, setToCurrency] = useState<string>('');
   const [inputCurrency, setInputCurrency] = useState<'CRYPTO' | 'NGN' | 'USD'>('CRYPTO');
-  const [loading, setLoading] = useState(false);
-  const [quote, setQuote] = useState<QuoteState | null>(null);
-  const [countdown, setCountdown] = useState<number>(14);
-  const [showTradePreview, setShowTradePreview] = useState(false);
-  const [userBalance, setUserBalance] = useState<any>(null);
   const [showAllCurrencies, setShowAllCurrencies] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [quote, setQuote] = useState<QuoteState | null>(null);
+  const [showTradePreview, setShowTradePreview] = useState(false);
+  const [countdown, setCountdown] = useState(30);
+  const [isConfirming, setIsConfirming] = useState<boolean>(false);
+  const [quidaxId, setQuidaxId] = useState('');
+  const [availableWallets, setAvailableWallets] = useState<WalletType[]>([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isQuoteExpired, setIsQuoteExpired] = useState(false);
+
   const { toast } = useToast();
   const { createSwapQuotation, confirmSwapQuotation } = useQuidaxAPI();
   const router = useRouter();
   const supabase = createClientComponentClient();
-  const [error, setError] = useState<string | null>(null);
-  const [isQuoteExpired, setIsQuoteExpired] = useState<boolean>(false);
-  const [isConfirming, setIsConfirming] = useState<boolean>(false);
-  const [quidaxId, setQuidaxId] = useState('');
 
-  // Filter available currencies based on user balances
-  const availableFromCurrencies = userBalance?.filter((b: any) => parseFloat(b.balance) > 0)
-    .map((b: any) => b.currency.toUpperCase()) || [];
+  // Filter available currencies based on non-zero balances
+  const availableCurrencies = useMemo(() => 
+    availableWallets
+      .filter(w => parseFloat(w.balance) > 0)
+      .map(w => w.currency),
+    [availableWallets]
+  );
 
   // Filter available currencies based on user balances and ensure unique keys
-  const fromCurrencyOptions = [...new Set(
-    availableFromCurrencies.length > 0 
-      ? availableFromCurrencies 
+  const fromCurrencyOptions = Array.from(new Set(
+    availableCurrencies.length > 0 
+      ? availableCurrencies 
       : CURRENCY_PAIRS.map(p => p.value)
-  )];
+  ));
 
   // Filter to currencies based on search and show all toggle
   const toCurrencyOptions: CurrencyPair[] = CURRENCY_PAIRS
@@ -295,7 +303,7 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
         .eq('user_id', user.id);
 
       if (error) throw error;
-      setUserBalance(balances);
+      setAvailableWallets(balances);
     } catch (error) {
       console.error('Error fetching balance:', error);
     }
@@ -429,10 +437,10 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
   };
 
   const handleMaxAmount = () => {
-    if (!userBalance) return;
+    if (!availableWallets) return;
     const maxAmount = inputCurrency === 'NGN' 
-      ? userBalance.find((b: any) => b.currency === 'NGN')?.balance || '0'
-      : userBalance.find((b: any) => b.currency === fromCurrency)?.balance || '0';
+      ? availableWallets.find((b: any) => b.currency === 'NGN')?.balance || '0'
+      : availableWallets.find((b: any) => b.currency === fromCurrency)?.balance || '0';
     setAmount(maxAmount.toString());
   };
 
@@ -478,9 +486,9 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
 
   // Display available balance in NGN equivalent
   const renderAvailableBalance = () => {
-    if (!isAuthenticated || !userBalance) return null;
+    if (!isAuthenticated || !availableWallets) return null;
     
-    const currentBalance = userBalance.find((b: any) => 
+    const currentBalance = availableWallets.find((b: any) => 
       b.currency.toUpperCase() === fromCurrency.toUpperCase()
     );
     
@@ -505,13 +513,31 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
     );
   };
 
+  const renderCurrencyOption = (currency: string): ReactNode => {
+    const pair = CURRENCY_PAIRS.find(p => p.value === currency);
+    if (!pair) return null;
+    return (
+      <SelectItem key={`source-${currency}`} value={currency}>
+        <span className="flex items-center gap-2">
+          <span>{pair.icon}</span>
+          {pair.label}
+          {availableCurrencies.includes(currency) && (
+            <span className="ml-auto text-xs text-green-600">
+              Available
+            </span>
+          )}
+        </span>
+      </SelectItem>
+    );
+  };
+
   return (
     <>
       <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px] bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-0 shadow-lg">
           <DialogHeader>
-            <DialogTitle>Instant Swap</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-xl font-semibold">Instant Swap</DialogTitle>
+            <DialogDescription className="text-base">
               Instantly swap between cryptocurrencies at the best rates.
             </DialogDescription>
           </DialogHeader>
@@ -521,34 +547,30 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
           <div className="space-y-6">
             {/* From Currency */}
             <div className="space-y-2">
-              <Label>From</Label>
-              <Select value={fromCurrency} onValueChange={setFromCurrency}>
-                <SelectTrigger>
+              <Label className="text-sm font-medium">From</Label>
+              <Select 
+                value={fromCurrency} 
+                onValueChange={setFromCurrency}
+              >
+                <SelectTrigger className="h-12 bg-white dark:bg-gray-800">
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(fromCurrencyOptions as string[]).map((currency) => {
-                    const pair = CURRENCY_PAIRS.find(p => p.value === currency);
-                    if (!pair) return null;
-                    return (
-                      <SelectItem key={`source-${currency}`} value={currency}>
-                        <span className="flex items-center gap-2">
-                          <span>{pair.icon}</span>
-                          {pair.label}
-                        </span>
-                      </SelectItem>
-                    );
-                  })}
+                  {(availableCurrencies.length > 0 ? availableCurrencies : fromCurrencyOptions)
+                    .map(renderCurrencyOption)}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Amount with NGN equivalent */}
+            {/* Amount with currency selection */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label>Amount</Label>
-                <Select value={inputCurrency} onValueChange={(value: any) => setInputCurrency(value)}>
-                  <SelectTrigger className="w-[110px]">
+                <Label className="text-sm font-medium">Amount</Label>
+                <Select 
+                  value={inputCurrency} 
+                  onValueChange={(value: any) => setInputCurrency(value)}
+                >
+                  <SelectTrigger className="w-[110px] h-8 text-sm bg-white dark:bg-gray-800">
                     <SelectValue placeholder="Currency" />
                   </SelectTrigger>
                   <SelectContent>
@@ -568,18 +590,19 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
                     inputCurrency === 'USD' ? '$0.00' :
                     '0.00'
                   }
+                  className="h-12 bg-white dark:bg-gray-800 pr-16"
                 />
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-xs"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-green-600 hover:text-green-700 dark:text-green-500 dark:hover:text-green-400"
                   onClick={handleMaxAmount}
                 >
                   MAX
                 </Button>
               </div>
               {amount && (
-                <p className="text-sm text-green-600">
+                <p className="text-sm text-green-600 dark:text-green-500">
                   ≈ ₦{formatNairaAmount(calculateNGNEquivalent(amount, fromCurrency))}
                 </p>
               )}
@@ -588,30 +611,35 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
             {/* To Currency with search */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label>To</Label>
+                <Label className="text-sm font-medium">To</Label>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setShowAllCurrencies(!showAllCurrencies)}
-                  className="text-xs"
+                  className="text-xs text-green-600 hover:text-green-700 dark:text-green-500 dark:hover:text-green-400"
                 >
                   {showAllCurrencies ? 'Show Less' : 'Show More'}
                 </Button>
               </div>
+              
               {showAllCurrencies && (
-                <Input
-                  type="text"
-                  placeholder="Search currencies..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="mb-2"
-                />
+                <div className="relative">
+                  <Icons.search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+                  <Input
+                    type="text"
+                    placeholder="Search currencies..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9 h-10 bg-white dark:bg-gray-800 mb-2"
+                  />
+                </div>
               )}
+
               <Select value={toCurrency} onValueChange={setToCurrency}>
-                <SelectTrigger>
+                <SelectTrigger className="h-12 bg-white dark:bg-gray-800">
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-[300px]">
                   {toCurrencyOptions.map((pair) => (
                     <SelectItem key={`target-${pair.value}`} value={pair.value}>
                       <span className="flex items-center gap-2">
@@ -626,16 +654,23 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
 
             {/* Rate Info */}
             {fromCurrency && toCurrency && quote?.rate && (
-              <Alert>
-                <Icons.info className="h-4 w-4" />
-                <AlertDescription>
+              <Alert className="bg-green-50 dark:bg-green-900/20 border-green-100 dark:border-green-900/50">
+                <Icons.info className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <AlertDescription className="text-green-700 dark:text-green-300">
                   1 {fromCurrency} ≈ {formatNairaAmount(quote.rate)} {toCurrency}
                   {amount && (
-                    <div className="mt-1 text-sm text-muted-foreground">
+                    <div className="mt-1 text-sm text-green-600/80 dark:text-green-400/80">
                       ≈ ₦{formatNairaAmount(calculateNGNEquivalent(amount, fromCurrency))}
                     </div>
                   )}
                 </AlertDescription>
+              </Alert>
+            )}
+
+            {error && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
           </div>
@@ -644,7 +679,7 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
             <Button 
               onClick={handleGetQuote} 
               disabled={loading || !amount || !fromCurrency || !toCurrency}
-              className="bg-green-600 hover:bg-green-700"
+              className="h-11 bg-green-600 hover:bg-green-700 text-white"
             >
               {loading ? (
                 <>
@@ -657,7 +692,7 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
                 'Get Quote'
               )}
             </Button>
-            <Button variant="outline" onClick={handleClose}>
+            <Button variant="outline" onClick={handleClose} className="h-11">
               Cancel
             </Button>
           </div>

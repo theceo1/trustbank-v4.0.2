@@ -91,9 +91,9 @@ export function WalletList({
            m.quote_currency === 'NGN'
     );
 
-    if (ngnPair?.raw_price) {
-      console.log(`Found NGN pair for ${currency}:`, ngnPair.raw_price);
-      return ngnPair.raw_price;
+    if (ngnPair?.price) {
+      console.log(`Found NGN pair for ${currency}:`, ngnPair.price);
+      return ngnPair.price;
     }
 
     // Try USDT pair
@@ -106,8 +106,8 @@ export function WalletList({
       m => m.currency === 'USDT' && m.quote_currency === 'NGN'
     );
 
-    if (usdtPair?.raw_price && usdtNgnPair?.raw_price) {
-      const price = usdtPair.raw_price * usdtNgnPair.raw_price;
+    if (usdtPair?.price && usdtNgnPair?.price) {
+      const price = usdtPair.price * usdtNgnPair.price;
       console.log(`Calculated ${currency} price via USDT:`, price);
       return price;
     }
@@ -122,8 +122,8 @@ export function WalletList({
       m => m.currency === 'BTC' && m.quote_currency === 'USDT'
     );
 
-    if (btcPair?.raw_price && btcUsdtPair?.raw_price && usdtNgnPair?.raw_price) {
-      const price = btcPair.raw_price * btcUsdtPair.raw_price * usdtNgnPair.raw_price;
+    if (btcPair?.price && btcUsdtPair?.price && usdtNgnPair?.price) {
+      const price = btcPair.price * btcUsdtPair.price * usdtNgnPair.price;
       console.log(`Calculated ${currency} price via BTC:`, price);
       return price;
     }

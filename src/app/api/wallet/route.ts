@@ -91,6 +91,8 @@ export async function GET(request: Request) {
       const transformedMarketData: MarketData[] = [];
       
       if (marketDataResponse?.data && typeof marketDataResponse.data === 'object') {
+        console.log('Raw market data:', marketDataResponse.data);
+        
         // Process each market pair from the response
         for (const [market, data] of Object.entries<any>(marketDataResponse.data)) {
           // Skip if data is not in expected format
@@ -99,10 +101,26 @@ export async function GET(request: Request) {
             continue;
           }
 
-          // Market pairs are in format base_quote (e.g., btc_ngn)
-          const [baseCurrency, quoteCurrency] = market.split('_');
+          // Market pairs are in format basecurrency_quotecurrency (e.g., btcngn)
+          // Handle both 3 and 4 character quote currencies (e.g., NGN, USDT)
+          let baseCurrency, quoteCurrency;
+          
+          if (market.endsWith('usdt')) {
+            baseCurrency = market.slice(0, -4);
+            quoteCurrency = 'USDT';
+          } else if (market.endsWith('ngn')) {
+            baseCurrency = market.slice(0, -3);
+            quoteCurrency = 'NGN';
+          } else if (market.endsWith('btc')) {
+            baseCurrency = market.slice(0, -3);
+            quoteCurrency = 'BTC';
+          } else {
+            console.log(`Skipping market ${market} - unknown quote currency`);
+            continue;
+          }
+          
           if (!baseCurrency || !quoteCurrency) {
-            console.log(`Skipping market ${market} - invalid pair format`);
+            console.log(`Skipping market ${market} - cannot parse pair`);
             continue;
           }
 
@@ -116,7 +134,8 @@ export async function GET(request: Request) {
             quoteCurrency: quoteCurrency.toUpperCase(),
             lastPrice,
             openPrice,
-            change24h
+            change24h,
+            rawTicker: ticker
           });
 
           transformedMarketData.push({
@@ -127,6 +146,12 @@ export async function GET(request: Request) {
             change_24h: change24h
           });
         }
+
+        // Log all transformed market data for debugging
+        console.log('Transformed market data:', transformedMarketData.map(m => ({
+          pair: `${m.currency}/${m.quote_currency}`,
+          price: m.price
+        })));
       } else {
         console.error('Invalid market data response:', marketDataResponse);
       }
@@ -144,8 +169,21 @@ export async function GET(request: Request) {
         const currency = wallet.currency?.toUpperCase();
         let valueInNGN = 0;
 
+        console.log(`Processing wallet ${currency}:`, {
+          balance,
+          currency
+        });
+
         if (currency === 'NGN') {
           valueInNGN = balance;
+        } else if (currency === 'USDT') {
+          // For USDT, use the USDT/NGN rate directly
+          valueInNGN = balance * usdtNgnRate;
+          console.log('USDT value calculation:', {
+            balance,
+            usdtNgnRate,
+            valueInNGN
+          });
         } else {
           // Try direct NGN pair first
           const ngnPair = transformedMarketData.find(m => 
@@ -154,6 +192,10 @@ export async function GET(request: Request) {
           
           if (ngnPair?.price) {
             valueInNGN = balance * ngnPair.price;
+            console.log(`Using NGN pair for ${currency}:`, {
+              price: ngnPair.price,
+              valueInNGN
+            });
           } else {
             // Try USDT pair with conversion to NGN
             const usdtPair = transformedMarketData.find(m => 
@@ -162,6 +204,11 @@ export async function GET(request: Request) {
             
             if (usdtPair?.price && usdtNgnRate > 0) {
               valueInNGN = balance * usdtPair.price * usdtNgnRate;
+              console.log(`Using USDT pair for ${currency}:`, {
+                usdtPrice: usdtPair.price,
+                usdtNgnRate,
+                valueInNGN
+              });
             } else {
               // Try BTC pair as last resort
               const btcPair = transformedMarketData.find(m => 
@@ -173,13 +220,20 @@ export async function GET(request: Request) {
               
               if (btcPair?.price && btcNgnPair?.price) {
                 valueInNGN = balance * btcPair.price * btcNgnPair.price;
+                console.log(`Using BTC pair for ${currency}:`, {
+                  btcPrice: btcPair.price,
+                  btcNgnPrice: btcNgnPair.price,
+                  valueInNGN
+                });
               }
             }
           }
         }
 
-        console.log(`Processing wallet ${currency}:`, {
-          balance,
+        // Ensure we have a valid number
+        valueInNGN = Number.isFinite(valueInNGN) ? valueInNGN : 0;
+
+        console.log(`Final value for ${currency}:`, {
           valueInNGN,
           marketPrice: valueInNGN / (balance || 1)
         });

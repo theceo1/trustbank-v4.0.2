@@ -207,6 +207,9 @@ export default function WalletPage() {
 
   // Helper function to get market price
   const getMarketPrice = (currency: string) => {
+    console.log(`Getting market price for ${currency}`);
+    console.log('Available market data:', marketData);
+
     if (currency.toLowerCase() === 'ngn') {
       return 1;
     }
@@ -217,8 +220,9 @@ export default function WalletPage() {
            m.quote_currency === 'NGN'
     );
 
-    if (ngnPair?.raw_price) {
-      return ngnPair.raw_price;
+    if (ngnPair?.price) {
+      console.log(`Found direct NGN pair for ${currency}:`, ngnPair);
+      return ngnPair.price;
     }
 
     // Try USDT pair
@@ -231,8 +235,14 @@ export default function WalletPage() {
       m => m.currency === 'USDT' && m.quote_currency === 'NGN'
     );
 
-    if (usdtPair?.raw_price && usdtNgnPair?.raw_price) {
-      return usdtPair.raw_price * usdtNgnPair.raw_price;
+    if (usdtPair?.price && usdtNgnPair?.price) {
+      const price = usdtPair.price * usdtNgnPair.price;
+      console.log(`Calculated ${currency} price via USDT:`, {
+        usdtPair,
+        usdtNgnPair,
+        calculatedPrice: price
+      });
+      return price;
     }
 
     // Try BTC pair as last resort
@@ -245,10 +255,18 @@ export default function WalletPage() {
       m => m.currency === 'BTC' && m.quote_currency === 'USDT'
     );
 
-    if (btcPair?.raw_price && btcUsdtPair?.raw_price && usdtNgnPair?.raw_price) {
-      return btcPair.raw_price * btcUsdtPair.raw_price * usdtNgnPair.raw_price;
+    if (btcPair?.price && btcUsdtPair?.price && usdtNgnPair?.price) {
+      const price = btcPair.price * btcUsdtPair.price * usdtNgnPair.price;
+      console.log(`Calculated ${currency} price via BTC:`, {
+        btcPair,
+        btcUsdtPair,
+        usdtNgnPair,
+        calculatedPrice: price
+      });
+      return price;
     }
 
+    console.log(`No market price found for ${currency}`);
     return 0;
   };
 
@@ -256,8 +274,15 @@ export default function WalletPage() {
   const totalValue = wallets.reduce((total: number, wallet: any) => {
     const balance = parseFloat(wallet.balance || '0');
     const price = getMarketPrice(wallet.currency);
+    console.log(`Calculating value for ${wallet.currency}:`, {
+      balance,
+      price,
+      value: balance * price
+    });
     return total + (balance * price);
   }, 0);
+
+  console.log('Total portfolio value:', totalValue);
 
   const handleDepositClick = (specificWallet?: any) => {
     if (specificWallet) {
