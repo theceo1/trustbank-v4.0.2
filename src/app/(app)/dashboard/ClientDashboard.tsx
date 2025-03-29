@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
-import { formatAmount } from "@/lib/utils";
+import { formatAmount, cn } from "@/lib/utils";
 import Link from 'next/link';
 import { InstantSwapModal } from '@/components/InstantSwapModal';
 import { DepositModal } from '@/components/wallet/DepositModal';
@@ -25,8 +25,8 @@ import {
   ArrowRight,
   Users
 } from 'lucide-react';
-import { cn } from "@/lib/utils";
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 interface ClientDashboardProps {
   user: any;
@@ -51,46 +51,49 @@ export default function ClientDashboard({
   volumeTrades,
   transactions 
 }: ClientDashboardProps) {
+  const [walletData, setWalletData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isBalanceHidden, setIsBalanceHidden] = useState(false);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [isSwapModalOpen, setIsSwapModalOpen] = useState(false);
-  const [walletData, setWalletData] = useState<{
-    wallets: any[];
-    marketData: any[];
-    totalValue: number;
-  }>({
-    wallets: [],
-    marketData: [],
-    totalValue: 0
-  });
+  const supabase = createClientComponentClient();
 
   useEffect(() => {
     const fetchWalletData = async () => {
       try {
-        const response = await fetch('/api/wallet');
-        const data = await response.json();
+        const { data: { session } } = await supabase.auth.getSession();
         
-        if (response.ok) {
-          // Calculate total value from non-zero wallets
-          const nonZeroWallets = data.wallets.filter((w: any) => w.estimated_value > 0);
-          const totalValue = nonZeroWallets.reduce((sum: number, w: any) => sum + w.estimated_value, 0);
-          
-          setWalletData({
-            wallets: data.wallets,
-            marketData: data.marketData,
-            totalValue
-          });
+        if (!session) {
+          throw new Error('No active session');
         }
+
+        const response = await fetch('/api/wallet', {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+        });
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            // Handle unauthorized error
+            throw new Error('Please sign in to view your wallet');
+          }
+          throw new Error('Failed to fetch wallet data');
+        }
+
+        const data = await response.json();
+        setWalletData(data);
       } catch (error) {
         console.error('Error fetching wallet data:', error);
+        setError(error instanceof Error ? error.message : 'Failed to fetch wallet data');
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchWalletData();
-  }, []);
+  }, [supabase]);
 
   const toggleBalanceVisibility = () => {
     setIsBalanceHidden(!isBalanceHidden);
@@ -330,35 +333,56 @@ export default function ClientDashboard({
 
       {/* Quick Links */}
       <div className="grid gap-4 md:grid-cols-2">
-        <Card className="p-6">
-          <h3 className="font-semibold mb-4">Quick Links</h3>
-          <div className="space-y-4">
-            <Button variant="outline" className="w-full justify-start" asChild>
+        <Card className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/50 dark:to-indigo-950/50 border-0">
+          <h3 className="font-semibold mb-4 text-lg">Quick Links</h3>
+          <div className="grid grid-cols-1 gap-3">
+            <Button 
+              variant="outline" 
+              className="w-full justify-start bg-white dark:bg-gray-800 hover:bg-green-600 hover:text-white transition-all duration-200 h-12" 
+              asChild
+            >
               <Link href="/profile/wallet">
-                <Wallet className="h-4 w-4 mr-2" />
-                View Full Portfolio
+                <Wallet className="h-5 w-5 mr-3" />
+                <div>
+                  <span className="font-medium">View Full Portfolio</span>
+                  <span className="text-xs text-muted-foreground ml-2">Check your assets</span>
+                </div>
               </Link>
             </Button>
-            <Button variant="outline" className="w-full justify-start" asChild>
+            <Button 
+              variant="outline" 
+              className="w-full justify-start bg-white dark:bg-gray-800 hover:bg-green-600 hover:text-white transition-all duration-200 h-12" 
+              asChild
+            >
               <Link href="/trades">
-                <ArrowRightLeft className="h-4 w-4 mr-2" />
-                Trade Crypto
+                <ArrowRightLeft className="h-5 w-5 mr-3" />
+                <div>
+                  <span className="font-medium">Trade Crypto</span>
+                  <span className="text-xs text-muted-foreground ml-2">Buy & sell crypto</span>
+                </div>
               </Link>
             </Button>
-            <Button variant="outline" className="w-full justify-start" asChild>
+            <Button 
+              variant="outline" 
+              className="w-full justify-start bg-white dark:bg-gray-800 hover:bg-green-600 hover:text-white transition-all duration-200 h-12" 
+              asChild
+            >
               <Link href="/trades/p2p">
-                <Users className="h-4 w-4 mr-2" />
-                P2P Trading
+                <Users className="h-5 w-5 mr-3" />
+                <div>
+                  <span className="font-medium">P2P Trading</span>
+                  <span className="text-xs text-muted-foreground ml-2">Trade with users</span>
+                </div>
               </Link>
             </Button>
           </div>
         </Card>
         
         {/* Recent Transactions */}
-        <Card className="p-6">
+        <Card className="p-6 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/50 dark:to-pink-950/50 border-0">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold">Recent Transactions</h3>
-            <Button variant="ghost" size="sm" asChild>
+            <h3 className="font-semibold text-lg">Recent Transactions</h3>
+            <Button variant="ghost" size="sm" asChild className="text-green-600 hover:text-green-700 hover:bg-green-100 dark:hover:bg-green-900/20">
               <Link href="/transactions">
                 View All
                 <ChevronRight className="ml-1 h-4 w-4" />
@@ -367,50 +391,49 @@ export default function ClientDashboard({
           </div>
           {transactions.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
-              <History className="h-12 w-12 text-muted-foreground/50 mb-4" />
-              <p className="text-muted-foreground">No transactions yet</p>
+              <div className="p-3 rounded-full bg-gray-100 dark:bg-gray-800 mb-3">
+                <History className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <p className="text-muted-foreground font-medium">No transactions yet</p>
+              <p className="text-sm text-muted-foreground mt-1 mb-4">Start trading to see your transactions here</p>
               <Button
                 variant="outline"
                 size="sm"
-                className="mt-4"
                 onClick={() => setIsSwapModalOpen(true)}
+                className="bg-white dark:bg-gray-800 hover:bg-green-600 hover:text-white"
               >
                 Make Your First Trade
               </Button>
             </div>
           ) : (
             <div className="space-y-4">
-              {transactions.slice(0, 5).map((tx: any) => (
-                <div key={tx.id} className="flex items-center justify-between">
+              {transactions.map((tx: any) => (
+                <div key={tx.id} className="flex items-center justify-between p-3 rounded-lg bg-white dark:bg-gray-800 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors">
                   <div className="flex items-center gap-3">
                     <div className={cn(
                       "p-2 rounded-full",
-                      tx.type === 'deposit' ? "bg-green-500/10 text-green-600" :
-                      tx.type === 'withdrawal' ? "bg-red-500/10 text-red-600" :
-                      "bg-purple-500/10 text-purple-600"
+                      tx.type === 'deposit' ? "bg-green-100 text-green-600" :
+                      tx.type === 'withdrawal' ? "bg-red-100 text-red-600" :
+                      "bg-blue-100 text-blue-600"
                     )}>
                       {tx.type === 'deposit' ? <ArrowDownRight className="h-4 w-4" /> :
                        tx.type === 'withdrawal' ? <ArrowUpRight className="h-4 w-4" /> :
                        <ArrowRightLeft className="h-4 w-4" />}
                     </div>
                     <div>
-                      <p className="text-sm font-medium capitalize">{tx.type}</p>
+                      <p className="font-medium capitalize">{tx.type}</p>
                       <p className="text-xs text-muted-foreground">
                         {new Date(tx.created_at).toLocaleDateString()}
                       </p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-medium">
-                      {formatAmount(parseFloat(tx.amount), tx.currency)}
+                    <p className="font-medium">
+                      {tx.type === 'withdrawal' ? '-' : '+'}
+                      {formatAmount(tx.amount, tx.currency)}
                     </p>
-                    <p className={cn(
-                      "text-xs",
-                      tx.status === 'completed' ? "text-green-600" :
-                      tx.status === 'pending' ? "text-yellow-600" :
-                      "text-red-600"
-                    )}>
-                      {tx.status}
+                    <p className="text-xs text-muted-foreground">
+                      ≈ ₦{formatAmount(tx.amount * (tx.rate || 1), 'NGN')}
                     </p>
                   </div>
                 </div>
