@@ -61,17 +61,10 @@ export function formatAmount(amount: number, currency: string) {
 /**
  * Formats a crypto amount with 8 decimal places
  */
-export function formatCryptoAmount(
-  amount: number | string,
-  decimals: number = 8
-): string {
+export function formatCryptoAmount(amount: string | number): string {
   const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  if (isNaN(num)) return '0';
-
-  return formatNumber(num, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: decimals,
-  });
+  if (isNaN(num)) return '0.00000000';
+  return num.toFixed(8);
 }
 
 /**
@@ -115,9 +108,13 @@ export function formatCompactNumber(value: number): string {
   return formatter.format(value);
 }
 
-export function formatNairaAmount(amount: number | string): string {
-  return formatCurrency(amount, 'NGN');
-}
+export const formatNairaAmount = (amount: number): string => {
+  if (isNaN(amount)) return '0.00';
+  return amount.toLocaleString('en-NG', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+};
 
 /**
  * Formats a rate with appropriate decimals

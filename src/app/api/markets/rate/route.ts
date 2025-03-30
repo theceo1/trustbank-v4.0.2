@@ -2,91 +2,110 @@ import { NextResponse } from 'next/server';
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 
-type CurrencyPairs = {
-  [key: string]: {
-    [key: string]: number;
-  };
-};
+interface Ticker {
+  buy: string;
+  sell: string;
+  low: string;
+  high: string;
+  open: string;
+  last: string;
+  vol: string;
+}
+
+interface QuidaxTickers {
+  [market: string]: {
+    ticker: Ticker;
+  }
+}
 
 export async function GET(request: Request) {
   try {
-    // Get URL parameters
     const { searchParams } = new URL(request.url);
     const from = searchParams.get('from')?.toUpperCase();
     const to = searchParams.get('to')?.toUpperCase();
 
-    if (!from || !to) {
-      return NextResponse.json(
-        { error: 'Missing required parameters' },
-        { status: 400 }
-      );
-    }
-
-    // Initialize Supabase client
-    const supabase = createServerComponentClient({ cookies });
-
-    // Verify authentication
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    // Define market rates (all in uppercase)
-    const rates: CurrencyPairs = {
-      'BTC': {
-        'USDT': 0.000015625, // 1/64000
-        'NGN': 126700000,
-        'ETH': 18.285714286,
-      },
-      'ETH': {
-        'USDT': 0.000285714, // 1/3500
-        'NGN': 6930000,
-        'BTC': 0.054687500,
-      },
-      'USDT': {
-        'BTC': 0.000015625,
-        'ETH': 0.000285714,
-        'NGN': 1980,
-      },
-      'NGN': {
-        'USDT': 0.000505051,
-        'BTC': 0.000000007893,
-        'ETH': 0.000000144300,
+    // Fetch market tickers from Quidax
+    const tickersResponse = await fetch('https://www.quidax.com/api/v1/markets/tickers', {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
       }
-    };
+    });
 
-    // Try to get direct rate
-    const fromUpper = from.toUpperCase();
-    const toUpper = to.toUpperCase();
-
-    if (rates[fromUpper]?.[toUpper]) {
-      return NextResponse.json({ rate: rates[fromUpper][toUpper] });
+    if (!tickersResponse.ok) {
+      throw new Error('Failed to fetch market tickers');
     }
 
-    // Try inverse rate
-    if (rates[toUpper]?.[fromUpper]) {
-      return NextResponse.json({ rate: 1 / rates[toUpper][fromUpper] });
-    }
+    const tickers = await tickersResponse.json() as { data: QuidaxTickers };
+    
+    // If specific currencies are requested, return single rate
+    if (from && to) {
+      // Helper function to find rate through a bridge currency
+      const findRateViaBridge = (fromCurrency: string, toCurrency: string, bridgeCurrency: string): number | null => {
+        const fromBridgeMarket = `${fromCurrency.toLowerCase()}${bridgeCurrency.toLowerCase()}`;
+        const toBridgeMarket = `${toCurrency.toLowerCase()}${bridgeCurrency.toLowerCase()}`;
+        
+        const fromRate = tickers.data[fromBridgeMarket]?.ticker.last;
+        const toRate = tickers.data[toBridgeMarket]?.ticker.last;
+        
+        if (fromRate && toRate) {
+          return parseFloat(fromRate) / parseFloat(toRate);
+        }
+        return null;
+      };
 
-    // Try through USDT
-    if (rates[fromUpper]?.['USDT'] && rates['USDT']?.[toUpper]) {
-      const throughUsdt = rates[fromUpper]['USDT'] * rates['USDT'][toUpper];
-      return NextResponse.json({ rate: throughUsdt });
-    }
+      // Try direct pair
+      const directMarket = `${from.toLowerCase()}${to.toLowerCase()}`;
+      if (tickers.data[directMarket]) {
+        return NextResponse.json({ 
+          rate: parseFloat(tickers.data[directMarket].ticker.last),
+          source: 'direct'
+        });
+      }
 
-    // Try through NGN
-    if (rates[fromUpper]?.['NGN'] && rates['NGN']?.[toUpper]) {
-      const throughNgn = rates[fromUpper]['NGN'] * rates['NGN'][toUpper];
-      return NextResponse.json({ rate: throughNgn });
-    }
+      // Try inverse pair
+      const inverseMarket = `${to.toLowerCase()}${from.toLowerCase()}`;
+      if (tickers.data[inverseMarket]) {
+        return NextResponse.json({ 
+          rate: 1 / parseFloat(tickers.data[inverseMarket].ticker.last),
+          source: 'inverse'
+        });
+      }
 
-    return NextResponse.json(
-      { error: 'Rate not available for this pair' },
-      { status: 404 }
-    );
+      // Try through USDT
+      const usdtRate = findRateViaBridge(from, to, 'USDT');
+      if (usdtRate !== null) {
+        return NextResponse.json({ 
+          rate: usdtRate,
+          source: 'usdt_bridge'
+        });
+      }
+
+      // Try through NGN
+      const ngnRate = findRateViaBridge(from, to, 'NGN');
+      if (ngnRate !== null) {
+        return NextResponse.json({ 
+          rate: ngnRate,
+          source: 'ngn_bridge'
+        });
+      }
+
+      return NextResponse.json(
+        { error: 'Rate not available for this pair' },
+        { status: 404 }
+      );
+    }
+    
+    // If no specific currencies requested, return all rates
+    const rates: Record<string, number> = {};
+    Object.entries(tickers.data).forEach(([market, data]) => {
+      if (data.ticker && data.ticker.last) {
+        rates[market.toUpperCase()] = parseFloat(data.ticker.last);
+      }
+    });
+
+    return NextResponse.json({ rates });
+
   } catch (error) {
     console.error('Error fetching market rate:', error);
     return NextResponse.json(

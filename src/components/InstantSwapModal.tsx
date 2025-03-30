@@ -44,6 +44,7 @@ interface TradeDetails {
   total: number;
   quote_amount: string;
   ngn_equivalent: number;
+  quotation_id: string;
 }
 
 interface CurrencyPair {
@@ -113,18 +114,18 @@ const TRADE_LIMITS = {
   MIN_CRYPTO: {
     BTC: 0.0001,
     ETH: 0.01,
-    USDT: 10,
-    USDC: 10,
-    DOGE: 100,
-    TRUMP: 100,
+    USDT: 0.1, // Minimum 0.1 USDT
+    USDC: 0.1,
+    SOL: 0.01,
+    // Add other currencies as needed
   },
   MAX_CRYPTO: {
-    BTC: 100,
+    BTC: 10,
     ETH: 1000,
     USDT: 100000,
     USDC: 100000,
-    DOGE: 1000000,
-    TRUMP: 1000000,
+    SOL: 1000,
+    // Add other currencies as needed
   }
 };
 
@@ -162,22 +163,63 @@ const formatCurrencyDisplay = (currency: string): string => {
   return currencyMap[currency] || currency;
 };
 
+// Add helper function to validate limits
+const validateLimits = (amount: string, currency: string, amountType: AmountCurrencyType): string | null => {
+  const numAmount = parseFloat(amount);
+  if (isNaN(numAmount)) return 'Please enter a valid amount';
+
+  if (amountType === 'NGN') {
+    if (numAmount < TRADE_LIMITS.MIN_NGN) {
+      return `Minimum amount is ₦${formatNairaAmount(TRADE_LIMITS.MIN_NGN)}`;
+    }
+    if (numAmount > TRADE_LIMITS.MAX_NGN) {
+      return `Maximum amount is ₦${formatNairaAmount(TRADE_LIMITS.MAX_NGN)}`;
+    }
+  } else {
+    const minAmount = TRADE_LIMITS.MIN_CRYPTO[currency as keyof typeof TRADE_LIMITS.MIN_CRYPTO];
+    const maxAmount = TRADE_LIMITS.MAX_CRYPTO[currency as keyof typeof TRADE_LIMITS.MAX_CRYPTO];
+    
+    if (minAmount && numAmount < minAmount) {
+      return `Minimum amount is ${minAmount} ${currency}`;
+    }
+    if (maxAmount && numAmount > maxAmount) {
+      return `Maximum amount is ${maxAmount} ${currency}`;
+    }
+  }
+  return null;
+};
+
 function TradePreviewModal({ 
   isOpen, 
   onClose, 
   onConfirm, 
   trade,
   countdown,
+  toCurrency,
+  setAmount,
+  setError,
+  setShowPreview,
 }: { 
   isOpen: boolean; 
   onClose: () => void; 
   onConfirm: () => void; 
   trade: TradeDetails;
   countdown: number;
+  toCurrency: string;
+  setAmount: (value: string) => void;
+  setError: (value: string | null) => void;
+  setShowPreview: (value: boolean) => void;
 }) {
+  const handleClose = () => {
+    onClose();
+    setAmount('');
+    setError(null);
+    setShowPreview(false);
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md bg-white dark:bg-gray-800">
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-md bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/30 dark:to-amber-900/30 backdrop-blur-sm">
         <DialogHeader>
           <DialogTitle>Confirm Swap</DialogTitle>
           <DialogDescription>
@@ -186,74 +228,53 @@ function TradePreviewModal({
         </DialogHeader>
 
         <div className="space-y-6">
-          <Card>
+          <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
             <CardContent className="space-y-6 pt-6">
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">From</p>
-                    <p className="font-medium">{formatAmount(trade.amount, trade.currency)} {trade.currency}</p>
+                    <p className="font-medium">
+                      {formatCryptoAmount(trade.amount)} {trade.currency}
+                    </p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">To</p>
-                    <p className="font-medium">{trade.quote_amount}</p>
+                    <p className="font-medium">
+                      {formatCryptoAmount(trade.quote_amount)} {toCurrency}
+                    </p>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Rate</span>
-                    <span className="font-medium">₦{trade.rate.toLocaleString()}</span>
+                  <div className="flex justify-between text-sm">
+                    <span>Rate</span>
+                    <span className="font-medium">₦{formatNairaAmount(trade.rate)}/{trade.currency}</span>
                   </div>
-                  {trade.ngn_equivalent > 0 && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">NGN Equivalent</span>
-                      <span className="font-medium">₦{trade.ngn_equivalent.toLocaleString()}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-2 pt-4 border-t">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Platform Fee</span>
-                    <span className="font-medium">₦{trade.fees.platform.toLocaleString()}</span>
+                  <div className="flex justify-between text-sm">
+                    <span>NGN Equivalent</span>
+                    <span className="font-medium">₦{formatNairaAmount(trade.ngn_equivalent)}</span>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Service Fee</span>
-                    <span className="font-medium">₦{trade.fees.service.toLocaleString()}</span>
+                  <div className="flex justify-between text-sm">
+                    <span>Trading Fee ({(trade.fees.total / trade.ngn_equivalent * 100).toFixed(1)}%)</span>
+                    <span className="font-medium">₦{formatNairaAmount(trade.fees.total)}</span>
                   </div>
-                  <div className="flex justify-between items-center font-medium">
-                    <span>Total Fee</span>
-                    <span>₦{trade.fees.total.toLocaleString()}</span>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t">
-                  <div className="flex justify-between items-center font-medium">
-                    <span>Total Amount</span>
-                    <span>₦{trade.total.toLocaleString()}</span>
+                  <div className="flex justify-between text-sm font-medium pt-2 border-t border-gray-200 dark:border-gray-700">
+                    <span>Total Amount (incl. fees)</span>
+                    <span>₦{formatNairaAmount(trade.total)}</span>
                   </div>
                 </div>
               </div>
             </CardContent>
           </Card>
-
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={onClose}
-            >
-              Cancel
-            </Button>
-            <Button
-              className="flex-1 bg-green-600 hover:bg-green-700"
-              onClick={onConfirm}
-            >
-              Confirm Swap
-            </Button>
-          </div>
         </div>
+
+        <DialogFooter className="flex space-x-2 sm:space-x-0">
+          <Button variant="outline" onClick={handleClose}>Cancel</Button>
+          <Button onClick={onConfirm} disabled={countdown <= 0}>
+            Confirm Swap
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -305,6 +326,40 @@ const getCurrencyName = (currency: string): string => {
   return names[currency.toUpperCase()] || currency.toUpperCase();
 };
 
+// Volume-based fee tiers
+interface VolumeTier {
+  min: number;
+  max: number;
+  fee: number;
+}
+
+const VOLUME_TIERS: Record<string, VolumeTier> = {
+  TIER_1: { min: 0, max: 1000, fee: 4.0 },        // 0-1K USD: 4.0%
+  TIER_2: { min: 1000, max: 5000, fee: 3.5 },     // 1K-5K USD: 3.5%
+  TIER_3: { min: 5000, max: 20000, fee: 3.0 },    // 5K-20K USD: 3.0%
+  TIER_4: { min: 20000, max: 100000, fee: 2.8 },  // 20K-100K USD: 2.8%
+  TIER_5: { min: 100000, max: Infinity, fee: 2.5 } // 100K+ USD: 2.5%
+};
+
+interface MarketRates {
+  [key: string]: number;
+}
+
+// Add this function after the existing imports
+const getMarketRate = async (from: string, to: string): Promise<number | null> => {
+  try {
+    const response = await fetch(`/api/markets/rate?from=${from}&to=${to}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch market rate');
+    }
+    const data = await response.json();
+    return data.rate || null;
+  } catch (error) {
+    console.error('Error fetching market rate:', error);
+    return null;
+  }
+};
+
 export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalProps) {
   const [fromCurrency, setFromCurrency] = useState<string>(wallet?.currency || '');
   const [toCurrency, setToCurrency] = useState<string>('');
@@ -320,11 +375,13 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
   const [wallets, setWallets] = useState<WalletType[]>([]);
   const [quidaxId, setQuidaxId] = useState('');
   const [countdown, setCountdown] = useState(14);
+  const [countdownInterval, setCountdownInterval] = useState<NodeJS.Timeout | null>(null);
   const [isQuoteExpired, setIsQuoteExpired] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [tradeDetails, setTradeDetails] = useState<TradeDetails | null>(null);
   const { toast } = useToast();
+  const [marketRates, setMarketRates] = useState<MarketRates>({});
 
   // Compute if form is valid
   const isValid = Boolean(amount && fromCurrency && toCurrency && !error);
@@ -480,19 +537,8 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
   // Calculate NGN equivalent
   const calculateNGNEquivalent = (amount: string, currency: string): number => {
     if (!amount || !currency) return 0;
-    const numAmount = parseFloat(amount);
-    if (isNaN(numAmount)) return 0;
-    
-    // If the currency is already NGN, return the amount
-    if (currency === 'NGN') return numAmount;
-
-    // Get the market rate for the currency to NGN
-    const marketData = wallets.find(w => w.currency === currency);
-    if (!marketData?.estimated_value) return 0;
-
-    // Calculate the NGN value using the estimated value
-    const rate = marketData.estimated_value / parseFloat(marketData.balance);
-    return numAmount * rate;
+    const rate = marketRates[`${currency}/NGN`] || marketRates[`${currency}/USDT`] * marketRates['USDT/NGN'];
+    return parseFloat(amount) * rate;
   };
 
   useEffect(() => {
@@ -565,11 +611,11 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
     } else if (amountCurrency === 'CRYPTO') {
       const minCrypto = TRADE_LIMITS.MIN_CRYPTO[fromCurrency as keyof typeof TRADE_LIMITS.MIN_CRYPTO];
       if (numValue < minCrypto) {
-        return `Minimum amount is ${minCrypto} ${fromCurrency}`;
+        return `Minimum amount is ${formatCryptoAmount(minCrypto)} ${fromCurrency}`;
       }
       const maxCrypto = TRADE_LIMITS.MAX_CRYPTO[fromCurrency as keyof typeof TRADE_LIMITS.MAX_CRYPTO];
       if (numValue > maxCrypto) {
-        return `Maximum amount is ${maxCrypto} ${fromCurrency}`;
+        return `Maximum amount is ${formatCryptoAmount(maxCrypto)} ${fromCurrency}`;
       }
     }
     return null;
@@ -620,67 +666,139 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
   }, []);
 
   const calculateFees = (amount: number) => {
-    if (!feeConfig) return { platform: 0, service: 0, total: 0 };
-    
-    const baseFee = feeConfig.user_tier.fee_percentage / 100;
-    const platformFee = amount * (baseFee / 2); // Split the fee between platform and service
-    const serviceFee = amount * (baseFee / 2);
+    // Get volume tier based on NGN amount
+    let feeTier = VOLUME_TIERS.TIER_1;
+    for (const tier of Object.values(VOLUME_TIERS)) {
+      if (amount >= tier.min && amount < tier.max) {
+        feeTier = tier;
+        break;
+      }
+    }
+
+    // Calculate total fee based on volume tier
+    const totalFee = (amount * feeTier.fee) / 100;
     
     return {
-      platform: platformFee,
-      service: serviceFee,
-      total: platformFee + serviceFee
+      platform: totalFee, // The entire fee is the platform fee
+      service: 0, // No separate service fee
+      total: totalFee
     };
   };
 
   const handleGetQuote = async () => {
-    try {
-      setIsLoading(true);
-      
-      // Validate inputs
-      if (!fromCurrency || !toCurrency || !amount) {
-        toast({
-          title: "Error",
-          description: "Please fill in all fields",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Get quote from API
-      const quote = await createSwapQuotation({
-        from_currency: fromCurrency.toLowerCase(),
-        to_currency: toCurrency.toLowerCase(),
-        from_amount: amount,
-        user_id: quidaxId,
-      });
-
-      const amountNum = Number(amount);
-      const fees = calculateFees(amountNum);
-
-      // Set trade details
-      setTradeDetails({
-        type: "swap",
-        amount: amount,
-        currency: fromCurrency,
-        rate: Number(quote.quoted_price),
-        fees,
-        total: amountNum + fees.total,
-        quote_amount: quote.to_amount,
-        ngn_equivalent: calculateNGNEquivalent(amount, fromCurrency)
-      });
-
-      // Show preview modal with countdown
-      setShowPreview(true);
-      setCountdown(14);
-
-    } catch (error: any) {
-      console.error('Error getting quote:', error);
+    if (!amount || !fromCurrency || !toCurrency) {
       toast({
         title: "Error",
-        description: error.message || "Failed to get quote",
+        description: "Please fill in all fields",
         variant: "destructive",
+        className: "bg-red-500/90 text-white border-red-600",
       });
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Get current wallet balance
+      const currentBalance = wallets.find(w => w.currency.toUpperCase() === fromCurrency.toUpperCase());
+      const walletBalance = currentBalance ? parseFloat(currentBalance.balance) : 0;
+
+      // Convert input amount to crypto based on selected currency type
+      let cryptoAmount = parseFloat(amount);
+      if (amountCurrency === 'NGN') {
+        const rate = await getMarketRate('NGN', fromCurrency);
+        if (!rate) throw new Error('Unable to determine conversion rate');
+        cryptoAmount = parseFloat(amount) / rate;
+      } else if (amountCurrency === 'USD') {
+        const rate = await getMarketRate('USDT', fromCurrency);
+        if (!rate) throw new Error('Unable to determine conversion rate');
+        cryptoAmount = parseFloat(amount) / rate;
+      }
+
+      // Check if user has sufficient balance
+      if (cryptoAmount > walletBalance) {
+        throw new Error(`Insufficient ${fromCurrency} balance. Available: ${formatCryptoAmount(walletBalance)} ${fromCurrency}`);
+      }
+
+      // Get USDT equivalent for fee calculation
+      let usdtAmount = cryptoAmount;
+      if (fromCurrency !== 'USDT') {
+        const usdtRate = await getMarketRate(fromCurrency, 'USDT');
+        if (!usdtRate) throw new Error('Unable to determine USDT rate');
+        usdtAmount = cryptoAmount * usdtRate;
+      }
+
+      // Get NGN/USDT rate for NGN equivalent calculation
+      const ngnUsdtRate = await getMarketRate('USDT', 'NGN');
+      if (!ngnUsdtRate) throw new Error('Unable to determine NGN/USDT rate');
+
+      // Calculate NGN equivalent
+      const ngnAmount = usdtAmount * ngnUsdtRate;
+
+      // Get quote from API using the converted crypto amount
+      const response = await fetch('/api/swap/quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from_currency: fromCurrency,
+          to_currency: toCurrency,
+          from_amount: cryptoAmount.toString()
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to get quote');
+      }
+
+      const data = await response.json();
+      
+      // Calculate USD amount for fee tier (1 USDT = 1 USD)
+      const usdAmount = usdtAmount;
+      
+      // Determine fee tier based on USD volume
+      let feeTier = VOLUME_TIERS.TIER_1;
+      for (const tier of Object.values(VOLUME_TIERS)) {
+        if (usdAmount >= tier.min && usdAmount < tier.max) {
+          feeTier = tier;
+          break;
+        }
+      }
+
+      // Calculate fees based on tier
+      const fees = (ngnAmount * feeTier.fee) / 100;
+
+      setTradeDetails({
+        type: 'swap',
+        amount: cryptoAmount.toString(),
+        currency: fromCurrency,
+        rate: ngnUsdtRate,
+        fees: {
+          total: fees,
+          platform: fees,
+          service: 0
+        },
+        total: ngnAmount + fees,
+        quote_amount: data.to_receive,
+        ngn_equivalent: ngnAmount,
+        quotation_id: data.id
+      });
+
+      setShowPreview(true);
+      startCountdown();
+    } catch (error) {
+      console.error('Error getting quote:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to get quote';
+      setError(errorMessage);
+      toast({
+        title: "❌ Error",
+        description: errorMessage,
+        variant: "destructive",
+        className: "bg-red-500/90 text-white border-red-600",
+      });
+      setAmount('');
+      setShowPreview(false);
     } finally {
       setIsLoading(false);
     }
@@ -715,29 +833,47 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
   };
 
   const handleConfirmSwap = async () => {
-    if (!quote || isQuoteExpired) return;
+    if (!tradeDetails?.quotation_id) return;
 
     try {
       setIsConfirming(true);
       setError(null);
 
-      const result = await confirmSwapQuotation({
-        quotation_id: quote.id,
-        from_currency: fromCurrency.toLowerCase(),
-        to_currency: toCurrency.toLowerCase(),
-        from_amount: amount,
-        user_id: quidaxId,
+      const response = await fetch('/api/swap/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          quotation_id: tradeDetails.quotation_id
+        })
       });
 
-      if (result.status === 'success' && result.data) {
-        setQuote(result.data);
-        setShowPreview(true);
-      } else {
-        throw new Error(result.message || 'Failed to get quote');
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to confirm swap');
       }
-    } catch (err) {
-      console.error('Error confirming swap:', err);
-      setError(err instanceof Error ? err.message : 'Failed to confirm swap');
+
+      const confirmation = await response.json();
+
+      toast({
+        title: "✅ Swap Successful",
+        description: `Successfully swapped ${tradeDetails.amount} ${tradeDetails.currency} to ${confirmation.received_amount} ${confirmation.to_currency}`,
+        variant: "default",
+        className: "bg-green-500/90 text-white border-green-600",
+      });
+
+      // Close modals and refresh balances
+      setShowPreview(false);
+      onClose();
+      router.refresh();
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to confirm swap';
+      setError(errorMessage);
+      toast({
+        title: "❌ Swap Failed",
+        description: errorMessage,
+        variant: "destructive",
+        className: "bg-red-500/90 text-white border-red-600",
+      });
     } finally {
       setIsConfirming(false);
     }
@@ -777,6 +913,69 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
     // Reset amount when changing currency type
     setAmount('');
   };
+
+  // Add useEffect to fetch market rates
+  useEffect(() => {
+    const fetchMarketRates = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        const response = await fetch('/api/markets/rate', {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch market rates');
+        }
+
+        const data = await response.json();
+        if (!data || !data.rates) {
+          throw new Error('Invalid rate data received');
+        }
+
+        setMarketRates(data.rates);
+      } catch (error) {
+        console.error('Error fetching market rates:', error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch market rates",
+          variant: "destructive"
+        });
+      }
+    };
+
+    if (isOpen) {
+      fetchMarketRates();
+    }
+  }, [isOpen, toast, supabase]);
+
+  const startCountdown = () => {
+    setCountdown(14);
+    if (countdownInterval) {
+      clearInterval(countdownInterval);
+    }
+    const interval = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    setCountdownInterval(interval);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (countdownInterval) {
+        clearInterval(countdownInterval);
+      }
+    };
+  }, [countdownInterval]);
 
   return (
     <>
@@ -940,6 +1139,10 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
           onConfirm={handleConfirmSwap}
           trade={tradeDetails}
           countdown={countdown}
+          toCurrency={toCurrency}
+          setAmount={setAmount}
+          setError={setError}
+          setShowPreview={setShowPreview}
         />
       )}
     </>

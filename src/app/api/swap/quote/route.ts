@@ -1,16 +1,15 @@
 import { NextResponse } from 'next/server';
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
-import { v4 as uuidv4 } from 'uuid';
+
+const QUIDAX_API_URL = process.env.NEXT_PUBLIC_QUIDAX_API_URL || 'https://www.quidax.com/api/v1';
+const QUIDAX_SECRET_KEY = process.env.QUIDAX_SECRET_KEY;
 
 export async function POST(request: Request) {
   try {
-    // Initialize Supabase client
-    const cookieStore = cookies();
-    const supabase = createServerComponentClient({ cookies: () => cookieStore });
-
-    // Verify authentication
+    const supabase = createServerComponentClient({ cookies });
     const { data: { session } } = await supabase.auth.getSession();
+
     if (!session) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -18,106 +17,59 @@ export async function POST(request: Request) {
       );
     }
 
-    // Get request body
-    const body = await request.json();
-    const { from_currency, to_currency, from_amount, user_id } = body;
+    const { from_currency, to_currency, from_amount } = await request.json();
 
-    if (!from_currency || !to_currency || !from_amount || !user_id) {
+    if (!from_currency || !to_currency || !from_amount) {
       return NextResponse.json(
         { error: 'Missing required parameters' },
         { status: 400 }
       );
     }
 
-    // Get market rate
-    const rateResponse = await fetch(`${request.headers.get('origin')}/api/markets/rate?from=${from_currency}&to=${to_currency}`, {
-      headers: {
-        cookie: request.headers.get('cookie') || '',
-      },
-    });
+    // Get user's Quidax ID
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('quidax_id')
+      .eq('user_id', session.user.id)
+      .single();
 
-    if (!rateResponse.ok) {
+    if (!profile?.quidax_id) {
       return NextResponse.json(
-        { error: 'Failed to fetch market rate' },
-        { status: rateResponse.status }
+        { error: 'User profile not found' },
+        { status: 404 }
       );
     }
 
-    const { rate } = await rateResponse.json();
-
-    // Calculate amounts
-    const to_amount = from_amount * rate;
-    const ngn_equivalent = from_currency.toLowerCase() === 'ngn' 
-      ? from_amount 
-      : from_amount * (await getUsdtNgnRate(request));
-
-    // Get user's 30-day trading volume
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    const { data: trades } = await supabase
-      .from('trades')
-      .select('amount, rate')
-      .eq('user_id', session.user.id)
-      .gte('created_at', thirtyDaysAgo.toISOString());
-
-    // Calculate total trading volume in USD
-    const tradingVolume = trades?.reduce((total, trade) => {
-      return total + (parseFloat(trade.amount) * parseFloat(trade.rate));
-    }, 0) || 0;
-
-    // Calculate fees based on trading volume
-    const feePercentage = getFeePercentage(tradingVolume);
-    const totalFee = ngn_equivalent * feePercentage;
-    const platformFee = totalFee / 2; // Split evenly
-    const serviceFee = totalFee / 2;
-
-    // Generate quote ID
-    const quoteId = uuidv4();
-
-    return NextResponse.json({
-      id: quoteId,
-      from_currency: from_currency.toUpperCase(),
-      to_currency: to_currency.toUpperCase(),
-      from_amount,
-      to_amount,
-      quoted_price: rate,
-      fees: {
-        platform: platformFee,
-        service: serviceFee,
-        total: totalFee
+    // Get swap quote from Quidax
+    const response = await fetch(`${QUIDAX_API_URL}/users/${profile.quidax_id}/swap_quotation`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${QUIDAX_SECRET_KEY}`,
+        'Content-Type': 'application/json'
       },
-      ngn_equivalent,
-      expires_at: new Date(Date.now() + 15000).toISOString() // 15 seconds expiry
+      body: JSON.stringify({
+        from_currency: from_currency.toLowerCase(),
+        to_currency: to_currency.toLowerCase(),
+        from_amount: from_amount.toString()
+      })
     });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return NextResponse.json(
+        { error: error.message || 'Failed to get quote' },
+        { status: response.status }
+      );
+    }
+
+    const data = await response.json();
+    return NextResponse.json(data.data);
+
   } catch (error) {
-    console.error('Error creating swap quote:', error);
+    console.error('Error in swap quote:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
     );
   }
-}
-
-async function getUsdtNgnRate(request: Request): Promise<number> {
-  const rateResponse = await fetch(`${request.headers.get('origin')}/api/markets/rate?from=usdt&to=ngn`, {
-    headers: {
-      cookie: request.headers.get('cookie') || '',
-    },
-  });
-  
-  if (!rateResponse.ok) {
-    throw new Error('Failed to fetch USDT/NGN rate');
-  }
-  
-  const { rate } = await rateResponse.json();
-  return rate;
-}
-
-function getFeePercentage(volumeInUSD: number): number {
-  if (volumeInUSD >= 100_000) return 0.025; // 2.5% for 100K+ USD
-  if (volumeInUSD >= 20_000) return 0.028; // 2.8% for 20K-100K USD
-  if (volumeInUSD >= 5_000) return 0.03; // 3.0% for 5K-20K USD
-  if (volumeInUSD >= 1_000) return 0.035; // 3.5% for 1K-5K USD
-  return 0.04; // 4.0% for 0-1K USD
 } 

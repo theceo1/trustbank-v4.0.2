@@ -27,7 +27,7 @@ const securityHeaders = [
   },
   {
     key: 'Content-Security-Policy',
-    value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; object-src 'self' data:; connect-src 'self' https://*.supabase.co https://*.vercel.app https://api.quidax.com https://api.dojah.io https://ipinfo.io;"
+    value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; object-src 'self' data:; connect-src 'self' https://*.supabase.co https://*.vercel.app https://api.quidax.com https://www.quidax.com https://api.dojah.io https://ipinfo.io;"
   }
 ];
 

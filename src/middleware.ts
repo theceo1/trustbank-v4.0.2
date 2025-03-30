@@ -31,6 +31,7 @@ const PUBLIC_PATHS = [
   '/api/auth/sign-up',
   '/api/markets/overview',
   '/api/markets/tickers',
+  '/api/markets/rate',
   '/api/markets/rates',
   '/api/markets/usdtngn/ticker',
   '/api/markets/usdtngn/order-book',
