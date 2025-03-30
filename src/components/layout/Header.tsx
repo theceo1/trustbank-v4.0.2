@@ -16,6 +16,7 @@ import { useModal } from "@/hooks/use-modal";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
 import type { User } from '@supabase/auth-helpers-nextjs';
+import { InstantSwapModal } from "@/components/InstantSwapModal";
 
 const waveAnimation = `
 @keyframes wave {
@@ -38,6 +39,7 @@ export function Header() {
   const [loading, setLoading] = useState(true);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isSwapModalOpen, setIsSwapModalOpen] = useState(false);
   const { theme, setTheme } = useTheme();
   const { onOpen } = useModal();
   const router = useRouter();
@@ -87,12 +89,7 @@ export function Header() {
   };
 
   const handleInstantSwap = () => {
-    onOpen("swap", {
-      wallet: {
-        currency: "btc",
-        balance: "0"
-      }
-    });
+    setIsSwapModalOpen(true);
   };
 
   return (
@@ -259,6 +256,11 @@ export function Header() {
         loading={loading}
         isSigningOut={isSigningOut}
         handleInstantSwap={handleInstantSwap}
+      />
+
+      <InstantSwapModal 
+        isOpen={isSwapModalOpen} 
+        onClose={() => setIsSwapModalOpen(false)} 
       />
     </>
   );

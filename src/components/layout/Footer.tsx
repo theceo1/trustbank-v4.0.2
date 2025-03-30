@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { InstantSwapModal, BuyCryptoModal } from "@/components/wallet/modals";
+import { InstantSwapModal } from "@/components/InstantSwapModal";
 import type { ComponentType } from "react";
 import {
   Wallet,
@@ -85,7 +85,6 @@ const socialLinks: SocialLink[] = [
 
 export function Footer() {
   const [isSwapModalOpen, setIsSwapModalOpen] = useState(false);
-  const [isBuyModalOpen, setIsBuyModalOpen] = useState(false);
 
   const quickLinks: LinkItem[] = [
     { name: "Market", href: "/market", icon: <LineChart className="w-4 h-4" /> },
@@ -99,13 +98,6 @@ export function Footer() {
       onClick: () => setIsSwapModalOpen(true),
       isNew: true
     },
-    { 
-      name: "Buy Crypto", 
-      href: "#", 
-      icon: <ArrowLeftRight className="w-4 h-4" />,
-      onClick: () => setIsBuyModalOpen(true),
-      isNew: true
-    }
   ];
 
   const aboutLinks: LinkItem[] = [
@@ -262,14 +254,7 @@ export function Footer() {
         </div>
       </div>
 
-      <InstantSwapModal
-        isOpen={isSwapModalOpen}
-        onClose={() => setIsSwapModalOpen(false)}
-      />
-      <BuyCryptoModal
-        isOpen={isBuyModalOpen}
-        onClose={() => setIsBuyModalOpen(false)}
-      />
+      <InstantSwapModal isOpen={isSwapModalOpen} onClose={() => setIsSwapModalOpen(false)} />
     </footer>
   );
 } 

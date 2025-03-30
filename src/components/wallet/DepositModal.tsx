@@ -10,13 +10,14 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/components/ui/use-toast"
 import { Icons } from "@/components/ui/icons"
 import { QRCodeSVG } from 'qrcode.react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { motion } from "framer-motion"
 
 interface DepositModalProps {
   isOpen: boolean;
@@ -47,7 +48,17 @@ const NETWORKS_BY_CURRENCY: Record<string, Array<{
     { id: 'bep20', name: 'BEP20 (BSC)' }
   ],
   bnb: [{ id: 'bep20', name: 'BEP20 (BSC)' }],
-  matic: [{ id: 'polygon', name: 'Polygon Network' }]
+  matic: [{ id: 'polygon', name: 'Polygon Network' }],
+  sol: [{ id: 'sol', name: 'Solana Network' }],
+  dot: [{ id: 'dot', name: 'Polkadot Network' }],
+  ada: [{ id: 'ada', name: 'Cardano Network' }],
+  xrp: [{ id: 'xrp', name: 'XRP Network' }],
+  doge: [{ id: 'doge', name: 'Dogecoin Network' }],
+  link: [{ id: 'erc20', name: 'ERC20' }],
+  aave: [{ id: 'erc20', name: 'ERC20' }],
+  uni: [{ id: 'erc20', name: 'ERC20' }],
+  cake: [{ id: 'bep20', name: 'BEP20 (BSC)' }],
+  shib: [{ id: 'erc20', name: 'ERC20' }],
 }
 
 export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
@@ -58,7 +69,6 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
   const [copied, setCopied] = useState(false)
   const [selectedNetwork, setSelectedNetwork] = useState('')
   const [selectedCurrency, setSelectedCurrency] = useState('')
-  const [depositMethod, setDepositMethod] = useState<'bank' | 'crypto'>('crypto')
   const supabase = createClientComponentClient()
 
   // Reset state when modal opens or currency changes
@@ -67,10 +77,9 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
       setError(null)
       setAddress(null)
       setSelectedCurrency(wallet?.currency || '')
-      setDepositMethod(wallet?.currency?.toLowerCase() === 'ngn' ? 'bank' : 'crypto')
       
       // Only fetch address for crypto deposits
-      if (wallet?.currency && wallet.currency.toLowerCase() !== 'ngn') {
+      if (wallet?.currency) {
         // Get available networks for the currency
         const networks = NETWORKS_BY_CURRENCY[wallet.currency.toLowerCase()]
         if (networks?.length === 1) {
@@ -98,7 +107,7 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
         throw new Error('No session found')
       }
 
-      const response = await fetch(`/api/wallet/address?currency=${wallet?.currency?.toLowerCase()}&network=${network}`, {
+      const response = await fetch(`/api/wallet/address?currency=${selectedCurrency?.toLowerCase()}&network=${network}`, {
         headers: {
           'Authorization': `Bearer ${session.access_token}`
         }
@@ -132,6 +141,18 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
     fetchAddress(network)
   }
 
+  const handleCurrencyChange = (currency: string) => {
+    setSelectedCurrency(currency)
+    setSelectedNetwork('')
+    setAddress(null)
+    
+    const networks = NETWORKS_BY_CURRENCY[currency.toLowerCase()]
+    if (networks?.length === 1) {
+      setSelectedNetwork(networks[0].id)
+      fetchAddress(networks[0].id)
+    }
+  }
+
   const handleCopy = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text)
@@ -151,41 +172,107 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
     }
   }
 
-  const networks = wallet?.currency ? NETWORKS_BY_CURRENCY[wallet.currency.toLowerCase()] : []
+  const networks = selectedCurrency ? NETWORKS_BY_CURRENCY[selectedCurrency.toLowerCase()] : []
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Deposit</DialogTitle>
-          <DialogDescription>
-            {wallet?.currency?.toLowerCase() === 'ngn' 
-              ? 'Make a bank transfer to fund your NGN wallet'
-              : 'Choose your preferred deposit method'}
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-[425px] bg-gradient-to-br from-green-50/90 via-white/95 to-green-100/90 dark:from-green-950/90 dark:via-gray-900/95 dark:to-green-900/90 backdrop-blur-xl border-green-200/50 dark:border-green-800/50">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-600 to-emerald-600 dark:from-green-400 dark:to-emerald-400">
+              Deposit {selectedCurrency?.toUpperCase()}
+            </DialogTitle>
+            <DialogDescription className="text-gray-600 dark:text-gray-400">
+              Select a network to generate your deposit address
+            </DialogDescription>
+          </DialogHeader>
 
-        {wallet?.currency?.toLowerCase() === 'ngn' ? (
-          <div className="space-y-4">
-            <div className="rounded-lg border p-4">
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-sm font-medium">Bank Name</span>
-                  <span className="text-sm">T.B.D</span>
+          <div className="space-y-6 mt-4">
+            {/* Currency Selection */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Select Currency</Label>
+              <Select value={selectedCurrency} onValueChange={handleCurrencyChange}>
+                <SelectTrigger className="w-full border-green-200 focus:ring-green-600">
+                  <SelectValue placeholder="Select currency" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.keys(NETWORKS_BY_CURRENCY).map((currency) => (
+                    <SelectItem key={currency} value={currency}>
+                      {currency.toUpperCase()}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Network Selection */}
+            {networks && networks.length > 1 && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Select Network</Label>
+                <Select value={selectedNetwork} onValueChange={handleNetworkChange}>
+                  <SelectTrigger className="w-full border-green-200 focus:ring-green-600">
+                    <SelectValue placeholder="Select network" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {networks.map((network) => (
+                      <SelectItem 
+                        key={network.id} 
+                        value={network.id}
+                        className="flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-2">
+                          {network.name}
+                          {network.isRecommended && (
+                            <span className="text-xs text-green-600 font-medium">(Recommended)</span>
+                          )}
+                        </div>
+                        {network.fee && (
+                          <span className="text-xs text-gray-500">Fee: ~{network.fee}</span>
+                        )}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedNetwork === 'trc20' && (
+                  <p className="text-sm text-green-600">
+                    TRC20 is recommended for faster and cheaper transactions
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Address Display */}
+            {address ? (
+              <motion.div 
+                className="space-y-6"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.2 }}
+              >
+                <div className="flex justify-center p-4 bg-white dark:bg-gray-800 rounded-lg">
+                  <QRCodeSVG 
+                    value={address} 
+                    size={200}
+                    level="H"
+                    includeMargin
+                    className="rounded-lg"
+                  />
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm font-medium">Account Name</span>
-                  <span className="text-sm text-green-600">trustBank Technologies</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">Account Number</span>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Deposit Address</Label>
                   <div className="flex items-center gap-2">
-                    <code className="rounded bg-muted px-2 py-1">T.B.D</code>
+                    <code className="flex-1 rounded bg-white/50 dark:bg-gray-800/50 px-2 py-1.5 text-sm break-all">
+                      {address}
+                    </code>
                     <Button
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8 text-green-600 hover:text-green-700"
-                      onClick={() => handleCopy('T.B.D')}
+                      onClick={() => handleCopy(address)}
                     >
                       {copied ? (
                         <Icons.check className="h-4 w-4" />
@@ -195,158 +282,41 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
                     </Button>
                   </div>
                 </div>
-              </div>
-            </div>
-            <Alert className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
-              <Icons.info className="h-4 w-4 text-green-600" />
-              <AlertDescription className="text-green-600">
-                Your deposit will be credited to your NGN wallet within 5-10 minutes after payment confirmation.
-                Please use your registered email as reference when making the transfer.
-              </AlertDescription>
-            </Alert>
-          </div>
-        ) : (
-          <Tabs defaultValue={depositMethod} onValueChange={(value) => setDepositMethod(value as 'bank' | 'crypto')}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="bank">Bank Transfer</TabsTrigger>
-              <TabsTrigger value="crypto">Crypto</TabsTrigger>
-            </TabsList>
 
-            <TabsContent value="bank" className="space-y-4">
-              <div className="rounded-lg border p-4">
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-sm font-medium">Bank Name</span>
-                    <span className="text-sm">T.B.D</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm font-medium">Account Name</span>
-                    <span className="text-sm text-green-600">trustBank Technologies</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">Account Number</span>
-                    <div className="flex items-center gap-2">
-                      <code className="rounded bg-muted px-2 py-1">T.B.D</code>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-green-600 hover:text-green-700"
-                        onClick={() => handleCopy('T.B.D')}
-                      >
-                        {copied ? (
-                          <Icons.check className="h-4 w-4" />
-                        ) : (
-                          <Icons.copy className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <Alert className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
-                <Icons.info className="h-4 w-4 text-green-600" />
-                <AlertDescription className="text-green-600">
-                  Your deposit will be credited to your NGN wallet within 5-10 minutes after payment confirmation.
-                  Please use your registered email as reference when making the transfer.
-                </AlertDescription>
-              </Alert>
-            </TabsContent>
-
-            <TabsContent value="crypto" className="space-y-4">
-              {networks && networks.length > 1 && (
-                <div className="space-y-2">
-                  <Label>Select Network</Label>
-                  <Select value={selectedNetwork} onValueChange={(value) => {
-                    setSelectedNetwork(value);
-                    fetchAddress(value);
-                  }}>
-                    <SelectTrigger className="border-green-200 focus:ring-green-600">
-                      <SelectValue placeholder="Select network" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {networks.map((network: { id: string; name: string; isRecommended?: boolean; fee?: string }) => (
-                        <SelectItem 
-                          key={network.id} 
-                          value={network.id}
-                          className="flex items-center justify-between"
-                        >
-                          <div className="flex items-center gap-2">
-                            {network.name}
-                            {network.isRecommended && (
-                              <span className="text-xs text-green-600 font-medium">(Recommended)</span>
-                            )}
-                          </div>
-                          {network.fee && (
-                            <span className="text-xs text-gray-500">Fee: ~{network.fee}</span>
-                          )}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {selectedNetwork === 'trc20' && (
-                    <p className="text-sm text-green-600">
-                      TRC20 is recommended for faster and cheaper transactions
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {loading ? (
-                <div className="flex flex-col items-center justify-center py-8 space-y-4">
-                  <Icons.spinner className="h-8 w-8 animate-spin text-green-600" />
-                  <p className="text-sm text-green-600">
-                    Generating deposit address...
-                  </p>
-                </div>
-              ) : error ? (
-                <Alert variant="destructive">
-                  <Icons.warning className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
+                <Alert className="bg-yellow-50/50 dark:bg-yellow-900/20 border-yellow-200/50 dark:border-yellow-800/50">
+                  <Icons.warning className="h-4 w-4 text-yellow-600" />
+                  <AlertDescription className="text-yellow-600 dark:text-yellow-400">
+                    Only send {selectedCurrency?.toUpperCase()} to this address on the {selectedNetwork.toUpperCase()} network.
+                    Sending any other asset may result in permanent loss.
+                  </AlertDescription>
                 </Alert>
-              ) : address ? (
-                <div className="space-y-6">
-                  <div className="flex justify-center">
-                    <QRCodeSVG value={address} size={200} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Deposit Address</Label>
-                    <div className="flex items-center gap-2">
-                      <code className="flex-1 rounded bg-muted p-2 font-mono text-sm break-all">
-                        {address}
-                      </code>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => handleCopy(address)}
-                        className="text-green-600 hover:text-green-700 border-green-200 hover:border-green-300"
-                      >
-                        {copied ? (
-                          <Icons.check className="h-4 w-4" />
-                        ) : (
-                          <Icons.copy className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                  <Alert className="bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
-                    <Icons.warning className="h-4 w-4 text-yellow-600" />
-                    <AlertDescription className="text-yellow-600">
-                      Only send {wallet?.currency?.toUpperCase()} to this address on the {selectedNetwork.toUpperCase()} network.
-                      Sending any other asset may result in permanent loss.
-                    </AlertDescription>
-                  </Alert>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-8 space-y-4">
-                  <Icons.info className="h-8 w-8 text-green-600" />
-                  <p className="text-sm text-green-600">
-                    Select a network to generate a deposit address
-                  </p>
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
-        )}
+              </motion.div>
+            ) : (
+              <motion.div 
+                className="flex flex-col items-center justify-center py-8 space-y-4"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.2 }}
+              >
+                {loading ? (
+                  <>
+                    <Icons.spinner className="h-8 w-8 text-green-600 animate-spin" />
+                    <p className="text-sm text-green-600">
+                      Generating deposit address...
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <Icons.info className="h-8 w-8 text-green-600" />
+                    <p className="text-sm text-green-600">
+                      {selectedCurrency ? 'Select a network to generate a deposit address' : 'Select a currency to continue'}
+                    </p>
+                  </>
+                )}
+              </motion.div>
+            )}
+          </div>
+        </motion.div>
       </DialogContent>
     </Dialog>
   )

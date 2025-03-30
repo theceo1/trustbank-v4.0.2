@@ -383,6 +383,16 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
   const { toast } = useToast();
   const [marketRates, setMarketRates] = useState<MarketRates>({});
 
+  const resetForm = useCallback(() => {
+    setAmount('');
+    setShowPreview(false);
+    setTradeDetails(null);
+    setQuote(null);
+    setCountdown(14);
+    setError(null);
+    setIsLoading(false);
+  }, []);
+
   // Compute if form is valid
   const isValid = Boolean(amount && fromCurrency && toCurrency && !error);
 
@@ -706,14 +716,32 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
 
       // Convert input amount to crypto based on selected currency type
       let cryptoAmount = parseFloat(amount);
+      
       if (amountCurrency === 'NGN') {
-        const rate = await getMarketRate('NGN', fromCurrency);
-        if (!rate) throw new Error('Unable to determine conversion rate');
-        cryptoAmount = parseFloat(amount) / rate;
+        // For NGN input, first get NGN/USDT rate
+        const ngnUsdtRate = await getMarketRate('USDT', 'NGN');
+        if (!ngnUsdtRate) throw new Error('Unable to determine NGN/USDT rate');
+        
+        // Convert NGN to USDT first
+        const usdtAmount = cryptoAmount / ngnUsdtRate;
+        
+        if (fromCurrency === 'USDT') {
+          cryptoAmount = usdtAmount;
+        } else {
+          // Then convert USDT to target crypto
+          const cryptoUsdtRate = await getMarketRate('USDT', fromCurrency);
+          if (!cryptoUsdtRate) throw new Error('Unable to determine conversion rate');
+          cryptoAmount = usdtAmount * cryptoUsdtRate;
+        }
       } else if (amountCurrency === 'USD') {
-        const rate = await getMarketRate('USDT', fromCurrency);
-        if (!rate) throw new Error('Unable to determine conversion rate');
-        cryptoAmount = parseFloat(amount) / rate;
+        // For USD input, treat it same as USDT
+        if (fromCurrency === 'USDT') {
+          cryptoAmount = parseFloat(amount);
+        } else {
+          const cryptoUsdtRate = await getMarketRate('USDT', fromCurrency);
+          if (!cryptoUsdtRate) throw new Error('Unable to determine conversion rate');
+          cryptoAmount = parseFloat(amount) * cryptoUsdtRate;
+        }
       }
 
       // Check if user has sufficient balance
@@ -797,8 +825,9 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
         variant: "destructive",
         className: "bg-red-500/90 text-white border-red-600",
       });
-      setAmount('');
-      setShowPreview(false);
+      
+      // Reset form state
+      resetForm();
     } finally {
       setIsLoading(false);
     }
@@ -825,10 +854,14 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
   };
 
   const handleClose = () => {
+    // Reset all form state
     setQuote(null);
     setAmount('');
     setCountdown(14);
     setShowPreview(false);
+    setTradeDetails(null);
+    setError(null);
+    setIsLoading(false);
     onClose();
   };
 
