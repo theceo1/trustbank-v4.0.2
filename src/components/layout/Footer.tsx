@@ -30,6 +30,9 @@ import {
   Cookie,
 } from "lucide-react";
 import { MetaLogo, SnapchatLogo, TikTokLogo, InstagramLogo, TwitterLogo, ThreadsLogo, TelegramLogo } from "../icons";
+import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast';
 
 interface LinkItem {
   name: string;
@@ -84,18 +87,44 @@ const socialLinks: SocialLink[] = [
 ];
 
 export function Footer() {
-  const [isSwapModalOpen, setIsSwapModalOpen] = useState(false);
+  const [showInstantSwap, setShowInstantSwap] = useState(false);
+  const { session } = useAuth();
+  const router = useRouter();
+  const { toast } = useToast();
+
+  const handleAuthenticatedNavigation = (path: string) => {
+    if (!session) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to access this feature.",
+        variant: "destructive",
+      });
+      router.push('/auth/login');
+      return;
+    }
+    router.push(path);
+  };
 
   const quickLinks: LinkItem[] = [
     { name: "Market", href: "/market", icon: <LineChart className="w-4 h-4" /> },
-    { name: "Trade", href: "/trades", icon: <ArrowLeftRight className="w-4 h-4" /> },
-    { name: "Wallet", href: "/profile/wallet", icon: <Wallet className="w-4 h-4" /> },
+    { 
+      name: "Trade", 
+      href: "#",
+      icon: <ArrowLeftRight className="w-4 h-4" />,
+      onClick: () => handleAuthenticatedNavigation('/trade')
+    },
+    { 
+      name: "Wallet", 
+      href: "#",
+      icon: <Wallet className="w-4 h-4" />,
+      onClick: () => handleAuthenticatedNavigation('/profile/wallet')
+    },
     { name: "Calculator", href: "/calculator", icon: <Calculator className="w-4 h-4" /> },
     { 
       name: "Instant Swap", 
       href: "#", 
       icon: <ArrowLeftRight className="w-4 h-4" />,
-      onClick: () => setIsSwapModalOpen(true),
+      onClick: () => setShowInstantSwap(true),
       isNew: true
     },
   ];
@@ -137,8 +166,12 @@ export function Footer() {
             <p className="text-sm text-muted-foreground">
               We are <span className="text-green-600">Crypto | Simplified</span>. Making cryptocurrency trading accessible, secure, and efficient by simplifying crypto adoption in emerging markets.
             </p>
-            <Button variant="default" className="w-full bg-green-600 hover:bg-green-700 text-white" asChild>
-              <Link href="/trade">Start Trading</Link>
+            <Button 
+              variant="default" 
+              className="w-full bg-green-600 hover:bg-green-700 text-white"
+              onClick={() => handleAuthenticatedNavigation('/trade')}
+            >
+              Start Trading
             </Button>
             <div className="flex items-center space-x-2 p-3 border rounded-lg bg-green-50 dark:bg-green-900/20">
               <span className="text-sm font-medium">Refer & Earn</span>
@@ -254,7 +287,12 @@ export function Footer() {
         </div>
       </div>
 
-      <InstantSwapModal isOpen={isSwapModalOpen} onClose={() => setIsSwapModalOpen(false)} />
+      {showInstantSwap && (
+        <InstantSwapModal
+          isOpen={showInstantSwap}
+          onClose={() => setShowInstantSwap(false)}
+        />
+      )}
     </footer>
   );
 } 

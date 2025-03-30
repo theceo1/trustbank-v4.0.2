@@ -17,6 +17,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
 import type { User } from '@supabase/auth-helpers-nextjs';
 import { InstantSwapModal } from "@/components/InstantSwapModal";
+import { toast } from "@/components/ui/use-toast";
 
 const waveAnimation = `
 @keyframes wave {
@@ -79,6 +80,11 @@ export function Header() {
     try {
       setIsSigningOut(true);
       await supabase.auth.signOut();
+      toast({
+        title: "Goodbye! 👋",
+        description: "You have been successfully signed out.",
+        className: "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-600 dark:text-green-400"
+      });
       router.push('/');
       router.refresh();
     } catch (error) {
@@ -102,6 +108,7 @@ export function Header() {
               <Link href="/" className="font-bold text-xl">
                 trustBank
               </Link>
+              {/* Show instant swap button for all users */}
               <Button
                 variant="outline"
                 size="sm"

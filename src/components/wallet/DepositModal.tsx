@@ -323,10 +323,10 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
           transition={{ duration: 0.3 }}
         >
           <DialogHeader className="space-y-1">
-            <DialogTitle className="text-lg sm:text-xl font-bold text-green-500">
+            <DialogTitle className="text-lg sm:text-xl font-bold text-white">
               Deposit {selectedCurrency?.toUpperCase()}
             </DialogTitle>
-            <DialogDescription className="text-sm text-gray-400">
+            <DialogDescription className="text-sm text-white/70">
               Select a network to generate your deposit address
             </DialogDescription>
           </DialogHeader>
@@ -334,9 +334,9 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
           <div className="space-y-3 mt-3">
             {/* Currency Selection */}
             <div className="space-y-1.5">
-              <Label className="text-xs sm:text-sm font-medium text-gray-200">Select Currency</Label>
+              <Label className="text-xs sm:text-sm font-medium text-white">Select Currency</Label>
               <Select value={selectedCurrency} onValueChange={handleCurrencyChange}>
-                <SelectTrigger className="w-full h-9 sm:h-10 bg-black text-foreground border-green-800/50">
+                <SelectTrigger className="w-full h-9 sm:h-10 bg-black text-white border-green-800/50">
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
                 <SelectContent className="bg-black border-green-800/50 max-h-[200px]">
@@ -346,7 +346,7 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
                       placeholder="Search currencies..."
                       value={fromSearchQuery}
                       onChange={(e) => setFromSearchQuery(e.target.value)}
-                      className="h-8 bg-black/90 text-foreground border-green-800/50"
+                      className="h-8 bg-black text-white placeholder:text-white/50 border-green-800/50"
                     />
                   </div>
                   <div className="overflow-y-auto max-h-[160px]">
@@ -360,11 +360,11 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
                         <SelectItem 
                           key={currency} 
                           value={currency}
-                          className="text-foreground hover:bg-green-900/20 cursor-pointer"
+                          className="text-white hover:bg-green-900/20 cursor-pointer"
                         >
                           <div className="flex items-center justify-between w-full">
                             <span className="font-medium">{currency.toUpperCase()}</span>
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-xs text-white/70">
                               {getCurrencyName(currency)}
                             </span>
                           </div>
@@ -378,9 +378,9 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
             {/* Network Selection */}
             {networks && networks.length > 1 && (
               <div className="space-y-1.5">
-                <Label className="text-xs sm:text-sm font-medium text-gray-200">Select Network</Label>
+                <Label className="text-xs sm:text-sm font-medium text-white">Select Network</Label>
                 <Select value={selectedNetwork} onValueChange={handleNetworkChange}>
-                  <SelectTrigger className="w-full h-9 sm:h-10 bg-black text-gray-200 border-green-800/50">
+                  <SelectTrigger className="w-full h-9 sm:h-10 bg-black text-white border-green-800/50">
                     <SelectValue placeholder="Select network" />
                   </SelectTrigger>
                   <SelectContent className="bg-black border-green-800/50">
@@ -388,17 +388,17 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
                       <SelectItem 
                         key={network.id} 
                         value={network.id}
-                        className="text-gray-200"
+                        className="text-white"
                       >
                         <div className="flex items-center justify-between w-full">
                           <div className="flex items-center gap-2">
                             <span className="text-sm">{network.name}</span>
                             {network.isRecommended && (
-                              <span className="text-[10px] sm:text-xs text-green-500">(Recommended)</span>
+                              <span className="text-[10px] sm:text-xs text-green-400">(Recommended)</span>
                             )}
                           </div>
                           {network.fee && (
-                            <span className="text-[10px] sm:text-xs text-gray-400">Fee: ~{network.fee}</span>
+                            <span className="text-[10px] sm:text-xs text-white/70">Fee: ~{network.fee}</span>
                           )}
                         </div>
                       </SelectItem>
@@ -406,7 +406,7 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
                   </SelectContent>
                 </Select>
                 {selectedNetwork === 'trc20' && (
-                  <p className="text-xs text-green-500">
+                  <p className="text-xs text-green-400">
                     TRC20 is recommended for faster and cheaper transactions
                   </p>
                 )}
@@ -431,15 +431,15 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs sm:text-sm font-medium text-gray-200">Deposit Address</Label>
+                  <Label className="text-xs sm:text-sm font-medium text-white">Deposit Address</Label>
                   <div className="flex items-center gap-2">
-                    <code className="flex-1 rounded bg-black px-2 py-1.5 text-xs sm:text-sm break-all text-gray-200">
+                    <code className="flex-1 rounded bg-black px-2 py-1.5 text-xs sm:text-sm break-all text-white">
                       {address}
                     </code>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-green-500 hover:text-green-400"
+                      className="h-8 w-8 text-green-400 hover:text-green-300"
                       onClick={() => handleCopy(address)}
                     >
                       {copied ? (
@@ -452,8 +452,8 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
                 </div>
 
                 <Alert className="bg-yellow-900/20 border-yellow-800/50 py-2">
-                  <Icons.warning className="h-4 w-4 text-yellow-500" />
-                  <AlertDescription className="text-xs sm:text-sm text-yellow-500">
+                  <Icons.warning className="h-4 w-4 text-yellow-400" />
+                  <AlertDescription className="text-xs sm:text-sm text-yellow-100">
                     Only send {selectedCurrency?.toUpperCase()} to this address on the {selectedNetwork.toUpperCase()} network.
                     Sending any other asset may result in permanent loss.
                   </AlertDescription>
@@ -468,15 +468,15 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
               >
                 {loading ? (
                   <>
-                    <Icons.spinner className="h-6 w-6 text-green-500 animate-spin" />
-                    <p className="text-xs sm:text-sm text-green-500">
+                    <Icons.spinner className="h-6 w-6 text-green-400 animate-spin" />
+                    <p className="text-xs sm:text-sm text-white">
                       Generating deposit address...
                     </p>
                   </>
                 ) : (
                   <>
-                    <Icons.info className="h-6 w-6 text-green-500" />
-                    <p className="text-xs sm:text-sm text-green-500">
+                    <Icons.info className="h-6 w-6 text-green-400" />
+                    <p className="text-xs sm:text-sm text-white">
                       {selectedCurrency ? 'Select a network to generate a deposit address' : 'Select a currency to continue'}
                     </p>
                   </>

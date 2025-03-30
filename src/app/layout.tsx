@@ -14,29 +14,20 @@ import { LanguageProvider } from "@/providers/LanguageProvider"
 import { GlobalErrorBoundary } from '@/components/error/GlobalErrorBoundary'
 import { AuthProvider } from '@/contexts/AuthContext'
 
-export const metadata: Metadata = {
+export const metadata = {
   title: {
-    default: "trustBank - CRYPTO | SIMPLIFIED",
-    template: "%s | trustBank",
+    default: 'trustBank',
+    template: '%s | trustBank'
   },
-  description:
-    "A simple and secure cryptocurrency ecosystem for emerging markets.",
-  keywords: [
-    "cryptocurrency",
-    "exchange",
-    "bitcoin",
-    "ethereum",
-    "trading",
-    "crypto",
-    "blockchain",
-  ],
-  authors: [
-    {
-      name: "trustBank",
-      url: "https://trustbank.tech",
-    },
-  ],
-  creator: "trustBank",
+  description: 'Making cryptocurrency trading accessible, secure, and efficient by simplifying crypto adoption in emerging markets.',
+  keywords: ['crypto', 'cryptocurrency', 'bitcoin', 'ethereum', 'trading', 'exchange', 'wallet', 'blockchain', 'trustBank', 'trustbank', 'trust bank tech', 'trust bank crypto', 'trust bank cryptocurrency', 'trust bank exchange'],
+  authors: [{ name: 'trustBank' }],
+  creator: 'trustBank',
+  publisher: 'trustBank',
+  robots: {
+    index: true,
+    follow: true
+  },
   icons: {
     icon: '/favicon.ico',
     shortcut: '/favicon.ico',

@@ -23,6 +23,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Icons } from "@/components/ui/icons";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
 import { Card, CardContent } from "@/components/ui/card";
+import { useAuth } from '@/contexts/AuthContext';
 
 interface WalletType {
   id: string;
@@ -382,6 +383,9 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
   const [tradeDetails, setTradeDetails] = useState<TradeDetails | null>(null);
   const { toast } = useToast();
   const [marketRates, setMarketRates] = useState<MarketRates>({});
+  const { session } = useAuth();
+  const router = useRouter();
+  const [feeConfig, setFeeConfig] = useState<any>(null);
 
   const resetForm = useCallback(() => {
     setAmount('');
@@ -415,7 +419,6 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
   );
 
   const { createSwapQuotation, confirmSwapQuotation } = useQuidaxAPI();
-  const router = useRouter();
   const supabase = createClientComponentClient();
 
   // Fetch user wallets and balances
@@ -654,26 +657,41 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
     fetchQuidaxId();
   }, [supabase]);
 
-  // Add state for fee config
-  const [feeConfig, setFeeConfig] = useState<any>(null);
-
-  // Add useEffect to fetch fee configuration
-  useEffect(() => {
-    const fetchFeeConfig = async () => {
-      try {
-        const response = await fetch('/api/config/fees');
-        if (!response.ok) throw new Error('Failed to fetch fee configuration');
-        const data = await response.json();
-        if (data.status === 'success') {
-          setFeeConfig(data.data);
-        }
-      } catch (error) {
-        console.error('Error fetching fee config:', error);
+  const fetchFeeConfig = async () => {
+    try {
+      // Check authentication before fetching fees
+      if (!session) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to access instant swap features.",
+          variant: "destructive"
+        });
+        onClose();
+        router.push('/auth/login');
+        return;
       }
-    };
 
-    fetchFeeConfig();
-  }, []);
+      const response = await fetch('/api/config/fees');
+      if (!response.ok) {
+        throw new Error('Failed to fetch fee configuration');
+      }
+      const data = await response.json();
+      setFeeConfig(data.data);
+    } catch (error) {
+      console.error('Error fetching fee config:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load fee configuration. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchFeeConfig();
+    }
+  }, [isOpen]);
 
   const calculateFees = (amount: number) => {
     // Get volume tier based on NGN amount

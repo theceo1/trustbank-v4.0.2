@@ -17,22 +17,6 @@ export async function GET() {
     const cookieStore = cookies();
     const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
 
-    // Get user session
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError) {
-      console.error('Session error:', sessionError);
-      return NextResponse.json(
-        { status: 'error', message: 'Authentication error' },
-        { status: 401 }
-      );
-    }
-    if (!session) {
-      return NextResponse.json(
-        { status: 'error', message: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
     // Define fee tiers in USD
     const volumeTiers: VolumeTiers = {
       TIER_1: { min: 0, max: 1000, fee: 4.0 },        // 0-1K USD: 4.0%
@@ -49,38 +33,45 @@ export async function GET() {
       USDT: 1
     };
 
-    // Get user profile to determine tier and trading volume
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('kyc_tier, completed_trades, trading_volume')
-      .eq('user_id', session.user.id)
-      .single();
-
-    // Default values if profile not found
-    const tradingVolume = profile?.trading_volume || 0;
+    // Get user session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    // Default values for unauthenticated users
+    let tradingVolume = 0;
     let currentTier: keyof VolumeTiers = 'TIER_1';
-    let nextTier: VolumeTier | null = null;
+    let nextTier: VolumeTier | null = volumeTiers.TIER_2;
 
-    // Convert trading volume to USD if it's in NGN
-    // Note: We'll assume trading_volume is stored in USD in the database
-    const volumeInUSD = tradingVolume;
+    // If user is authenticated, get their profile data
+    if (session?.user) {
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('kyc_tier, completed_trades, trading_volume')
+        .eq('user_id', session.user.id)
+        .single();
 
-    // Determine current tier based on trading volume
-    for (const [tier, config] of Object.entries(volumeTiers)) {
-      if (volumeInUSD >= config.min && (!config.max || volumeInUSD < config.max)) {
-        currentTier = tier as keyof VolumeTiers;
-        // Find next tier
-        const tiers = Object.entries(volumeTiers);
-        const currentIndex = tiers.findIndex(([t]) => t === tier);
-        if (currentIndex < tiers.length - 1) {
-          const [nextTierKey, nextTierConfig] = tiers[currentIndex + 1];
-          nextTier = {
-            min: nextTierConfig.min,
-            max: nextTierConfig.max,
-            fee: nextTierConfig.fee
-          };
+      if (profile) {
+        tradingVolume = profile.trading_volume || 0;
+        
+        // Determine current tier based on trading volume
+        for (const [tier, config] of Object.entries(volumeTiers)) {
+          if (tradingVolume >= config.min && (!config.max || tradingVolume < config.max)) {
+            currentTier = tier as keyof VolumeTiers;
+            // Find next tier
+            const tiers = Object.entries(volumeTiers);
+            const currentIndex = tiers.findIndex(([t]) => t === tier);
+            if (currentIndex < tiers.length - 1) {
+              const [nextTierKey, nextTierConfig] = tiers[currentIndex + 1];
+              nextTier = {
+                min: nextTierConfig.min,
+                max: nextTierConfig.max,
+                fee: nextTierConfig.fee
+              };
+            } else {
+              nextTier = null;
+            }
+            break;
+          }
         }
-        break;
       }
     }
 
@@ -93,15 +84,15 @@ export async function GET() {
         },
         network_fees: networkFees,
         user_tier: {
-          trading_volume: volumeInUSD,
+          trading_volume: tradingVolume,
           fee_percentage: volumeTiers[currentTier].fee,
           tier_level: currentTier,
           next_tier: nextTier,
-          volume_currency: 'USD' // Explicitly specify the currency
+          volume_currency: 'USD'
         },
-        referral_discount: 0.1, // 0.1% discount for referrals
+        referral_discount: 0.1,
         volume_tiers: volumeTiers,
-        currency: 'USD' // Add currency indicator
+        currency: 'USD'
       }
     });
 

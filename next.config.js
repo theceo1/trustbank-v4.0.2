@@ -38,9 +38,6 @@ const nextConfig = {
   distDir: '.next',
   output: 'standalone',
   
-  // Add source directory configuration
-  dir: 'src',
-  
   typescript: {
     // !! WARN !!
     // This allows production builds to successfully complete even if

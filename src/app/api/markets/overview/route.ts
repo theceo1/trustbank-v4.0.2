@@ -23,10 +23,31 @@ interface QuidaxMarketTickers {
   [key: string]: QuidaxTicker;
 }
 
+const QUIDAX_API_URL = process.env.NEXT_PUBLIC_QUIDAX_API_URL || 'https://www.quidax.com/api/v1';
+
 export async function GET() {
   try {
-    // Fetch market tickers
-    const response = await quidaxService.getMarketTickers();
+    // Fetch market tickers with error handling
+    const tickersResponse = await fetch(`${QUIDAX_API_URL}/markets/tickers`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!tickersResponse.ok) {
+      const errorText = await tickersResponse.text();
+      console.error('Quidax API error:', {
+        status: tickersResponse.status,
+        statusText: tickersResponse.statusText,
+        body: errorText,
+        url: `${QUIDAX_API_URL}/markets/tickers`
+      });
+      throw new Error(`Failed to fetch market tickers: ${tickersResponse.statusText}`);
+    }
+
+    const response = await tickersResponse.json();
     console.log('Raw API Response:', response);
 
     // Ensure we have data and it's in the expected format
