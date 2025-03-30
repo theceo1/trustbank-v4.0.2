@@ -122,9 +122,11 @@ export async function middleware(request: NextRequest) {
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/static') ||
+    pathname.startsWith('/assets') ||
+    pathname.startsWith('/icons') ||
     pathname.includes('.') ||
     pathname === '/' ||
-    PUBLIC_PATHS.includes(pathname)
+    PUBLIC_PATHS.some(path => pathname.startsWith(path))
   ) {
     console.log(`[Middleware] Allowing public path: ${pathname}`);
     return NextResponse.next({

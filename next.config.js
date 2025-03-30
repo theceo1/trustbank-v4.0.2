@@ -37,6 +37,10 @@ const nextConfig = {
   compress: true,
   distDir: '.next',
   output: 'standalone',
+  
+  // Add source directory configuration
+  dir: 'src',
+  
   typescript: {
     // !! WARN !!
     // This allows production builds to successfully complete even if
@@ -48,33 +52,46 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   
+  // Remove experimental config as it's no longer needed
+  experimental: {
+    // serverActions is now enabled by default in Next.js 14
+  },
+
+  // Update headers configuration
   async headers() {
     return [
       {
         source: '/:path*',
-        headers: [
-          {
-            key: 'Content-Security-Policy',
-            value: `
-              default-src 'self';
-              script-src 'self' 'unsafe-eval' 'unsafe-inline';
-              style-src 'self' 'unsafe-inline';
-              img-src 'self' data: blob: https:;
-              font-src 'self';
-              connect-src 'self' 
-                https://*.supabase.co 
-                wss://*.supabase.co 
-                https://*.vercel.app 
-                https://api.quidax.com 
-                https://api.dojah.io 
-                https://ipinfo.io;
-              frame-src 'self';
-              media-src 'self';
-              object-src 'none';
-            `.replace(/\s+/g, ' ').trim()
-          }
-        ]
+        headers: securityHeaders
       }
+    ];
+  },
+  
+  // Update rewrites to handle API routes properly
+  async rewrites() {
+    return {
+      beforeFiles: [
+        {
+          source: '/api/:path*',
+          destination: '/api/:path*',
+        },
+      ],
+    };
+  },
+  
+  // Add redirects for authentication
+  async redirects() {
+    return [
+      {
+        source: '/login',
+        destination: '/auth/login',
+        permanent: true,
+      },
+      {
+        source: '/signup',
+        destination: '/auth/signup',
+        permanent: true,
+      },
     ];
   },
   

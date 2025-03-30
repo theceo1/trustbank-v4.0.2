@@ -22,6 +22,7 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Icons } from "@/components/ui/icons";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
+import { Card, CardContent } from "@/components/ui/card";
 
 interface WalletType {
   id: string;
@@ -127,6 +128,40 @@ const TRADE_LIMITS = {
   }
 };
 
+// Update the currency display format
+const formatCurrencyDisplay = (currency: string): string => {
+  const currencyMap: Record<string, string> = {
+    USDT: 'USDT (Tether)',
+    BTC: 'BTC (Bitcoin)',
+    ETH: 'ETH (Ethereum)',
+    SOL: 'SOL (Solana)',
+    MATIC: 'MATIC (Polygon)',
+    XRP: 'XRP (Ripple)',
+    DOGE: 'DOGE (Dogecoin)',
+    ADA: 'ADA (Cardano)',
+    DOT: 'DOT (Polkadot)',
+    LTC: 'LTC (Litecoin)',
+    LINK: 'LINK (Chainlink)',
+    BCH: 'BCH (Bitcoin Cash)',
+    AAVE: 'AAVE (Aave)',
+    ALGO: 'ALGO (Algorand)',
+    NEAR: 'NEAR (NEAR Protocol)',
+    FIL: 'FIL (Filecoin)',
+    SAND: 'SAND (The Sandbox)',
+    MANA: 'MANA (Decentraland)',
+    APE: 'APE (ApeCoin)',
+    SHIB: 'SHIB (Shiba Inu)',
+    SUI: 'SUI (Sui)',
+    INJ: 'INJ (Injective)',
+    ARB: 'ARB (Arbitrum)',
+    TON: 'TON (Toncoin)',
+    RNDR: 'RNDR (Render Token)',
+    STX: 'STX (Stacks)',
+    GRT: 'GRT (The Graph)'
+  };
+  return currencyMap[currency] || currency;
+};
+
 function TradePreviewModal({ 
   isOpen, 
   onClose, 
@@ -142,82 +177,80 @@ function TradePreviewModal({
 }) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-md bg-white dark:bg-gray-800">
         <DialogHeader>
-          <DialogTitle>Confirm Trade Details</DialogTitle>
+          <DialogTitle>Confirm Swap</DialogTitle>
           <DialogDescription>
-            Quote expires in {countdown} seconds
+            Please review your swap details. This quote expires in {countdown} seconds.
           </DialogDescription>
         </DialogHeader>
-        
+
         <div className="space-y-6">
-          {/* Trade Summary */}
-          <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
-            <div className="text-lg font-semibold text-center mb-2">Trade Summary</div>
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span>You Pay</span>
-                <div className="text-right">
-                  <div className="font-medium">₦{formatNairaAmount(trade.ngn_equivalent)}</div>
-                  <div className="text-sm text-muted-foreground">
-                    {formatCryptoAmount(trade.amount)} {trade.currency}
+          <Card>
+            <CardContent className="space-y-6 pt-6">
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">From</p>
+                    <p className="font-medium">{formatAmount(trade.amount, trade.currency)} {trade.currency}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">To</p>
+                    <p className="font-medium">{trade.quote_amount}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Rate</span>
+                    <span className="font-medium">₦{trade.rate.toLocaleString()}</span>
+                  </div>
+                  {trade.ngn_equivalent > 0 && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">NGN Equivalent</span>
+                      <span className="font-medium">₦{trade.ngn_equivalent.toLocaleString()}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2 pt-4 border-t">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Platform Fee</span>
+                    <span className="font-medium">₦{trade.fees.platform.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Service Fee</span>
+                    <span className="font-medium">₦{trade.fees.service.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center font-medium">
+                    <span>Total Fee</span>
+                    <span>₦{trade.fees.total.toLocaleString()}</span>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t">
+                  <div className="flex justify-between items-center font-medium">
+                    <span>Total Amount</span>
+                    <span>₦{trade.total.toLocaleString()}</span>
                   </div>
                 </div>
               </div>
-              <div className="flex justify-between items-center">
-                <span>You Receive</span>
-                <div className="text-right">
-                  <div className="font-medium">{formatCryptoAmount(trade.quote_amount)} {trade.currency}</div>
-                  <div className="text-sm text-muted-foreground">
-                    ≈ ₦{formatNairaAmount(Number(trade.quote_amount) * trade.rate)}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
-          {/* Exchange Rate */}
-          <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-            <div className="text-sm font-medium mb-2">Exchange Rate</div>
-            <div className="text-lg font-semibold">
-              1 {trade.currency} = ₦{formatNairaAmount(trade.rate)}
-            </div>
-          </div>
-
-          {/* Fees Breakdown */}
-          <div className="space-y-2">
-            <div className="text-sm font-medium">Fees Breakdown</div>
-            <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg space-y-2">
-              <div className="flex justify-between">
-                <span>Service Fee (3%)</span>
-                <span>₦{formatNairaAmount(trade.fees.service)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Network Fee</span>
-                <span>₦{formatNairaAmount(trade.fees.platform)}</span>
-              </div>
-              <div className="border-t pt-2 mt-2 flex justify-between font-medium">
-                <span>Total Fees</span>
-                <span>₦{formatNairaAmount(trade.fees.total)}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 flex flex-col gap-2">
-            <div className="text-center">
-              <p className={`text-sm text-gray-500 ${countdown <= 5 ? 'text-red-500' : 'text-gray-700'}`}>
-                Quote expires in{' '}
-                <span className={`font-medium ${countdown <= 5 ? 'text-red-500' : 'text-gray-700'}`}>
-                  {countdown}s
-                </span>
-              </p>
-            </div>
+          <div className="flex gap-3">
             <Button
-              onClick={onConfirm}
-              disabled={countdown === 0}
-              className="w-full bg-green-600 hover:bg-green-700"
+              variant="outline"
+              className="flex-1"
+              onClick={onClose}
             >
-              {countdown === 0 ? 'Quote Expired' : 'Confirm Trade'}
+              Cancel
+            </Button>
+            <Button
+              className="flex-1 bg-green-600 hover:bg-green-700"
+              onClick={onConfirm}
+            >
+              Confirm Swap
             </Button>
           </div>
         </div>
@@ -286,10 +319,11 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
   const [error, setError] = useState<string | null>(null);
   const [wallets, setWallets] = useState<WalletType[]>([]);
   const [quidaxId, setQuidaxId] = useState('');
-  const [countdown, setCountdown] = useState(30);
+  const [countdown, setCountdown] = useState(14);
   const [isQuoteExpired, setIsQuoteExpired] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
-  const [showTradePreview, setShowTradePreview] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [tradeDetails, setTradeDetails] = useState<TradeDetails | null>(null);
   const { toast } = useToast();
 
   // Compute if form is valid
@@ -564,41 +598,89 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
     fetchQuidaxId();
   }, [supabase]);
 
+  // Add state for fee config
+  const [feeConfig, setFeeConfig] = useState<any>(null);
+
+  // Add useEffect to fetch fee configuration
+  useEffect(() => {
+    const fetchFeeConfig = async () => {
+      try {
+        const response = await fetch('/api/config/fees');
+        if (!response.ok) throw new Error('Failed to fetch fee configuration');
+        const data = await response.json();
+        if (data.status === 'success') {
+          setFeeConfig(data.data);
+        }
+      } catch (error) {
+        console.error('Error fetching fee config:', error);
+      }
+    };
+
+    fetchFeeConfig();
+  }, []);
+
+  const calculateFees = (amount: number) => {
+    if (!feeConfig) return { platform: 0, service: 0, total: 0 };
+    
+    const baseFee = feeConfig.user_tier.fee_percentage / 100;
+    const platformFee = amount * (baseFee / 2); // Split the fee between platform and service
+    const serviceFee = amount * (baseFee / 2);
+    
+    return {
+      platform: platformFee,
+      service: serviceFee,
+      total: platformFee + serviceFee
+    };
+  };
+
   const handleGetQuote = async () => {
-    if (!quidaxId) {
-      setError('Please complete your profile setup first');
-      return;
-    }
-
-    if (!amount) {
-      setError('Please enter an amount');
-      return;
-    }
-
     try {
       setIsLoading(true);
-      setError(null);
-      setQuote(null);
-      setIsQuoteExpired(false);
-      setCountdown(14);
+      
+      // Validate inputs
+      if (!fromCurrency || !toCurrency || !amount) {
+        toast({
+          title: "Error",
+          description: "Please fill in all fields",
+          variant: "destructive",
+        });
+        return;
+      }
 
-      const cryptoAmount = amountCurrency === 'NGN' ? convertAmount(amount, true).toString() : amount;
-      const result = await createSwapQuotation({
+      // Get quote from API
+      const quote = await createSwapQuotation({
         from_currency: fromCurrency.toLowerCase(),
         to_currency: toCurrency.toLowerCase(),
-        from_amount: cryptoAmount,
+        from_amount: amount,
         user_id: quidaxId,
       });
 
-      if (result.status === 'success' && result.data) {
-        setQuote(result.data);
-        setShowTradePreview(true);
-      } else {
-        throw new Error(result.message || 'Failed to get quote');
-      }
-    } catch (err) {
-      console.error('Error getting quote:', err);
-      setError(err instanceof Error ? err.message : 'Failed to get quote');
+      const amountNum = Number(amount);
+      const fees = calculateFees(amountNum);
+
+      // Set trade details
+      setTradeDetails({
+        type: "swap",
+        amount: amount,
+        currency: fromCurrency,
+        rate: Number(quote.quoted_price),
+        fees,
+        total: amountNum + fees.total,
+        quote_amount: quote.to_amount,
+        ngn_equivalent: calculateNGNEquivalent(amount, fromCurrency)
+      });
+
+      // Show preview modal with countdown
+      setShowPreview(true);
+      setCountdown(14);
+
+    } catch (error: any) {
+      console.error('Error getting quote:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to get quote",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -628,7 +710,7 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
     setQuote(null);
     setAmount('');
     setCountdown(14);
-    setShowTradePreview(false);
+    setShowPreview(false);
     onClose();
   };
 
@@ -648,13 +730,10 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
       });
 
       if (result.status === 'success' && result.data) {
-        toast({
-          title: "Success",
-          description: "Swap confirmed successfully!",
-        });
-        onClose();
+        setQuote(result.data);
+        setShowPreview(true);
       } else {
-        throw new Error(result.message || 'Failed to confirm swap');
+        throw new Error(result.message || 'Failed to get quote');
       }
     } catch (err) {
       console.error('Error confirming swap:', err);
@@ -700,175 +779,169 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md bg-orange-50 dark:bg-orange-900/90 border-0">
-        <DialogHeader>
-          <DialogTitle>Instant Swap</DialogTitle>
-          <DialogDescription>
-            Instantly swap between cryptocurrencies at the best rates.
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={isOpen} onOpenChange={handleClose}>
+        <DialogContent className="sm:max-w-md bg-white dark:bg-gray-800">
+          <DialogHeader>
+            <DialogTitle>Instant Swap</DialogTitle>
+            <DialogDescription>
+              Instantly swap between cryptocurrencies at the best rates.
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="space-y-6">
-          {/* From Section */}
-          <div className="space-y-2">
-            <Label>From</Label>
-            <Select
-              value={fromCurrency}
-              onValueChange={setFromCurrency}
-            >
-              <SelectTrigger className="w-full h-12 bg-white dark:bg-gray-800 border shadow-sm">
-                <SelectValue placeholder="Select currency" />
-              </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-gray-800">
-                {wallets.map((wallet) => (
-                  <SelectItem 
-                    key={wallet.currency} 
-                    value={wallet.currency}
-                    className="hover:bg-green-600 hover:text-white transition-colors"
-                  >
-                    <span className="font-medium">{wallet.currency.toUpperCase()}</span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {renderAvailableBalance()}
-          </div>
-
-          {/* Amount Section */}
-          <div className="space-y-2">
-            <Label>Amount</Label>
-            <div className="relative">
-              <Input
-                type="number"
-                step="any"
-                min="0"
-                value={amount}
-                onChange={(e) => handleAmountChange(e.target.value)}
-                className="pr-24 h-12 bg-white dark:bg-gray-800"
-                placeholder={`Enter amount in ${amountCurrency === 'CRYPTO' ? fromCurrency : amountCurrency}`}
-              />
+          <div className="space-y-6">
+            {/* From Section */}
+            <div className="space-y-2">
+              <Label>From</Label>
               <Select
-                value={amountCurrency}
-                onValueChange={handleAmountCurrencyChange}
+                value={fromCurrency}
+                onValueChange={setFromCurrency}
               >
-                <SelectTrigger className="absolute right-0 top-0 h-full w-24 border-l bg-white dark:bg-gray-800">
-                  <SelectValue placeholder="Currency" />
+                <SelectTrigger className="w-full h-12 bg-white dark:bg-gray-800 border shadow-sm">
+                  <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
                 <SelectContent className="bg-white dark:bg-gray-800">
-                  {fromCurrency && (
+                  {wallets.map((wallet) => (
                     <SelectItem 
-                      value="CRYPTO"
+                      key={wallet.currency} 
+                      value={wallet.currency}
                       className="hover:bg-green-600 hover:text-white transition-colors"
                     >
-                      {fromCurrency}
+                      <div className="flex items-center justify-between w-full">
+                        <span className="font-medium">{wallet.currency}</span>
+                        <span className="text-muted-foreground">
+                          {getCurrencyName(wallet.currency)}
+                        </span>
+                      </div>
                     </SelectItem>
-                  )}
-                  <SelectItem 
-                    value="NGN"
-                    className="hover:bg-green-600 hover:text-white transition-colors"
-                  >
-                    NGN
-                  </SelectItem>
-                  <SelectItem 
-                    value="USD"
-                    className="hover:bg-green-600 hover:text-white transition-colors"
-                  >
-                    USD
-                  </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {renderAvailableBalance()}
+            </div>
+
+            {/* Amount Section */}
+            <div className="space-y-2">
+              <Label>Amount</Label>
+              <div className="relative">
+                <Input
+                  type="number"
+                  step="any"
+                  min="0"
+                  value={amount}
+                  onChange={(e) => handleAmountChange(e.target.value)}
+                  className="pr-24 h-12 bg-white dark:bg-gray-800"
+                  placeholder={`Enter amount in ${amountCurrency === 'CRYPTO' ? fromCurrency : amountCurrency}`}
+                />
+                <Select
+                  value={amountCurrency}
+                  onValueChange={handleAmountCurrencyChange}
+                >
+                  <SelectTrigger className="absolute right-0 top-0 h-full w-24 border-l bg-white dark:bg-gray-800">
+                    <SelectValue placeholder="Currency" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white dark:bg-gray-800">
+                    {fromCurrency && (
+                      <SelectItem 
+                        value="CRYPTO"
+                        className="hover:bg-green-600 hover:text-white transition-colors"
+                      >
+                        {fromCurrency}
+                      </SelectItem>
+                    )}
+                    <SelectItem 
+                      value="NGN"
+                      className="hover:bg-green-600 hover:text-white transition-colors"
+                    >
+                      NGN
+                    </SelectItem>
+                    <SelectItem 
+                      value="USD"
+                      className="hover:bg-green-600 hover:text-white transition-colors"
+                    >
+                      USD
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* To Section */}
+            <div className="space-y-2">
+              <Label>To</Label>
+              <Select
+                value={toCurrency}
+                onValueChange={setToCurrency}
+              >
+                <SelectTrigger className="w-full h-12 bg-white dark:bg-gray-800 border shadow-sm">
+                  <SelectValue placeholder="Select currency" />
+                </SelectTrigger>
+                <SelectContent className="bg-white dark:bg-gray-800 max-h-[200px] overflow-hidden">
+                  <div className="sticky top-0 z-10 bg-white dark:bg-gray-800 p-2 border-b">
+                    <Input
+                      type="text"
+                      placeholder="Search currencies..."
+                      value={toSearchQuery}
+                      onChange={(e) => setToSearchQuery(e.target.value)}
+                      className="h-9"
+                    />
+                  </div>
+                  <div className="overflow-y-auto max-h-[160px]">
+                    {SUPPORTED_CURRENCIES
+                      .filter(currency => 
+                        currency.value.toLowerCase() !== fromCurrency?.toLowerCase() &&
+                        (currency.value.toLowerCase().includes(toSearchQuery.toLowerCase()) ||
+                         currency.label.toLowerCase().includes(toSearchQuery.toLowerCase()))
+                      )
+                      .map((currency) => (
+                        <SelectItem 
+                          key={currency.value} 
+                          value={currency.value}
+                          className="hover:bg-green-600 hover:text-white transition-colors"
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <span className="font-medium">{currency.value}</span>
+                            <span className="text-muted-foreground">
+                              {currency.label}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                  </div>
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          {/* To Section */}
-          <div className="space-y-2">
-            <Label>To</Label>
-            <Select
-              value={toCurrency}
-              onValueChange={setToCurrency}
+          <DialogFooter>
+            <Button
+              type="submit"
+              onClick={handleGetQuote}
+              disabled={!isValid || isLoading}
+              className="w-full bg-green-600 hover:bg-green-700"
             >
-              <SelectTrigger className="w-full h-12 bg-white dark:bg-gray-800 border shadow-sm">
-                <SelectValue placeholder="Select currency" />
-              </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-gray-800 max-h-[200px] overflow-hidden">
-                <div className="sticky top-0 z-10 bg-white dark:bg-gray-800 p-2 border-b">
-                  <Input
-                    type="text"
-                    placeholder="Search currencies..."
-                    value={toSearchQuery}
-                    onChange={(e) => setToSearchQuery(e.target.value)}
-                    className="h-9"
-                  />
-                </div>
-                <div className="overflow-y-auto max-h-[160px]">
-                  {SUPPORTED_CURRENCIES
-                    .filter(currency => 
-                      currency.value.toLowerCase() !== fromCurrency?.toLowerCase() &&
-                      (currency.value.toLowerCase().includes(toSearchQuery.toLowerCase()) ||
-                       currency.label.toLowerCase().includes(toSearchQuery.toLowerCase()))
-                    )
-                    .map((currency) => (
-                      <SelectItem 
-                        key={currency.value} 
-                        value={currency.value}
-                        className="hover:bg-green-600 hover:text-white transition-colors"
-                      >
-                        <div className="flex items-center justify-between w-full">
-                          <span className="font-medium">{currency.value}</span>
-                          <span className="text-muted-foreground">
-                            {currency.label}
-                          </span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                </div>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+              {isLoading ? (
+                <>
+                  <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
+                  Getting Quote...
+                </>
+              ) : (
+                'Get Quote'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-        <DialogFooter>
-          <Button
-            type="submit"
-            onClick={handleGetQuote}
-            disabled={!isValid || isLoading}
-            className="w-full bg-green-600 hover:bg-green-700"
-          >
-            {isLoading ? (
-              <>
-                <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
-                Getting Quote...
-              </>
-            ) : (
-              'Get Quote'
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-
-      {quote && (
+      {tradeDetails && (
         <TradePreviewModal
-          isOpen={showTradePreview}
-          onClose={() => setShowTradePreview(false)}
+          isOpen={showPreview}
+          onClose={() => setShowPreview(false)}
           onConfirm={handleConfirmSwap}
-          trade={{
-            type: 'swap',
-            amount: amount,
-            currency: fromCurrency,
-            rate: quote.rate,
-            fees: {
-              total: quote.fee + quote.network_fee,
-              platform: quote.fee,
-              service: quote.network_fee
-            },
-            total: quote.total,
-            quote_amount: quote.quote_amount,
-            ngn_equivalent: calculateNGNEquivalent(amount, fromCurrency)
-          }}
+          trade={tradeDetails}
           countdown={countdown}
         />
       )}
-    </Dialog>
+    </>
   );
 } 
