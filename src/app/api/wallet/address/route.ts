@@ -191,14 +191,20 @@ export async function GET(request: Request) {
     const quidaxService = new QuidaxServerService(process.env.QUIDAX_SECRET_KEY);
 
     try {
-      console.log('[WalletAddress] Fetching address for:', { currency, network, userId: profile.quidax_id });
+      console.log('[WalletAddress] Fetching address for:', { 
+        currency, 
+        network, 
+        userId: profile.quidax_id,
+        apiUrl: process.env.NEXT_PUBLIC_QUIDAX_API_URL,
+        hasSecretKey: !!process.env.QUIDAX_SECRET_KEY
+      });
       
       // First try to get existing address
       const existingAddressResponse = await quidaxService.request(
         `/users/${profile.quidax_id}/wallets/${currency}/address`
       );
 
-      console.log('[WalletAddress] Existing address response:', existingAddressResponse);
+      console.log('[WalletAddress] Raw existing address response:', JSON.stringify(existingAddressResponse, null, 2));
 
       let depositAddress = null;
       let destinationTag = null;
@@ -206,9 +212,14 @@ export async function GET(request: Request) {
       if (existingAddressResponse?.data?.address) {
         depositAddress = existingAddressResponse.data.address;
         destinationTag = existingAddressResponse.data.tag;
-        console.log('[WalletAddress] Found existing address:', depositAddress);
+        console.log('[WalletAddress] Found existing address:', { depositAddress, destinationTag });
       } else {
-        console.log('[WalletAddress] No existing address, creating new one');
+        console.log('[WalletAddress] No existing address, creating new one with params:', {
+          userId: profile.quidax_id,
+          currency,
+          network: targetNetwork
+        });
+        
         // Create new address with network as query parameter
         const newAddressResponse = await quidaxService.request(
           `/users/${profile.quidax_id}/wallets/${currency}/addresses?network=${targetNetwork}`,
@@ -217,12 +228,14 @@ export async function GET(request: Request) {
           }
         );
 
-        console.log('[WalletAddress] New address response:', newAddressResponse);
+        console.log('[WalletAddress] Raw new address response:', JSON.stringify(newAddressResponse, null, 2));
 
         if (newAddressResponse?.data?.address) {
           depositAddress = newAddressResponse.data.address;
           destinationTag = newAddressResponse.data.tag;
-          console.log('[WalletAddress] Created new address:', depositAddress);
+          console.log('[WalletAddress] Created new address:', { depositAddress, destinationTag });
+        } else {
+          console.error('[WalletAddress] No address in new address response:', newAddressResponse);
         }
       }
 

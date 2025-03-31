@@ -28,6 +28,12 @@ export class QuidaxService {
 
   async request(endpoint: string, options: RequestInit = {}) {
     try {
+      console.log('[QuidaxService] Making request:', {
+        url: `${this.baseUrl}${endpoint}`,
+        method: options.method || 'GET',
+        hasSecretKey: !!this.secretKey
+      });
+
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         ...options,
         headers: {
@@ -37,22 +43,33 @@ export class QuidaxService {
         },
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        let errorData;
-        try {
-          errorData = JSON.parse(errorText);
-        } catch {
-          errorData = { message: errorText };
-        }
-        
-        throw new Error(errorData.message || 'Request failed');
+      const responseText = await response.text();
+      console.log('[QuidaxService] Raw response:', responseText);
+
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.error('[QuidaxService] Failed to parse response as JSON:', e);
+        throw new Error('Invalid response format from API');
       }
 
-      const data = await response.json();
+      if (!response.ok) {
+        console.error('[QuidaxService] Request failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          data
+        });
+        
+        throw new Error(data.message || data.error || 'Request failed');
+      }
+
       return data;
     } catch (error: any) {
-      console.error('[API Request Error]:', error);
+      console.error('[QuidaxService] Request error:', {
+        endpoint,
+        error: error.message || error
+      });
       throw new Error(error.message || 'Failed to process request');
     }
   }

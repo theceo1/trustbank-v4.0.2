@@ -84,94 +84,83 @@ export async function POST(request: Request) {
       );
     }
 
-    // Update user metadata with Quidax ID
-    if (signUpData.user) {
-      const { error: updateError } = await supabase.auth.updateUser({
-        data: {
-          email: email,
-          email_verified: true,
+    // Check for existing profile before creating a new one
+    const { data: existingProfile } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .eq('user_id', signUpData.user!.id)
+      .single();
+
+    if (!existingProfile) {
+      // Update the profile created by the trigger with Quidax ID
+      const { error: profileError } = await supabase
+        .from('user_profiles')
+        .update({
+          quidax_id: quidaxId,
           first_name: firstName,
           last_name: lastName || '',
-          full_name: `${firstName} ${lastName || ''}`.trim(),
-          phone_verified: false,
-          quidax_id: quidaxId,
-          sub: signUpData.user.id
-        }
-      });
+          email: email,
+          verification_history: {
+            email: true,
+            phone: false,
+            basic_info: false
+          }
+        })
+        .eq('user_id', signUpData.user!.id);
 
-      if (updateError) {
-        console.error('Error updating user metadata:', updateError);
+      if (profileError) {
+        console.error('Error updating profile:', profileError);
+        return NextResponse.json(
+          { error: 'Failed to update user profile' },
+          { status: 500 }
+        );
       }
     }
 
     // Generate a unique referral code
     const newReferralCode = nanoid(8);
 
-    // Create user profile
-    if (signUpData.user) {
-      const { error: profileError } = await supabase
-        .from('user_profiles')
-        .insert({
-          user_id: signUpData.user.id,
-          first_name: firstName,
-          last_name: lastName || '',
-          full_name: `${firstName} ${lastName || ''}`.trim(),
-          email: email,
-          referral_code: newReferralCode,
-          referred_by: referralCode || null,
-          quidax_id: quidaxId,
-          quidax_sn: quidaxId,
-          role: 'user',
-          kyc_level: 'basic',
-          kyc_verified: false,
-          two_factor_enabled: false,
-          total_referrals: 0,
-          active_referrals: 0,
-          referral_earnings: 0,
-          pending_earnings: 0,
-          completed_trades: 0,
-          completion_rate: 100,
-          trading_volume_usd: 0,
-          monthly_volume_usd: 0,
-          daily_volume_usd: 0,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          verification_history: {
-            email: true,
-            phone: false,
-            basic_info: false
-          }
-        });
-
-      if (profileError) {
-        console.error('Error creating user profile:', profileError);
-        return NextResponse.json(
-          { error: 'Failed to create user profile', details: profileError.message },
-          { status: 500 }
-        );
-      }
-
-      // Update referrer's stats if applicable
-      if (referralCode) {
-        // First get current referral count
-        const { data: referrer } = await supabase
-          .from('user_profiles')
-          .select('referral_count')
-          .eq('referral_code', referralCode)
-          .single();
-
-        const { error: referrerUpdateError } = await supabase
-          .from('user_profiles')
-          .update({
-            referral_count: (referrer?.referral_count || 0) + 1,
-            updated_at: new Date().toISOString()
-          })
-          .eq('referral_code', referralCode);
-
-        if (referrerUpdateError) {
-          console.error('Error updating referrer stats:', referrerUpdateError);
+    // Update the user profile with additional fields
+    const { error: profileError } = await supabase
+      .from('user_profiles')
+      .update({
+        first_name: firstName,
+        last_name: lastName || '',
+        full_name: `${firstName} ${lastName || ''}`.trim(),
+        email: email,
+        referral_code: newReferralCode,
+        referred_by: referralCode || null,
+        quidax_id: quidaxId,
+        quidax_sn: quidaxId,
+        role: 'user',
+        kyc_level: 'basic',
+        kyc_verified: false,
+        two_factor_enabled: false,
+        total_referrals: 0,
+        active_referrals: 0,
+        referral_earnings: 0,
+        pending_earnings: 0,
+        completed_trades: 0,
+        completion_rate: 100,
+        trading_volume_usd: 0,
+        monthly_volume_usd: 0,
+        daily_volume_usd: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        verification_history: {
+          email: true,
+          phone: false,
+          basic_info: false
         }
-      }
+      })
+      .eq('user_id', signUpData.user!.id);
+
+    if (profileError) {
+      console.error('Error updating user profile:', profileError);
+      return NextResponse.json(
+        { error: 'Failed to update user profile', details: profileError.message },
+        { status: 500 }
+      );
     }
 
     // Sign in the user immediately

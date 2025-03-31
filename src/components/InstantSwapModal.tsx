@@ -675,14 +675,20 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        const { data: profile, error } = await supabase
+        const { data: profiles, error } = await supabase
           .from('user_profiles')
           .select('quidax_id')
           .eq('user_id', user.id)
-          .single();
+          .order('created_at', { ascending: false })
+          .limit(1);
 
         if (error) throw error;
-        setQuidaxId(profile?.quidax_id || '');
+        if (!profiles || profiles.length === 0) {
+          setError('No profile found');
+          return;
+        }
+        
+        setQuidaxId(profiles[0]?.quidax_id || '');
       } catch (err) {
         console.error('Error fetching Quidax ID:', err);
         setError('Failed to fetch user profile');

@@ -59,39 +59,45 @@ export async function POST(request: Request) {
 export async function GET(request: Request) {
   try {
     const supabase = createRouteHandlerClient({ cookies });
-    
-    // Check if user is authenticated
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session) {
       return NextResponse.json(
-        { status: 'error', message: 'Unauthorized' },
+        { error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
-    // Get user profile
-    const { data: profile, error: profileError } = await supabase
+    // Get all profiles for the user, ordered by creation date
+    const { data: profiles, error } = await supabase
       .from('user_profiles')
       .select('*')
-      .eq('user_id', user.id)
-      .single();
+      .eq('user_id', session.user.id)
+      .order('created_at', { ascending: false });
 
-    if (profileError) {
-      console.error('Error fetching profile:', profileError);
+    if (error) {
+      console.error('Error fetching profile:', error);
       return NextResponse.json(
-        { status: 'error', message: 'Failed to fetch user profile' },
+        { error: 'Failed to fetch profile' },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ 
-      status: 'success', 
-      data: profile 
-    });
+    // If no profiles found
+    if (!profiles || profiles.length === 0) {
+      return NextResponse.json(
+        { error: 'Profile not found' },
+        { status: 404 }
+      );
+    }
+
+    // Return the most recent profile
+    return NextResponse.json(profiles[0]);
+
   } catch (error) {
-    console.error('Error fetching profile:', error);
+    console.error('Unhandled error:', error);
     return NextResponse.json(
-      { status: 'error', message: 'Failed to fetch profile' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
