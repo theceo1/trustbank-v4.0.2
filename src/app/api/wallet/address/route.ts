@@ -6,36 +6,38 @@ import { QuidaxServerService } from '@/lib/quidax';
 // Define supported networks for each currency
 const CURRENCY_NETWORKS: Record<string, string[]> = {
   btc: ['bitcoin'],
-  eth: ['ethereum', 'erc20'],
-  usdt: ['ethereum', 'erc20', 'trc20', 'bep20'],
-  usdc: ['ethereum', 'erc20', 'trc20', 'bep20'],
-  trx: ['tron', 'trc20'],
-  bnb: ['bsc', 'bep20'],
+  eth: ['erc20', 'ethereum'],
+  usdt: ['erc20', 'trc20', 'bep20'],
+  usdc: ['erc20', 'trc20', 'bep20'],
+  bnb: ['bep20'],
+  trx: ['trc20'],
   xrp: ['ripple'],
-  sol: ['solana'],
+  sol: ['sol'],
   matic: ['polygon'],
-  ada: ['cardano'],
-  dot: ['polkadot'],
+  ada: ['ada'],
+  dot: ['dot'],
   doge: ['dogecoin'],
-  shib: ['ethereum', 'erc20'],
-  link: ['ethereum', 'erc20'],
-  bch: ['bitcoin-cash'],
-  ltc: ['litecoin'],
-  aave: ['ethereum', 'erc20'],
-  algo: ['algorand'],
+  shib: ['erc20'],
+  link: ['erc20'],
+  bch: ['bch'],
+  ltc: ['ltc'],
+  aave: ['erc20'],
+  algo: ['algo'],
   near: ['near'],
-  fil: ['filecoin'],
-  sand: ['ethereum', 'erc20'],
-  mana: ['ethereum', 'erc20'],
-  ape: ['ethereum', 'erc20'],
+  fil: ['fil'],
+  sand: ['erc20'],
+  mana: ['erc20'],
+  ape: ['erc20'],
   sui: ['sui'],
-  inj: ['injective'],
-  arb: ['arbitrum'],
+  inj: ['inj'],
+  arb: ['arb'],
   ton: ['ton'],
-  rndr: ['ethereum', 'erc20'],
-  stx: ['stacks'],
-  grt: ['ethereum', 'erc20'],
-  trump: ['ethereum', 'erc20']
+  rndr: ['erc20'],
+  stx: ['stx'],
+  grt: ['erc20'],
+  trump: ['erc20'],
+  pol: ['polygon'],
+  qdx: ['erc20']
 };
 
 // List of fiat currencies
@@ -51,7 +53,9 @@ const CURRENCY_NAMES: Record<string, string> = {
 
 function getDefaultNetwork(currency: string): string {
   const networks = CURRENCY_NETWORKS[currency.toLowerCase()];
-  if (!networks) return '';
+  if (!networks || networks.length === 0) {
+    throw new Error(`No networks available for currency: ${currency}`);
+  }
   return networks[0];
 }
 
@@ -75,32 +79,32 @@ export async function GET(request: Request) {
       );
     }
 
-    // Validate network parameter
-    if (!network) {
-      console.log('[WalletAddress] Missing network parameter');
+    // Check if currency is supported
+    if (!CURRENCY_NETWORKS[currency]) {
       return NextResponse.json(
         { 
-          status: 'error',
-          message: 'Network is required',
-          error: 'Network parameter is missing'
+          status: 'error', 
+          message: `Currency ${currency} is not supported`,
+          error: 'Unsupported currency'
         },
         { status: 400 }
       );
     }
 
-    // Check if network is supported for the currency
-    const supportedNetworks = CURRENCY_NETWORKS[currency];
-    if (!supportedNetworks?.includes(network)) {
-      console.log('[WalletAddress] Unsupported network:', { currency, network, supportedNetworks });
+    // If network is not provided, use default network
+    const targetNetwork = network || getDefaultNetwork(currency);
+
+    // Validate network
+    if (!CURRENCY_NETWORKS[currency].includes(targetNetwork)) {
       return NextResponse.json(
-        { 
+        {
           status: 'error',
-          message: `Network ${network} is not supported for ${currency}`,
+          message: `Network ${targetNetwork} is not supported for ${currency}`,
           error: 'Unsupported network',
           details: {
             currency,
-            network,
-            supported_networks: supportedNetworks || []
+            network: targetNetwork,
+            supported_networks: CURRENCY_NETWORKS[currency]
           }
         },
         { status: 400 }
@@ -207,7 +211,7 @@ export async function GET(request: Request) {
         console.log('[WalletAddress] No existing address, creating new one');
         // Create new address with network as query parameter
         const newAddressResponse = await quidaxService.request(
-          `/users/${profile.quidax_id}/wallets/${currency}/addresses?network=${network}`,
+          `/users/${profile.quidax_id}/wallets/${currency}/addresses?network=${targetNetwork}`,
           {
             method: 'POST'
           }
@@ -239,7 +243,7 @@ export async function GET(request: Request) {
         message: 'Address generated successfully',
         data: {
           currency,
-          network,
+          network: targetNetwork,
           deposit_address: depositAddress,
           destination_tag: destinationTag,
           is_crypto: true
