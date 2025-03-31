@@ -35,6 +35,9 @@ const AUTH_REQUIRED_PATHS = [
   
   // Trade routes
   '/trade',               // Main trade page
+  '/trade/spot',         // Spot trading
+  '/trade/spot/orders',  // Spot orders
+  '/trade/spot/history', // Spot history
   '/trade/p2p',          // P2P trading
   '/trade/p2p/offers',   // P2P offers
   '/trade/p2p/orders',   // P2P orders
@@ -50,15 +53,14 @@ const AUTH_REQUIRED_PATHS = [
   // Protected API routes
   '/api/wallet',         // All wallet endpoints
   '/api/trades',         // All trade endpoints
+  '/api/trades/spot',    // Spot trading endpoints
+  '/api/trades/p2p',     // P2P trading endpoints
+  '/api/trades/swap',    // Swap endpoints
+  '/api/trades/history', // Trading history
   '/api/user',          // User data endpoints
   '/api/admin',         // Admin endpoints
   '/api/config',        // Protected config endpoints
   '/api/swap',          // Swap endpoints
-  
-  // Specific trading API endpoints
-  '/api/trades/p2p',    // P2P trading endpoints
-  '/api/trades/swap',   // Swap endpoints
-  '/api/trades/history' // Trading history
 ];
 
 // Public paths that don't require authentication
@@ -129,27 +131,52 @@ export async function middleware(req: NextRequest) {
     return res;
   }
 
-  // Refresh session if expired - required for Server Components
-  const { data: { session } } = await supabase.auth.getSession()
+  try {
+    // Refresh session if expired
+    const { data: { session }, error } = await supabase.auth.getSession();
+    
+    if (error) {
+      console.error('Session error:', error);
+      // Clear any invalid session data
+      await supabase.auth.signOut();
+      const redirectUrl = req.nextUrl.clone();
+      redirectUrl.pathname = '/auth/login';
+      redirectUrl.searchParams.set('redirect', req.nextUrl.pathname);
+      return NextResponse.redirect(redirectUrl);
+    }
 
-  // Check if route requires authentication
-  const isAuthRequired = AUTH_REQUIRED_PATHS.some(route => req.nextUrl.pathname.startsWith(route))
-  const isAuthRoute = req.nextUrl.pathname.startsWith('/auth')
+    // Check if route requires authentication
+    const isAuthRequired = AUTH_REQUIRED_PATHS.some(route => req.nextUrl.pathname.startsWith(route));
+    const isAuthRoute = req.nextUrl.pathname.startsWith('/auth');
 
-  if (isAuthRequired && !session) {
-    // Redirect to login if accessing protected route without session
-    const redirectUrl = req.nextUrl.clone()
-    redirectUrl.pathname = '/auth/login'
-    redirectUrl.searchParams.set('redirect', req.nextUrl.pathname)
-    return NextResponse.redirect(redirectUrl)
+    if (isAuthRequired && !session) {
+      // Redirect to login if accessing protected route without session
+      const redirectUrl = req.nextUrl.clone();
+      redirectUrl.pathname = '/auth/login';
+      redirectUrl.searchParams.set('redirect', req.nextUrl.pathname);
+      return NextResponse.redirect(redirectUrl);
+    }
+
+    if (isAuthRoute && session) {
+      // Redirect to dashboard if accessing auth routes with active session
+      return NextResponse.redirect(new URL('/dashboard', req.url));
+    }
+
+    // Set session cookie for client-side access
+    if (session) {
+      res.cookies.set('sb-access-token', session.access_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 3600 // 1 hour
+      });
+    }
+
+    return res;
+  } catch (error) {
+    console.error('Middleware error:', error);
+    return res;
   }
-
-  if (isAuthRoute && session) {
-    // Redirect to dashboard if accessing auth routes with active session
-    return NextResponse.redirect(new URL('/dashboard', req.url))
-  }
-
-  return res
 }
 
 // Configure which routes to run middleware on

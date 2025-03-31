@@ -74,44 +74,32 @@ export function SignUpForm() {
 
     try {
       setIsLoading(true);
-
-      // Validate referral code if provided
-      if (data.referralCode) {
-        const { data: referralCheck } = await supabase
-          .from('user_profiles')
-          .select('referral_code')
-          .eq('referral_code', data.referralCode)
-          .single();
-
-        if (!referralCheck) {
-          toast({
-            title: "Invalid Referral Code",
-            description: "The referral code you entered is not valid.",
-            variant: "destructive",
-          });
-          setIsLoading(false);
-          return;
-        }
-      }
-
-      const result = await createUserAccount(data);
-
-      if (!result.success) {
-        throw new Error(result.error);
-      }
-
-      toast({
-        title: 'Welcome to trustBank!',
-        description: 'Your account has been created successfully.',
+      
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
       });
 
-      router.push('/dashboard');
-    } catch (error: any) {
-      console.error('Registration error:', error);
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to sign up');
+      }
+
       toast({
-        title: 'Error',
-        description: error.message || 'Failed to create account',
-        variant: 'destructive',
+        title: "Success",
+        description: "Your account has been created successfully.",
+      });
+
+      // Redirect to dashboard after successful signup
+      router.push('/dashboard');
+    } catch (error) {
+      console.error('Signup error:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Something went wrong",
+        variant: "destructive",
       });
     } finally {
       setIsLoading(false);

@@ -45,17 +45,35 @@ export async function GET(request: Request) {
       .from('user_profiles')
       .select('quidax_id')
       .eq('user_id', session.user.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
       .single();
 
     if (profileError || !profileData) {
-      console.error('Error fetching profile:', profileError);
-      return NextResponse.json({ error: 'Failed to fetch user profile' }, { status: 500 });
+      console.error('Error fetching profile:', {
+        error: profileError,
+        data: profileData,
+        userId: session.user.id
+      });
+      return NextResponse.json({ 
+        error: 'Failed to fetch user profile',
+        details: profileError
+      }, { status: 500 });
     }
 
     const profile = profileData as UserProfile;
-    if (!profile.quidax_id) {
+    if (!profile?.quidax_id) {
+      console.error('No Quidax ID found in profile:', {
+        profile,
+        userId: session.user.id
+      });
       return NextResponse.json({ error: 'User has no Quidax ID' }, { status: 400 });
     }
+
+    console.log('Found user profile:', {
+      userId: session.user.id,
+      quidaxId: profile.quidax_id
+    });
 
     // Initialize Quidax service
     const quidaxSecretKey = process.env.QUIDAX_SECRET_KEY;

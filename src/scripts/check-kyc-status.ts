@@ -1,6 +1,9 @@
-const { createClient } = require('@supabase/supabase-js');
-const path = require('path');
-require('dotenv').config({ path: path.resolve(process.cwd(), '.env.local') });
+import { createClient } from '@supabase/supabase-js';
+import path from 'path';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -10,7 +13,7 @@ if (!supabaseUrl || !supabaseServiceKey) {
   process.exit(1);
 }
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false
@@ -22,7 +25,7 @@ async function updateBasicVerification(quidaxId: string) {
     console.log('Searching for user profile with Quidax ID:', quidaxId);
     
     // First try to find the user profile by Quidax ID
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from('user_profiles')
       .select('*')
       .eq('quidax_id', quidaxId)
@@ -46,7 +49,7 @@ async function updateBasicVerification(quidaxId: string) {
     };
 
     // Update the user's profile with verification history and set tier to TIER_1
-    const { data: updatedProfile, error: updateError } = await supabase
+    const { data: updatedProfile, error: updateError } = await supabaseAdmin
       .from('user_profiles')
       .update({
         verification_history: verificationHistory,
@@ -67,7 +70,7 @@ async function updateBasicVerification(quidaxId: string) {
     // Create verification request records
     const verificationTypes = ['email', 'phone', 'basic_info'];
     for (const type of verificationTypes) {
-      const { error: requestError } = await supabase
+      const { error: requestError } = await supabaseAdmin
         .from('verification_requests')
         .insert({
           user_id: profile.user_id,

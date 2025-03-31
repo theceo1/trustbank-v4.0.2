@@ -44,6 +44,15 @@ interface ClientDashboardProps {
   transactions: any[];
 }
 
+interface WalletData {
+  totalValue: number;
+  wallets: Array<{
+    currency: string;
+    balance: string;
+    estimated_value: number;
+  }>;
+}
+
 export default function ClientDashboard({ 
   user,
   kycStatus,
@@ -51,7 +60,7 @@ export default function ClientDashboard({
   volumeTrades,
   transactions 
 }: ClientDashboardProps) {
-  const [walletData, setWalletData] = useState<any>(null);
+  const [walletData, setWalletData] = useState<WalletData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isBalanceHidden, setIsBalanceHidden] = useState(false);
@@ -62,28 +71,14 @@ export default function ClientDashboard({
   useEffect(() => {
     const fetchWalletData = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (!session) {
-          throw new Error('No active session');
-        }
-
-        const response = await fetch('/api/wallet', {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-        });
-
+        setIsLoading(true);
+        const response = await fetch('/api/wallet');
         if (!response.ok) {
-          if (response.status === 401) {
-            // Handle unauthorized error
-            throw new Error('Please sign in to view your wallet');
-          }
           throw new Error('Failed to fetch wallet data');
         }
-
         const data = await response.json();
         setWalletData(data);
+        setError(null);
       } catch (error) {
         console.error('Error fetching wallet data:', error);
         setError(error instanceof Error ? error.message : 'Failed to fetch wallet data');
@@ -93,7 +88,7 @@ export default function ClientDashboard({
     };
 
     fetchWalletData();
-  }, [supabase]);
+  }, []);
 
   const toggleBalanceVisibility = () => {
     setIsBalanceHidden(!isBalanceHidden);
@@ -144,7 +139,17 @@ export default function ClientDashboard({
             <div>
               <p className="text-sm font-medium text-muted-foreground">Total Balance</p>
               <h2 className="text-2xl font-bold mt-2">
-                {isBalanceHidden ? '•••••••' : formatAmount(walletData.totalValue, 'NGN')}
+                {isLoading ? (
+                  <span className="animate-pulse">Loading...</span>
+                ) : error ? (
+                  <span className="text-red-500">Error loading balance</span>
+                ) : isBalanceHidden ? (
+                  '•••••••'
+                ) : walletData?.totalValue ? (
+                  formatAmount(walletData.totalValue, 'NGN')
+                ) : (
+                  '0.00 NGN'
+                )}
               </h2>
             </div>
             <Button

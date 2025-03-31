@@ -328,8 +328,8 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
             </DialogTitle>
             <DialogDescription className="text-sm text-white/70">
               Select a network to generate your deposit address
-            </DialogDescription>
-          </DialogHeader>
+          </DialogDescription>
+        </DialogHeader>
 
           <div className="space-y-3 mt-3">
             {/* Currency Selection */}
@@ -367,29 +367,29 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
                             <span className="text-xs text-white/70">
                               {getCurrencyName(currency)}
                             </span>
-                          </div>
+                    </div>
                         </SelectItem>
                       ))}
                   </div>
                 </SelectContent>
               </Select>
-            </div>
+              </div>
 
             {/* Network Selection */}
-            {networks && networks.length > 1 && (
+              {networks && networks.length > 1 && (
               <div className="space-y-1.5">
                 <Label className="text-xs sm:text-sm font-medium text-white">Select Network</Label>
                 <Select value={selectedNetwork} onValueChange={handleNetworkChange}>
                   <SelectTrigger className="w-full h-9 sm:h-10 bg-black text-white border-green-800/50">
-                    <SelectValue placeholder="Select network" />
-                  </SelectTrigger>
+                      <SelectValue placeholder="Select network" />
+                    </SelectTrigger>
                   <SelectContent className="bg-black border-green-800/50">
                     {networks.map((network) => (
-                      <SelectItem 
-                        key={network.id} 
-                        value={network.id}
+                        <SelectItem 
+                          key={network.id} 
+                          value={network.id}
                         className="text-white"
-                      >
+                        >
                         <div className="flex items-center justify-between w-full">
                           <div className="flex items-center gap-2">
                             <span className="text-sm">{network.name}</span>
@@ -401,17 +401,17 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
                             <span className="text-[10px] sm:text-xs text-white/70">Fee: ~{network.fee}</span>
                           )}
                         </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {selectedNetwork === 'trc20' && (
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedNetwork === 'trc20' && (
                   <p className="text-xs text-green-400">
-                    TRC20 is recommended for faster and cheaper transactions
-                  </p>
-                )}
-              </div>
-            )}
+                      TRC20 is recommended for faster and cheaper transactions
+                    </p>
+                  )}
+                </div>
+              )}
 
             {/* Address Display */}
             {address ? (
@@ -432,32 +432,32 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs sm:text-sm font-medium text-white">Deposit Address</Label>
-                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2">
                     <code className="flex-1 rounded bg-black px-2 py-1.5 text-xs sm:text-sm break-all text-white">
-                      {address}
-                    </code>
-                    <Button
+                        {address}
+                      </code>
+                      <Button
                       variant="ghost"
-                      size="icon"
+                        size="icon"
                       className="h-8 w-8 text-green-400 hover:text-green-300"
-                      onClick={() => handleCopy(address)}
-                    >
-                      {copied ? (
-                        <Icons.check className="h-4 w-4" />
-                      ) : (
-                        <Icons.copy className="h-4 w-4" />
-                      )}
-                    </Button>
+                        onClick={() => handleCopy(address)}
+                      >
+                        {copied ? (
+                          <Icons.check className="h-4 w-4" />
+                        ) : (
+                          <Icons.copy className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
                   </div>
-                </div>
 
                 <Alert className="bg-yellow-900/20 border-yellow-800/50 py-2">
                   <Icons.warning className="h-4 w-4 text-yellow-400" />
                   <AlertDescription className="text-xs sm:text-sm text-yellow-100">
                     Only send {selectedCurrency?.toUpperCase()} to this address on the {selectedNetwork.toUpperCase()} network.
-                    Sending any other asset may result in permanent loss.
-                  </AlertDescription>
-                </Alert>
+                      Sending any other asset may result in permanent loss.
+                    </AlertDescription>
+                  </Alert>
               </motion.div>
             ) : (
               <motion.div 
