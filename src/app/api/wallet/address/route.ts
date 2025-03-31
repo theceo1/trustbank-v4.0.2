@@ -3,114 +3,270 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { QuidaxServerService } from '@/lib/quidax';
 
+// Define supported networks for each currency
+const CURRENCY_NETWORKS: Record<string, string[]> = {
+  btc: ['bitcoin'],
+  eth: ['ethereum', 'erc20'],
+  usdt: ['ethereum', 'erc20', 'trc20', 'bep20'],
+  usdc: ['ethereum', 'erc20', 'trc20', 'bep20'],
+  trx: ['tron', 'trc20'],
+  bnb: ['bsc', 'bep20'],
+  xrp: ['ripple'],
+  sol: ['solana'],
+  matic: ['polygon'],
+  ada: ['cardano'],
+  dot: ['polkadot'],
+  doge: ['dogecoin'],
+  shib: ['ethereum', 'erc20'],
+  link: ['ethereum', 'erc20'],
+  bch: ['bitcoin-cash'],
+  ltc: ['litecoin'],
+  aave: ['ethereum', 'erc20'],
+  algo: ['algorand'],
+  near: ['near'],
+  fil: ['filecoin'],
+  sand: ['ethereum', 'erc20'],
+  mana: ['ethereum', 'erc20'],
+  ape: ['ethereum', 'erc20'],
+  sui: ['sui'],
+  inj: ['injective'],
+  arb: ['arbitrum'],
+  ton: ['ton'],
+  rndr: ['ethereum', 'erc20'],
+  stx: ['stacks'],
+  grt: ['ethereum', 'erc20'],
+  trump: ['ethereum', 'erc20']
+};
+
+// List of fiat currencies
+const FIAT_CURRENCIES = ['ngn', 'usd', 'eur', 'gbp'];
+
+// Currency display names
+const CURRENCY_NAMES: Record<string, string> = {
+  ngn: 'Naira',
+  usd: 'US Dollar',
+  trump: 'Official Trump',
+  // Add other currency names as needed
+};
+
+function getDefaultNetwork(currency: string): string {
+  const networks = CURRENCY_NETWORKS[currency.toLowerCase()];
+  if (!networks) return '';
+  return networks[0];
+}
+
 export async function GET(request: Request) {
   try {
-    // Get URL parameters
     const { searchParams } = new URL(request.url);
-    const currency = searchParams.get('currency');
-    const network = searchParams.get('network');
+    const currency = searchParams.get('currency')?.toLowerCase();
+    const network = searchParams.get('network')?.toLowerCase();
 
-    if (!currency || !network) {
+    console.log('[WalletAddress] Request params:', { currency, network });
+
+    if (!currency) {
+      console.log('[WalletAddress] Missing currency parameter');
       return NextResponse.json(
-        { error: 'Currency and network are required' },
+        { 
+          status: 'error',
+          message: 'Currency is required',
+          error: 'Currency parameter is missing'
+        },
         { status: 400 }
       );
     }
 
-    // Initialize Supabase client with proper cookie handling
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
-
-    // Get the current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    // Validate network parameter
+    if (!network) {
+      console.log('[WalletAddress] Missing network parameter');
       return NextResponse.json(
-        { error: 'Unauthorized' },
+        { 
+          status: 'error',
+          message: 'Network is required',
+          error: 'Network parameter is missing'
+        },
+        { status: 400 }
+      );
+    }
+
+    // Check if network is supported for the currency
+    const supportedNetworks = CURRENCY_NETWORKS[currency];
+    if (!supportedNetworks?.includes(network)) {
+      console.log('[WalletAddress] Unsupported network:', { currency, network, supportedNetworks });
+      return NextResponse.json(
+        { 
+          status: 'error',
+          message: `Network ${network} is not supported for ${currency}`,
+          error: 'Unsupported network',
+          details: {
+            currency,
+            network,
+            supported_networks: supportedNetworks || []
+          }
+        },
+        { status: 400 }
+      );
+    }
+
+    const supabase = createRouteHandlerClient({ cookies });
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session) {
+      console.log('[WalletAddress] No session found');
+      return NextResponse.json(
+        { 
+          status: 'error',
+          message: 'Unauthorized',
+          error: 'No session found'
+        },
         { status: 401 }
       );
     }
 
-    // Get user's Quidax ID from profile
-    const { data: profile } = await supabase
+    console.log('[WalletAddress] Session user:', session.user.id);
+
+    // Get user's Quidax ID
+    const { data: profile, error: profileError } = await supabase
       .from('user_profiles')
-      .select('quidax_id')
-      .eq('user_id', user.id)
+      .select('quidax_id, user_id')
+      .eq('user_id', session.user.id)
       .single();
 
-    if (!profile?.quidax_id) {
+    if (profileError) {
+      console.error('[WalletAddress] Profile fetch error:', profileError);
       return NextResponse.json(
-        { error: 'User profile not found' },
+        { 
+          status: 'error',
+          message: 'Failed to fetch user profile',
+          error: profileError.message
+        },
+        { status: 500 }
+      );
+    }
+
+    if (!profile?.quidax_id) {
+      console.log('[WalletAddress] No wallet ID found for user:', session.user.id);
+      return NextResponse.json(
+        { 
+          status: 'error',
+          message: 'Account setup incomplete',
+          error: 'Please complete your account setup'
+        },
         { status: 404 }
       );
     }
 
-    // Initialize Quidax service
-    const quidaxSecretKey = process.env.QUIDAX_SECRET_KEY;
-    if (!quidaxSecretKey) {
-      throw new Error('QUIDAX_SECRET_KEY is not configured');
+    console.log('[WalletAddress] Found wallet ID:', profile.quidax_id);
+
+    // For fiat currencies, return early with bank transfer message
+    if (FIAT_CURRENCIES.includes(currency)) {
+      return NextResponse.json({
+        status: 'success',
+        message: 'Bank transfer details',
+        data: {
+          currency: currency,
+          is_crypto: false,
+          transfer_type: 'bank',
+          message: 'Please use bank transfer for fiat deposits'
+        }
+      });
     }
-    
-    const quidaxService = new QuidaxServerService(quidaxSecretKey);
+
+    // Initialize service
+    if (!process.env.QUIDAX_SECRET_KEY) {
+      console.error('[WalletAddress] Missing API configuration');
+      return NextResponse.json(
+        { 
+          status: 'error',
+          message: 'Service temporarily unavailable',
+          error: 'Internal configuration error'
+        },
+        { status: 500 }
+      );
+    }
+
+    const quidaxService = new QuidaxServerService(process.env.QUIDAX_SECRET_KEY);
 
     try {
-      // First try to get existing addresses
-      const response = await quidaxService.request(
-        `/users/${profile.quidax_id}/wallets/${currency}/addresses?network=${network}`
+      console.log('[WalletAddress] Fetching address for:', { currency, network, userId: profile.quidax_id });
+      
+      // First try to get existing address
+      const existingAddressResponse = await quidaxService.request(
+        `/users/${profile.quidax_id}/wallets/${currency}/address`
       );
 
-      // If we have addresses, return the first one
-      if (response?.data?.length > 0) {
-        return NextResponse.json({
-          status: 'success',
-          data: response.data[0]
-        });
+      console.log('[WalletAddress] Existing address response:', existingAddressResponse);
+
+      let depositAddress = null;
+      let destinationTag = null;
+
+      if (existingAddressResponse?.data?.address) {
+        depositAddress = existingAddressResponse.data.address;
+        destinationTag = existingAddressResponse.data.tag;
+        console.log('[WalletAddress] Found existing address:', depositAddress);
+      } else {
+        console.log('[WalletAddress] No existing address, creating new one');
+        // Create new address with network as query parameter
+        const newAddressResponse = await quidaxService.request(
+          `/users/${profile.quidax_id}/wallets/${currency}/addresses?network=${network}`,
+          {
+            method: 'POST'
+          }
+        );
+
+        console.log('[WalletAddress] New address response:', newAddressResponse);
+
+        if (newAddressResponse?.data?.address) {
+          depositAddress = newAddressResponse.data.address;
+          destinationTag = newAddressResponse.data.tag;
+          console.log('[WalletAddress] Created new address:', depositAddress);
+        }
       }
 
-      // If no addresses found, create a new one
-      const newAddress = await quidaxService.request(
-        `/users/${profile.quidax_id}/wallets/${currency}/addresses`,
-        {
-          method: 'POST',
-          body: JSON.stringify({ network })
-        }
-      );
+      if (!depositAddress) {
+        console.error('[WalletAddress] Failed to get or create address');
+        return NextResponse.json(
+          { 
+            status: 'error',
+            message: 'Unable to generate deposit address',
+            error: 'Failed to create deposit address. Please try again later.'
+          },
+          { status: 500 }
+        );
+      }
 
       return NextResponse.json({
         status: 'success',
-        data: newAddress.data
-      });
-    } catch (error: any) {
-      // If address already exists, try to fetch it again
-      if (error.message?.includes('Address already generated')) {
-        try {
-          // Retry fetching addresses
-          const existingAddresses = await quidaxService.request(
-            `/users/${profile.quidax_id}/wallets/${currency}/addresses?network=${network}`
-          );
-
-          if (existingAddresses?.data?.length > 0) {
-            return NextResponse.json({
-              status: 'success',
-              data: existingAddresses.data[0]
-            });
-          }
-        } catch (fetchError) {
-          console.error('Error fetching existing address:', fetchError);
+        message: 'Address generated successfully',
+        data: {
+          currency,
+          network,
+          deposit_address: depositAddress,
+          destination_tag: destinationTag,
+          is_crypto: true
         }
-      }
+      });
 
-      // If we get here, something went wrong
-      console.error('Error handling wallet address:', error);
+    } catch (error: any) {
+      console.error('[WalletAddress] API error:', error);
+      
       return NextResponse.json(
-        { error: error.message || 'Failed to handle wallet address request' },
-        { status: error.message?.includes('Address already generated') ? 409 : 500 }
+        { 
+          status: 'error',
+          message: 'Unable to process request',
+          error: 'Failed to generate deposit address. Please try again later.'
+        },
+        { status: 500 }
       );
     }
-  } catch (error: any) {
-    console.error('Error in wallet address route:', error);
+
+  } catch (error) {
+    console.error('[WalletAddress] Unhandled error:', error);
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { 
+        status: 'error',
+        message: 'Failed to process request',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

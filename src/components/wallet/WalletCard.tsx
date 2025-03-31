@@ -34,8 +34,6 @@ export function WalletCard({
   
   // Calculate fiat value
   const calculateFiatValue = (balance: number, price: number, currency: string) => {
-    console.log(`Calculating fiat value for ${currency}:`, { balance, price });
-    
     if (currency.toUpperCase() === 'NGN') {
       return balance;
     }
@@ -45,12 +43,10 @@ export function WalletCard({
     const numericPrice = parseFloat(String(price)) || 0;
     const value = numericBalance * numericPrice;
     
-    console.log(`Calculated value: ${value}`);
     return value;
   };
 
   const fiatValue = calculateFiatValue(parseFloat(balance || '0'), price || 0, currency);
-  console.log(`Final fiat value for ${currency}: ${fiatValue}`);
 
   const formatBalance = (balance: number, currency: string) => {
     const numericBalance = parseFloat(String(balance)) || 0;

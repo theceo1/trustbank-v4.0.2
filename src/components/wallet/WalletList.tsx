@@ -78,9 +78,6 @@ export function WalletList({
     );
 
   const getMarketPrice = (currency: string) => {
-    console.log(`Getting market price for ${currency}`);
-    console.log('Market data:', marketData);
-
     if (currency.toLowerCase() === 'ngn') {
       return 1;
     }
@@ -92,7 +89,6 @@ export function WalletList({
     );
 
     if (ngnPair?.price) {
-      console.log(`Found NGN pair for ${currency}:`, ngnPair.price);
       return ngnPair.price;
     }
 
@@ -108,7 +104,6 @@ export function WalletList({
 
     if (usdtPair?.price && usdtNgnPair?.price) {
       const price = usdtPair.price * usdtNgnPair.price;
-      console.log(`Calculated ${currency} price via USDT:`, price);
       return price;
     }
 
@@ -124,11 +119,9 @@ export function WalletList({
 
     if (btcPair?.price && btcUsdtPair?.price && usdtNgnPair?.price) {
       const price = btcPair.price * btcUsdtPair.price * usdtNgnPair.price;
-      console.log(`Calculated ${currency} price via BTC:`, price);
       return price;
     }
 
-    console.log(`No market data found for ${currency}`);
     return 0;
   };
 

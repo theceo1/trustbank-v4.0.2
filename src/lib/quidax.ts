@@ -27,34 +27,33 @@ export class QuidaxService {
   }
 
   async request(endpoint: string, options: RequestInit = {}) {
-    const url = `${this.baseUrl}${endpoint}`;
     try {
-      const response = await fetch(url, {
+      const response = await fetch(`${this.baseUrl}${endpoint}`, {
         ...options,
         headers: {
-          ...options.headers,
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          ...(this.secretKey && { 'Authorization': `Bearer ${this.secretKey}` }),
+          'Authorization': `Bearer ${this.secretKey}`,
+          ...options.headers,
         },
       });
 
       if (!response.ok) {
-        const text = await response.text();
-        console.error('Quidax API error:', {
-          status: response.status,
-          statusText: response.statusText,
-          url,
-          response: text
-        });
-        throw new Error(`API request failed: ${response.statusText}`);
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { message: errorText };
+        }
+        
+        throw new Error(errorData.message || 'Request failed');
       }
 
       const data = await response.json();
       return data;
-    } catch (error) {
-      console.error('Request error:', error);
-      throw error;
+    } catch (error: any) {
+      console.error('[API Request Error]:', error);
+      throw new Error(error.message || 'Failed to process request');
     }
   }
 
@@ -148,15 +147,18 @@ export class QuidaxServerService extends QuidaxService {
   }
 
   // Wallet addresses
-  async getWalletAddress(userId: string, currency: string, network: string) {
-    return this.request(`/users/${userId}/wallets/${currency}/addresses?network=${network}`);
+  async getWalletAddress(userId: string, currency: string) {
+    return this.request(`/users/${userId}/wallets/${currency}/address`);
   }
 
   async createWalletAddress(userId: string, currency: string, network: string) {
-    return this.request(`/users/${userId}/wallets/${currency}/addresses`, {
-      method: 'POST',
-      body: JSON.stringify({ network })
+    return this.request(`/users/${userId}/wallets/${currency}/addresses?network=${network}`, {
+      method: 'POST'
     });
+  }
+
+  async getWalletAddresses(userId: string, currency: string) {
+    return this.request(`/users/${userId}/wallets/${currency}/addresses`);
   }
 }
 

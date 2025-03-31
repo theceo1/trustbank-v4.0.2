@@ -68,7 +68,6 @@ export default function WalletPage() {
       setWalletData(data);
       setError(null);
     } catch (err) {
-      console.error('Error fetching wallet data:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch wallet data');
     } finally {
       setLoading(false);
@@ -100,8 +99,7 @@ export default function WalletPage() {
             event: '*',
             schema: 'public',
             table: 'wallets'
-          }, (payload) => {
-            console.log('Wallet change detected:', payload);
+          }, () => {
             fetchWalletData();
           })
           .subscribe();
@@ -113,8 +111,7 @@ export default function WalletPage() {
             event: '*',
             schema: 'public',
             table: 'transactions'
-          }, (payload) => {
-            console.log('Transaction change detected:', payload);
+          }, () => {
             fetchWalletData();
           })
           .subscribe();
@@ -127,9 +124,7 @@ export default function WalletPage() {
             schema: 'public',
             table: 'swap_transactions'
           }, (payload: { new: { status?: string } }) => {
-            console.log('Swap change detected:', payload);
             if (payload.new?.status === 'completed') {
-              console.log('Swap completed, refreshing wallet data');
               fetchWalletData();
             }
           })
@@ -142,7 +137,7 @@ export default function WalletPage() {
           swapSubscription.unsubscribe();
         };
       } catch (error) {
-        console.error('Error setting up realtime subscriptions:', error);
+        setError('Error setting up realtime subscriptions');
       }
     };
 
@@ -207,9 +202,6 @@ export default function WalletPage() {
 
   // Helper function to get market price
   const getMarketPrice = (currency: string) => {
-    console.log(`Getting market price for ${currency}`);
-    console.log('Available market data:', marketData);
-
     if (currency.toLowerCase() === 'ngn') {
       return 1;
     }
@@ -221,7 +213,6 @@ export default function WalletPage() {
     );
 
     if (ngnPair?.price) {
-      console.log(`Found direct NGN pair for ${currency}:`, ngnPair);
       return ngnPair.price;
     }
 
@@ -237,11 +228,6 @@ export default function WalletPage() {
 
     if (usdtPair?.price && usdtNgnPair?.price) {
       const price = usdtPair.price * usdtNgnPair.price;
-      console.log(`Calculated ${currency} price via USDT:`, {
-        usdtPair,
-        usdtNgnPair,
-        calculatedPrice: price
-      });
       return price;
     }
 
@@ -257,16 +243,9 @@ export default function WalletPage() {
 
     if (btcPair?.price && btcUsdtPair?.price && usdtNgnPair?.price) {
       const price = btcPair.price * btcUsdtPair.price * usdtNgnPair.price;
-      console.log(`Calculated ${currency} price via BTC:`, {
-        btcPair,
-        btcUsdtPair,
-        usdtNgnPair,
-        calculatedPrice: price
-      });
       return price;
     }
 
-    console.log(`No market price found for ${currency}`);
     return 0;
   };
 
@@ -274,15 +253,8 @@ export default function WalletPage() {
   const totalValue = wallets.reduce((total: number, wallet: any) => {
     const balance = parseFloat(wallet.balance || '0');
     const price = getMarketPrice(wallet.currency);
-    console.log(`Calculating value for ${wallet.currency}:`, {
-      balance,
-      price,
-      value: balance * price
-    });
     return total + (balance * price);
   }, 0);
-
-  console.log('Total portfolio value:', totalValue);
 
   const handleDepositClick = (specificWallet?: any) => {
     if (specificWallet) {

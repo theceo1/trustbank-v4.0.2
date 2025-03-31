@@ -85,22 +85,10 @@ export async function GET(request: Request) {
 
     try {
       // Fetch data in parallel
-      console.log('Fetching wallet and market data...');
       const [walletsResponse, marketDataResponse] = await Promise.all([
         quidax.request(`/users/${profile.quidax_id}/wallets`),
         quidax.getMarketTickers()
       ]);
-
-      // Log raw responses for debugging
-      console.log('Wallets Response:', {
-        status: walletsResponse?.status,
-        walletCount: walletsResponse?.data?.length || 0
-      });
-
-      console.log('Market Data Response:', {
-        status: marketDataResponse?.status,
-        markets: marketDataResponse?.data ? Object.keys(marketDataResponse.data) : []
-      });
 
       // Get recent swap transactions
       const transactionsResponse = await quidax.request(`/users/${profile.quidax_id}/swap_transactions`);
@@ -187,21 +175,11 @@ export async function GET(request: Request) {
         const currency = wallet.currency?.toUpperCase();
         let valueInNGN = 0;
 
-        console.log(`Processing wallet ${currency}:`, {
-          balance,
-          currency
-        });
-
         if (currency === 'NGN') {
           valueInNGN = balance;
         } else if (currency === 'USDT') {
           // For USDT, use the USDT/NGN rate directly
           valueInNGN = balance * usdtNgnRate;
-          console.log('USDT value calculation:', {
-            balance,
-            usdtNgnRate,
-            valueInNGN
-          });
         } else {
           // Try direct NGN pair first
           const ngnPair = transformedMarketData.find(m => 
@@ -210,10 +188,6 @@ export async function GET(request: Request) {
           
           if (ngnPair?.price) {
             valueInNGN = balance * ngnPair.price;
-            console.log(`Using NGN pair for ${currency}:`, {
-              price: ngnPair.price,
-              valueInNGN
-            });
           } else {
             // Try USDT pair with conversion to NGN
             const usdtPair = transformedMarketData.find(m => 
@@ -222,11 +196,6 @@ export async function GET(request: Request) {
             
             if (usdtPair?.price && usdtNgnRate > 0) {
               valueInNGN = balance * usdtPair.price * usdtNgnRate;
-              console.log(`Using USDT pair for ${currency}:`, {
-                usdtPrice: usdtPair.price,
-                usdtNgnRate,
-                valueInNGN
-              });
             } else {
               // Try BTC pair as last resort
               const btcPair = transformedMarketData.find(m => 
@@ -238,11 +207,6 @@ export async function GET(request: Request) {
               
               if (btcPair?.price && btcNgnPair?.price) {
                 valueInNGN = balance * btcPair.price * btcNgnPair.price;
-                console.log(`Using BTC pair for ${currency}:`, {
-                  btcPrice: btcPair.price,
-                  btcNgnPrice: btcNgnPair.price,
-                  valueInNGN
-                });
               }
             }
           }
@@ -250,11 +214,6 @@ export async function GET(request: Request) {
 
         // Ensure we have a valid number
         valueInNGN = Number.isFinite(valueInNGN) ? valueInNGN : 0;
-
-        console.log(`Final value for ${currency}:`, {
-          valueInNGN,
-          marketPrice: valueInNGN / (balance || 1)
-        });
 
         return {
           ...wallet,
@@ -279,7 +238,6 @@ export async function GET(request: Request) {
       });
 
     } catch (quidaxError: any) {
-      console.error('Quidax API error:', quidaxError);
       return NextResponse.json(
         { error: quidaxError.message || 'Failed to fetch wallet data from Quidax' },
         { status: quidaxError.status || 500 }

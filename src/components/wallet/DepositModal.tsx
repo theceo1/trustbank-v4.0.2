@@ -38,9 +38,13 @@ const NETWORKS_BY_CURRENCY: Record<string, Array<{
   name: string;
   isRecommended?: boolean;
   fee?: string;
+  isFiat?: boolean;
 }>> = {
-  btc: [{ id: 'btc', name: 'Bitcoin Network', isRecommended: true }],
-  eth: [{ id: 'erc20', name: 'ERC20', isRecommended: true }],
+  btc: [{ id: 'bitcoin', name: 'Bitcoin Network', isRecommended: true }],
+  eth: [
+    { id: 'erc20', name: 'Ethereum Network (ERC20)', isRecommended: true },
+    { id: 'ethereum', name: 'Ethereum Network', fee: '10-20 USDT' }
+  ],
   usdt: [
     { id: 'trc20', name: 'TRC20', isRecommended: true, fee: '1 USDT' },
     { id: 'erc20', name: 'ERC20', fee: '10-20 USDT' },
@@ -52,11 +56,11 @@ const NETWORKS_BY_CURRENCY: Record<string, Array<{
   ],
   bnb: [{ id: 'bep20', name: 'BEP20 (BSC)', isRecommended: true }],
   matic: [{ id: 'polygon', name: 'Polygon Network', isRecommended: true }],
-  sol: [{ id: 'sol', name: 'Solana Network', isRecommended: true }],
-  dot: [{ id: 'dot', name: 'Polkadot Network', isRecommended: true }],
-  ada: [{ id: 'ada', name: 'Cardano Network', isRecommended: true }],
-  xrp: [{ id: 'xrp', name: 'XRP Network', isRecommended: true }],
-  doge: [{ id: 'doge', name: 'Dogecoin Network', isRecommended: true }],
+  sol: [{ id: 'solana', name: 'Solana Network', isRecommended: true }],
+  dot: [{ id: 'polkadot', name: 'Polkadot Network', isRecommended: true }],
+  ada: [{ id: 'cardano', name: 'Cardano Network', isRecommended: true }],
+  xrp: [{ id: 'ripple', name: 'XRP Network', isRecommended: true }],
+  doge: [{ id: 'dogecoin', name: 'Dogecoin Network', isRecommended: true }],
   link: [{ id: 'erc20', name: 'ERC20', isRecommended: true }],
   aave: [{ id: 'erc20', name: 'ERC20', isRecommended: true }],
   uni: [{ id: 'erc20', name: 'ERC20', isRecommended: true }],
@@ -116,7 +120,9 @@ const NETWORKS_BY_CURRENCY: Record<string, Array<{
   trump: [{ id: 'erc20', name: 'ERC20', isRecommended: true }],
   fartcoin: [{ id: 'erc20', name: 'ERC20', isRecommended: true }],
   pnut: [{ id: 'erc20', name: 'ERC20', isRecommended: true }],
-  hype: [{ id: 'erc20', name: 'ERC20', isRecommended: true }]
+  hype: [{ id: 'erc20', name: 'ERC20', isRecommended: true }],
+  ngn: [{ id: 'bank', name: 'Bank Transfer', isRecommended: true }],
+  usd: [{ id: 'bank', name: 'Bank Transfer', isRecommended: true }]
 };
 
 // Add this helper function
@@ -208,90 +214,144 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
   const [open, setOpen] = useState(false)
   const supabase = createClientComponentClient()
   const [fromSearchQuery, setFromSearchQuery] = useState('')
+  const [destinationTag, setDestinationTag] = useState('')
 
-  // Reset state when modal opens or currency changes
-  useEffect(() => {
-    if (isOpen) {
-      setError(null)
-      setAddress(null)
-      const currency = wallet?.currency || ''
-      setSelectedCurrency(currency)
-      
-      if (currency) {
-        const networks = NETWORKS_BY_CURRENCY[currency.toLowerCase()]
-        const recommendedNetwork = networks?.find(n => n.isRecommended)
-        if (recommendedNetwork) {
-          setSelectedNetwork(recommendedNetwork.id)
-          fetchAddress(recommendedNetwork.id, currency)
-        } else if (networks?.length === 1) {
-          setSelectedNetwork(networks[0].id)
-          fetchAddress(networks[0].id, currency)
-        }
-      }
+  // Define FIAT_CURRENCIES constant
+  const FIAT_CURRENCIES = ['ngn', 'usd', 'eur', 'gbp'];
+
+  const fetchAddress = async (currency?: string, network?: string) => {
+    if (!currency || !network) {
+      console.log('[DepositModal] Missing required parameters:', { currency, network });
+      setError('Please select a currency and network');
+      return;
     }
-  }, [isOpen, wallet?.currency])
-
-  const fetchAddress = async (network: string, currency: string) => {
-    if (!currency || !network) return;
-    
-    setLoading(true)
-    setError(null)
 
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        throw new Error('No session found')
-      }
+      setLoading(true);
+      setError('');
+      setAddress('');
+      setDestinationTag('');
 
-      const response = await fetch(`/api/wallet/address?currency=${currency.toLowerCase()}&network=${network}`, {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        }
-      })
-      const data = await response.json()
+      console.log('[DepositModal] Fetching address for:', { currency, network });
+      
+      const response = await fetch(
+        `/api/wallet/address?currency=${currency}&network=${network}`,
+        { method: 'GET' }
+      );
+
+      const data = await response.json();
+      console.log('[DepositModal] Address API response:', data);
 
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to fetch deposit address')
+        const errorMessage = data.error || data.message || 'Failed to fetch deposit address';
+        console.error('[DepositModal] API error:', { status: response.status, error: errorMessage });
+        throw new Error(errorMessage);
       }
 
-      if (data.status === 'success' && data.data?.address) {
-        setAddress(data.data.address)
-      } else {
-        throw new Error('No deposit address found')
+      if (data.status === 'error') {
+        throw new Error(data.error || data.message || 'Failed to fetch deposit address');
       }
+
+      // Handle fiat currencies
+      if (data.data?.is_crypto === false) {
+        setError(data.data.message || 'Please use bank transfer for fiat deposits');
+        return;
+      }
+
+      // Validate deposit address
+      if (!data.data?.deposit_address) {
+        throw new Error('No deposit address returned from API');
+      }
+
+      setAddress(data.data.deposit_address);
+      if (data.data.destination_tag) {
+        setDestinationTag(data.data.destination_tag);
+      }
+
     } catch (error) {
-      console.error('Error fetching address:', error)
-      setError(error instanceof Error ? error.message : 'Failed to fetch deposit address')
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error instanceof Error ? error.message : 'Failed to fetch deposit address'
-      })
+      console.error('[DepositModal] Error fetching address:', error);
+      setError(error instanceof Error ? error.message : 'Failed to generate deposit address');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
+
+  useEffect(() => {
+    if (!isOpen) {
+      console.log('[DepositModal] Modal closed, resetting state');
+      setAddress('');
+      setDestinationTag('');
+      setError('');
+      setLoading(false);
+      setSelectedCurrency('');
+      setSelectedNetwork('');
+      return;
+    }
+
+    if (!wallet?.currency) {
+      console.error('[DepositModal] No wallet currency available');
+      return;
+    }
+
+    const currency = wallet.currency.toLowerCase();
+    setSelectedCurrency(currency);
+    console.log('[DepositModal] Modal opened/currency changed:', { currency });
+
+    if (FIAT_CURRENCIES.includes(currency)) {
+      console.log('[DepositModal] Fiat currency detected:', currency);
+      setError('Please use bank transfer for fiat deposits');
+      return;
+    }
+
+    const networks = NETWORKS_BY_CURRENCY[currency];
+    if (!networks?.length) {
+      console.error('[DepositModal] No networks available for currency:', currency);
+      setError(`${currency.toUpperCase()} deposits are not supported`);
+      return;
+    }
+
+    console.log('[DepositModal] Available networks:', networks);
+    const recommendedNetwork = networks.find(n => n.isRecommended);
+    const defaultNetwork = recommendedNetwork || networks[0];
+    
+    if (defaultNetwork) {
+      console.log('[DepositModal] Setting default network:', defaultNetwork.id);
+      setSelectedNetwork(defaultNetwork.id);
+      // Add a small delay to ensure state is updated
+      setTimeout(() => {
+        fetchAddress(currency, defaultNetwork.id);
+      }, 100);
+    }
+  }, [isOpen, wallet?.currency]);
 
   const handleNetworkChange = (network: string) => {
-    setSelectedNetwork(network)
-    fetchAddress(network, selectedCurrency)
-  }
+    setSelectedNetwork(network);
+    if (selectedCurrency) {
+      fetchAddress(selectedCurrency, network);
+    }
+  };
 
   const handleCurrencyChange = (currency: string) => {
-    setSelectedCurrency(currency)
-    setSelectedNetwork('')
-    setAddress(null)
-    
-    const networks = NETWORKS_BY_CURRENCY[currency.toLowerCase()]
-    const recommendedNetwork = networks?.find(n => n.isRecommended)
-    if (recommendedNetwork) {
-      setSelectedNetwork(recommendedNetwork.id)
-      fetchAddress(recommendedNetwork.id, currency)
-    } else if (networks?.length === 1) {
-      setSelectedNetwork(networks[0].id)
-      fetchAddress(networks[0].id, currency)
+    const currencyLower = currency.toLowerCase();
+    setSelectedCurrency(currencyLower);
+    setAddress('');
+    setDestinationTag('');
+    setError('');
+
+    if (FIAT_CURRENCIES.includes(currencyLower)) {
+      setError('Please use bank transfer for fiat deposits');
+      return;
     }
-  }
+
+    const networks = NETWORKS_BY_CURRENCY[currencyLower];
+    if (networks?.length) {
+      const defaultNetwork = networks.find(n => n.isRecommended) || networks[0];
+      setSelectedNetwork(defaultNetwork.id);
+      fetchAddress(currencyLower, defaultNetwork.id);
+    } else {
+      setError(`${currency.toUpperCase()} deposits are not supported`);
+    }
+  };
 
   const handleCopy = async (text: string) => {
     try {
@@ -327,9 +387,12 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
               Deposit {selectedCurrency?.toUpperCase()}
             </DialogTitle>
             <DialogDescription className="text-sm text-white/70">
-              Select a network to generate your deposit address
-          </DialogDescription>
-        </DialogHeader>
+              {NETWORKS_BY_CURRENCY[selectedCurrency.toLowerCase()]?.[0]?.isFiat 
+                ? "Get bank transfer details from support"
+                : "Select a network to generate your deposit address"
+              }
+            </DialogDescription>
+          </DialogHeader>
 
           <div className="space-y-3 mt-3">
             {/* Currency Selection */}
@@ -375,8 +438,8 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
               </Select>
               </div>
 
-            {/* Network Selection */}
-              {networks && networks.length > 1 && (
+            {/* Network Selection - Only show for non-fiat currencies */}
+            {networks && networks.length > 1 && !networks[0].isFiat && (
               <div className="space-y-1.5">
                 <Label className="text-xs sm:text-sm font-medium text-white">Select Network</Label>
                 <Select value={selectedNetwork} onValueChange={handleNetworkChange}>
@@ -413,8 +476,15 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
                 </div>
               )}
 
-            {/* Address Display */}
-            {address ? (
+            {/* Address Display or Fiat Message */}
+            {error ? (
+              <Alert className="bg-red-900/20 border-red-800/50 py-2">
+                <Icons.warning className="h-4 w-4 text-red-400" />
+                <AlertDescription className="text-xs sm:text-sm text-red-100">
+                  {error}
+                </AlertDescription>
+              </Alert>
+            ) : address ? (
               <motion.div 
                 className="space-y-3"
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -470,14 +540,22 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
                   <>
                     <Icons.spinner className="h-6 w-6 text-green-400 animate-spin" />
                     <p className="text-xs sm:text-sm text-white">
-                      Generating deposit address...
+                      {NETWORKS_BY_CURRENCY[selectedCurrency.toLowerCase()]?.[0]?.isFiat 
+                        ? "Getting bank transfer details..."
+                        : "Generating deposit address..."
+                      }
                     </p>
                   </>
                 ) : (
                   <>
                     <Icons.info className="h-6 w-6 text-green-400" />
                     <p className="text-xs sm:text-sm text-white">
-                      {selectedCurrency ? 'Select a network to generate a deposit address' : 'Select a currency to continue'}
+                      {NETWORKS_BY_CURRENCY[selectedCurrency.toLowerCase()]?.[0]?.isFiat 
+                        ? "Contact support for bank transfer details"
+                        : selectedCurrency 
+                          ? 'Select a network to generate a deposit address' 
+                          : 'Select a currency to continue'
+                      }
                     </p>
                   </>
                 )}
