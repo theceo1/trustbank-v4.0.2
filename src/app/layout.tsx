@@ -13,13 +13,15 @@ import { cn } from "@/lib/utils"
 import { LanguageProvider } from "@/providers/LanguageProvider"
 import { GlobalErrorBoundary } from '@/components/error/GlobalErrorBoundary'
 import { AuthProvider } from '@/contexts/AuthContext'
+import { Analytics } from '@vercel/analytics/react'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 
 export const metadata = {
   title: {
-    default: 'trustBank',
+    default: 'trustBank - CRYPTO | SIMPLIFIED',
     template: '%s | trustBank'
   },
-  description: 'Making cryptocurrency trading accessible, secure, and efficient by simplifying crypto adoption in emerging markets.',
+  description: 'simplifying crypto adoption in emerging markets.',
   keywords: ['crypto', 'cryptocurrency', 'bitcoin', 'ethereum', 'trading', 'exchange', 'wallet', 'blockchain', 'trustBank', 'trustbank', 'trust bank tech', 'trust bank crypto', 'trust bank cryptocurrency', 'trust bank exchange'],
   authors: [{ name: 'trustBank' }],
   creator: 'trustBank',
@@ -73,6 +75,8 @@ export default function RootLayout({ children }: RootLayoutProps) {
             </AuthProvider>
           </GlobalErrorBoundary>
         </ThemeProvider>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   )
