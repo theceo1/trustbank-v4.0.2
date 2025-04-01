@@ -90,6 +90,7 @@ export function SignUpForm() {
       toast({
         title: "Success",
         description: "Your account has been created successfully.",
+        className: "bg-green-500/90 text-white border-green-600",
       });
 
       // Redirect to dashboard after successful signup

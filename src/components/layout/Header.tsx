@@ -14,7 +14,7 @@ import { useState, useEffect } from "react";
 import { MobileMenu } from "./MobileMenu";
 import { useModal } from "@/hooks/use-modal";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import type { User } from '@supabase/auth-helpers-nextjs';
 import { InstantSwapModal } from "@/components/InstantSwapModal";
 import { toast } from "@/components/ui/use-toast";
@@ -44,6 +44,7 @@ export function Header() {
   const { theme, setTheme } = useTheme();
   const { onOpen } = useModal();
   const router = useRouter();
+  const pathname = usePathname();
   const supabase = createClientComponentClient();
 
   useEffect(() => {
@@ -144,23 +145,38 @@ export function Header() {
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-6">
-              <Link href="/market" className="text-sm font-medium transition-colors hover:text-primary">
+              <Link 
+                href="/market" 
+                className={`text-sm font-medium transition-colors hover:text-primary ${pathname === '/market' ? 'text-green-600' : ''}`}
+              >
                 Market
               </Link>
-              <Link href="/calculator" className="text-sm font-medium transition-colors hover:text-primary">
+              <Link 
+                href="/calculator" 
+                className={`text-sm font-medium transition-colors hover:text-primary ${pathname === '/calculator' ? 'text-green-600' : ''}`}
+              >
                 Calculator
               </Link>
 
               {/* Links only for authenticated users */}
               {!loading && user && (
                 <>
-                  <Link href="/dashboard" className="text-sm font-medium transition-colors hover:text-primary">
+                  <Link 
+                    href="/dashboard" 
+                    className={`text-sm font-medium transition-colors hover:text-primary ${pathname === '/dashboard' ? 'text-green-600' : ''}`}
+                  >
                     Dashboard
                   </Link>
-                  <Link href="/trade" className="text-sm font-medium transition-colors hover:text-primary">
+                  <Link 
+                    href="/trade" 
+                    className={`text-sm font-medium transition-colors hover:text-primary ${pathname === '/trade' ? 'text-green-600' : ''}`}
+                  >
                     Trade
                   </Link>
-                  <Link href="/trade/guide" className="text-sm font-medium transition-colors hover:text-primary">
+                  <Link 
+                    href="/trade/guide" 
+                    className={`text-sm font-medium transition-colors hover:text-primary ${pathname === '/trade/guide' ? 'text-green-600' : ''}`}
+                  >
                     Trade Guide
                   </Link>
                 </>
@@ -209,23 +225,60 @@ export function Header() {
               ) : user ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm">Profile</Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className={
+                        pathname?.startsWith('/profile') || 
+                        pathname === '/kyc' || 
+                        pathname === '/features'
+                          ? 'bg-green-600 text-white hover:bg-green-700'
+                          : ''
+                      }
+                    >
+                      Profile
+                    </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-48">
                     <DropdownMenuItem asChild>
-                      <Link href="/profile">My Profile</Link>
+                      <Link 
+                        href="/profile" 
+                        className={pathname === '/profile' ? 'text-green-600' : ''}
+                      >
+                        My Profile
+                      </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <Link href="/kyc">KYC Verification</Link>
+                      <Link 
+                        href="/kyc" 
+                        className={pathname === '/kyc' ? 'text-green-600' : ''}
+                      >
+                        KYC Verification
+                      </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <Link href="/profile/wallet">Wallet</Link>
+                      <Link 
+                        href="/profile/wallet" 
+                        className={pathname === '/profile/wallet' ? 'text-green-600' : ''}
+                      >
+                        Wallet
+                      </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <Link href="/profile/security">Security</Link>
+                      <Link 
+                        href="/profile/security" 
+                        className={pathname === '/profile/security' ? 'text-green-600' : ''}
+                      >
+                        Security
+                      </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <Link href="/features">Features</Link>
+                      <Link 
+                        href="/features" 
+                        className={pathname === '/features' ? 'text-green-600' : ''}
+                      >
+                        Features
+                      </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem 
                       onClick={handleSignOut}
