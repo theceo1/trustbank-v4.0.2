@@ -151,27 +151,28 @@ export function GeneralSwapModal({ isOpen, onClose }: { isOpen: boolean; onClose
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] bg-gradient-to-br from-amber-950 via-orange-900 to-black border-orange-800/50">
         <DialogHeader>
           <DialogTitle>Instant Swap</DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-white/70">
             Swap between currencies instantly
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label>From Currency</Label>
+            <Label className="text-white">From Currency</Label>
             <Select value={fromCurrency} onValueChange={setFromCurrency}>
-              <SelectTrigger>
+              <SelectTrigger className="bg-black/90 text-white border-orange-800/50">
                 <SelectValue placeholder="Select currency" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-black/90 border-orange-800/50">
                 {SUPPORTED_CURRENCIES.map((currency) => (
                   <SelectItem 
                     key={currency.value} 
                     value={currency.value}
                     disabled={currency.value === toCurrency}
+                    className="text-white hover:bg-green-600 hover:text-white data-[highlighted]:text-white data-[highlighted]:bg-green-600"
                   >
                     {currency.label}
                   </SelectItem>
@@ -184,8 +185,8 @@ export function GeneralSwapModal({ isOpen, onClose }: { isOpen: boolean; onClose
             <>
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <Label>Amount</Label>
-                  <span className="text-sm text-muted-foreground">
+                  <Label className="text-white">Amount</Label>
+                  <span className="text-sm text-white/70">
                     Available: {availableBalance} {fromCurrency}
                   </span>
                 </div>
@@ -194,21 +195,23 @@ export function GeneralSwapModal({ isOpen, onClose }: { isOpen: boolean; onClose
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="Enter amount"
+                  className="bg-black/90 text-white border-orange-800/50"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label>To Currency</Label>
+                <Label className="text-white">To Currency</Label>
                 <Select value={toCurrency} onValueChange={setToCurrency}>
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-black/90 text-white border-orange-800/50">
                     <SelectValue placeholder="Select currency" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-black/90 border-orange-800/50">
                     {SUPPORTED_CURRENCIES.map((currency) => (
                       <SelectItem 
                         key={currency.value} 
                         value={currency.value}
                         disabled={currency.value === fromCurrency}
+                        className="text-white hover:bg-green-600 hover:text-white data-[highlighted]:text-white data-[highlighted]:bg-green-600"
                       >
                         {currency.label}
                       </SelectItem>
@@ -218,22 +221,22 @@ export function GeneralSwapModal({ isOpen, onClose }: { isOpen: boolean; onClose
               </div>
 
               {quote && (
-                <div className="rounded-lg border p-4 space-y-3">
+                <div className="rounded-lg border border-orange-800/50 bg-black/90 p-4 space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-sm">Rate</span>
-                    <span className="text-sm font-medium">
+                    <span className="text-sm text-white/70">Rate</span>
+                    <span className="text-sm font-medium text-white">
                       1 {fromCurrency} = {quote.rate} {toCurrency}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm">You'll Receive</span>
-                    <span className="text-sm font-medium">
+                    <span className="text-sm text-white/70">You'll Receive</span>
+                    <span className="text-sm font-medium text-white">
                       {quote.quote_amount} {toCurrency}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm">Network Fee</span>
-                    <span className="text-sm font-medium">
+                    <span className="text-sm text-white/70">Network Fee</span>
+                    <span className="text-sm font-medium text-white">
                       {quote.network_fee} {fromCurrency}
                     </span>
                   </div>
@@ -241,7 +244,7 @@ export function GeneralSwapModal({ isOpen, onClose }: { isOpen: boolean; onClose
               )}
 
               {error && (
-                <Alert variant="destructive">
+                <Alert variant="destructive" className="border-red-500/50 bg-red-950/50">
                   <Icons.warning className="h-4 w-4" />
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
@@ -252,14 +255,14 @@ export function GeneralSwapModal({ isOpen, onClose }: { isOpen: boolean; onClose
                   variant="outline"
                   onClick={getQuote}
                   disabled={loading || !fromCurrency || !toCurrency || !amount}
-                  className="flex-1"
+                  className="flex-1 bg-black/90 text-white border-orange-800/50 hover:bg-green-600 hover:text-white"
                 >
                   Get Quote
                 </Button>
                 <Button
                   onClick={handleSwap}
                   disabled={loading || !quote}
-                  className="flex-1"
+                  className="flex-1 bg-orange-600 hover:bg-orange-700 text-white"
                 >
                   {loading ? (
                     <>

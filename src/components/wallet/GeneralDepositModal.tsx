@@ -114,25 +114,29 @@ export function GeneralDepositModal({ isOpen, onClose }: { isOpen: boolean; onCl
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] bg-gradient-to-br from-black via-green-950 to-black border-green-800/50">
         <DialogHeader>
-          <DialogTitle>Deposit Funds</DialogTitle>
-          <DialogDescription>
-            Select currency and network to deposit funds
+          <DialogTitle className="text-white">Deposit Funds</DialogTitle>
+          <DialogDescription className="text-white/70">
+            Select currency and network to generate deposit address
           </DialogDescription>
         </DialogHeader>
 
         {!showAddress ? (
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Select Currency</Label>
+              <Label className="text-white">Select Currency</Label>
               <Select value={selectedCurrency} onValueChange={setSelectedCurrency}>
-                <SelectTrigger>
+                <SelectTrigger className="bg-black/90 text-white border-green-800/50">
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-black/90 border-green-800/50">
                   {SUPPORTED_CURRENCIES.map((currency) => (
-                    <SelectItem key={currency.value} value={currency.value}>
+                    <SelectItem 
+                      key={currency.value} 
+                      value={currency.value}
+                      className="text-white hover:bg-green-600 hover:text-white data-[highlighted]:text-white data-[highlighted]:bg-green-600"
+                    >
                       {currency.label}
                     </SelectItem>
                   ))}
@@ -142,29 +146,22 @@ export function GeneralDepositModal({ isOpen, onClose }: { isOpen: boolean; onCl
 
             {selectedCurrency && selectedCurrency !== 'NGN' && networks.length > 0 && (
               <div className="space-y-2">
-                <Label>Select Network</Label>
+                <Label className="text-white">Select Network</Label>
                 <Select value={selectedNetwork} onValueChange={setSelectedNetwork}>
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-black/90 text-white border-green-800/50">
                     <SelectValue placeholder="Select network" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-black/90 border-green-800/50">
                     {networks.map((network) => (
                       <SelectItem 
                         key={network.id} 
                         value={network.id}
-                        className="flex items-center justify-between"
+                        className="text-white hover:bg-green-600 hover:text-white data-[highlighted]:text-white data-[highlighted]:bg-green-600"
                       >
-                        <div className="flex items-center gap-2">
-                          {network.name}
-                          {network.isRecommended && (
-                            <span className="text-xs text-green-600 font-medium">
-                              (Recommended)
-                            </span>
-                          )}
-                        </div>
+                        {network.name}
                         {network.fee && (
-                          <span className="text-xs text-gray-500">
-                            Fee: ~{network.fee}
+                          <span className="text-white/70 ml-2">
+                            (Fee: ~{network.fee})
                           </span>
                         )}
                       </SelectItem>
@@ -176,24 +173,25 @@ export function GeneralDepositModal({ isOpen, onClose }: { isOpen: boolean; onCl
 
             {selectedCurrency === 'NGN' ? (
               <div className="space-y-4">
-                <div className="rounded-lg border p-4">
+                <div className="rounded-lg border border-green-800/50 bg-black/90 p-4">
                   <div className="space-y-3">
                     <div className="flex justify-between">
-                      <span className="text-sm font-medium">Bank Name</span>
-                      <span className="text-sm">T.B.D</span>
+                      <span className="text-sm font-medium text-white">Bank Name</span>
+                      <span className="text-sm text-white">T.B.D</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-sm font-medium">Account Name</span>
-                      <span className="text-sm text-green-600">trustBank Technologies</span>
+                      <span className="text-sm font-medium text-white">Account Name</span>
+                      <span className="text-sm text-green-400">trustBank Technologies</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">Account Number</span>
+                      <span className="text-sm font-medium text-white">Account Number</span>
                       <div className="flex items-center gap-2">
-                        <code className="rounded bg-muted px-2 py-1">T.B.D</code>
+                        <code className="rounded bg-black/90 px-2 py-1 text-white">T.B.D</code>
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => handleCopy('T.B.D')}
+                          className="text-green-400 hover:text-green-300"
                         >
                           {copied ? (
                             <Icons.check className="h-4 w-4" />
@@ -227,31 +225,32 @@ export function GeneralDepositModal({ isOpen, onClose }: { isOpen: boolean; onCl
           <div className="space-y-6">
             {loading ? (
               <div className="flex flex-col items-center justify-center py-8 space-y-4">
-                <Icons.spinner className="h-8 w-8 animate-spin text-green-600" />
-                <p className="text-sm text-green-600">
+                <Icons.spinner className="h-8 w-8 animate-spin text-green-400" />
+                <p className="text-sm text-white">
                   Generating deposit address...
                 </p>
               </div>
             ) : error ? (
-              <Alert variant="destructive">
+              <Alert variant="destructive" className="border-red-500/50 bg-red-950/50">
                 <Icons.warning className="h-4 w-4" />
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             ) : address ? (
               <>
-                <div className="flex justify-center">
+                <div className="flex justify-center p-4 bg-white rounded-lg">
                   <QRCodeSVG value={address} size={200} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Deposit Address</Label>
+                  <Label className="text-white">Deposit Address</Label>
                   <div className="flex items-center gap-2">
-                    <code className="flex-1 rounded bg-muted p-2 font-mono text-sm break-all">
+                    <code className="flex-1 rounded bg-black/90 p-2 font-mono text-sm break-all text-white border border-green-800/50">
                       {address}
                     </code>
                     <Button
                       variant="outline"
                       size="icon"
                       onClick={() => handleCopy(address)}
+                      className="bg-black/90 text-green-400 hover:text-green-300 border-green-800/50"
                     >
                       {copied ? (
                         <Icons.check className="h-4 w-4" />
@@ -261,9 +260,9 @@ export function GeneralDepositModal({ isOpen, onClose }: { isOpen: boolean; onCl
                     </Button>
                   </div>
                 </div>
-                <Alert className="bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
-                  <Icons.warning className="h-4 w-4 text-yellow-600" />
-                  <AlertDescription className="text-yellow-600">
+                <Alert className="bg-yellow-950/20 border-yellow-800/50">
+                  <Icons.warning className="h-4 w-4 text-yellow-400" />
+                  <AlertDescription className="text-yellow-100">
                     Only send {selectedCurrency} to this address on the {selectedNetwork.toUpperCase()} network.
                     Sending any other asset may result in permanent loss.
                   </AlertDescription>
@@ -271,7 +270,7 @@ export function GeneralDepositModal({ isOpen, onClose }: { isOpen: boolean; onCl
                 <Button
                   variant="outline"
                   onClick={() => setShowAddress(false)}
-                  className="w-full"
+                  className="w-full bg-black/90 text-white border-green-800/50 hover:bg-green-600"
                 >
                   Back
                 </Button>

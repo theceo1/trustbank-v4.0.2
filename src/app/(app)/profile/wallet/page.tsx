@@ -320,14 +320,14 @@ export default function WalletPage() {
           </Button>
           <Button 
             onClick={() => handleSwapClick()}
-            className="w-full h-auto py-4 bg-purple-600 hover:bg-purple-700 text-white flex flex-col items-center gap-2"
+            className="w-full h-auto py-4 bg-purple-800 hover:bg-purple-900 text-white flex flex-col items-center gap-2"
           >
-            <div className="bg-purple-500/20 p-2 rounded-lg">
+            <div className="bg-white/10 p-2 rounded-lg">
               <Icons.refresh className="h-5 w-5" />
             </div>
             <div className="text-center">
               <div className="font-medium">Instant Swap</div>
-              <div className="text-xs text-purple-100">Exchange between currencies</div>
+              <div className="text-xs text-purple-50">Exchange between currencies</div>
             </div>
           </Button>
         </div>

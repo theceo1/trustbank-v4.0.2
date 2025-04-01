@@ -160,10 +160,10 @@ export function GeneralWithdrawModal({ isOpen, onClose }: { isOpen: boolean; onC
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] bg-gradient-to-br from-indigo-950 via-purple-900 to-black border-purple-800/50">
         <DialogHeader>
-          <DialogTitle>Withdraw Funds</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-white">Withdraw Funds</DialogTitle>
+          <DialogDescription className="text-white/70">
             Select currency and enter withdrawal details
           </DialogDescription>
         </DialogHeader>
@@ -171,14 +171,18 @@ export function GeneralWithdrawModal({ isOpen, onClose }: { isOpen: boolean; onC
         {!showPreview ? (
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Select Currency</Label>
+              <Label className="text-white">Select Currency</Label>
               <Select value={selectedCurrency} onValueChange={setSelectedCurrency}>
-                <SelectTrigger>
+                <SelectTrigger className="bg-black/90 text-white border-purple-800/50">
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-black/90 border-purple-800/50">
                   {SUPPORTED_CURRENCIES.map((currency) => (
-                    <SelectItem key={currency.value} value={currency.value}>
+                    <SelectItem 
+                      key={currency.value} 
+                      value={currency.value}
+                      className="text-white hover:bg-green-600 hover:text-white data-[highlighted]:text-white data-[highlighted]:bg-green-600"
+                    >
                       {currency.label}
                     </SelectItem>
                   ))}
@@ -190,8 +194,8 @@ export function GeneralWithdrawModal({ isOpen, onClose }: { isOpen: boolean; onC
               <>
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <Label>Amount</Label>
-                    <span className="text-sm text-muted-foreground">
+                    <Label className="text-white">Amount</Label>
+                    <span className="text-sm text-white/70">
                       Available: {availableBalance} {selectedCurrency}
                     </span>
                   </div>
@@ -200,21 +204,23 @@ export function GeneralWithdrawModal({ isOpen, onClose }: { isOpen: boolean; onC
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     placeholder="Enter amount"
+                    className="bg-black/90 text-white border-purple-800/50"
                   />
                 </div>
 
                 {selectedCurrency !== 'NGN' && (
                   <div className="space-y-2">
-                    <Label>Select Network</Label>
+                    <Label className="text-white">Select Network</Label>
                     <Select value={selectedNetwork} onValueChange={setSelectedNetwork}>
-                      <SelectTrigger>
+                      <SelectTrigger className="bg-black/90 text-white border-purple-800/50">
                         <SelectValue placeholder="Select network" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-black/90 border-purple-800/50">
                         {networks.map((network) => (
                           <SelectItem 
                             key={network.id} 
                             value={network.id}
+                            className="text-white hover:bg-green-600 hover:text-white data-[highlighted]:text-white data-[highlighted]:bg-green-600"
                           >
                             {network.name}
                             {network.fee && ` (Fee: ~${network.fee})`}
@@ -226,7 +232,7 @@ export function GeneralWithdrawModal({ isOpen, onClose }: { isOpen: boolean; onC
                 )}
 
                 <div className="space-y-2">
-                  <Label>
+                  <Label className="text-white">
                     {selectedCurrency === 'NGN' ? 'Bank Account Number' : 'Withdrawal Address'}
                   </Label>
                   <Input
@@ -237,11 +243,12 @@ export function GeneralWithdrawModal({ isOpen, onClose }: { isOpen: boolean; onC
                         ? "Enter bank account number" 
                         : "Enter withdrawal address"
                     }
+                    className="bg-black/90 text-white border-purple-800/50"
                   />
                 </div>
 
                 {error && (
-                  <Alert variant="destructive">
+                  <Alert variant="destructive" className="border-red-500/50 bg-red-950/50">
                     <Icons.warning className="h-4 w-4" />
                     <AlertDescription>{error}</AlertDescription>
                   </Alert>
@@ -250,7 +257,7 @@ export function GeneralWithdrawModal({ isOpen, onClose }: { isOpen: boolean; onC
                 <Button
                   onClick={handleSubmit}
                   disabled={loading || !selectedCurrency || !amount || !address}
-                  className="w-full"
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white"
                 >
                   {loading ? (
                     <>

@@ -1088,19 +1088,19 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
                 value={fromCurrency}
                 onValueChange={setFromCurrency}
               >
-                <SelectTrigger className="w-full h-12 bg-white dark:bg-gray-800 border shadow-sm">
+                <SelectTrigger className="w-full h-12 bg-black/90 text-white border-orange-800/50">
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
-                <SelectContent className="bg-white dark:bg-gray-800">
+                <SelectContent className="bg-black/90 border-orange-800/50">
                   {wallets.map((wallet) => (
                     <SelectItem 
                       key={wallet.currency} 
                       value={wallet.currency}
-                      className="hover:bg-green-600 hover:text-white transition-colors"
+                      className="text-white hover:bg-green-600 hover:text-white data-[highlighted]:text-white data-[highlighted]:bg-green-600"
                     >
                       <div className="flex items-center justify-between w-full">
                         <span className="font-medium">{wallet.currency}</span>
-                        <span className="text-muted-foreground">
+                        <span className="text-white/70">
                           {getCurrencyName(wallet.currency)}
                         </span>
                       </div>
@@ -1113,7 +1113,7 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
 
             {/* Amount Section */}
             <div className="space-y-2">
-              <Label>Amount</Label>
+              <Label className="text-white">Amount</Label>
               <div className="relative">
                 <Input
                   type="number"
@@ -1121,34 +1121,34 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
                   min="0"
                   value={amount}
                   onChange={(e) => handleAmountChange(e.target.value)}
-                  className="pr-24 h-12 bg-white dark:bg-gray-800"
+                  className="pr-24 h-12 bg-black/90 text-white border-orange-800/50"
                   placeholder={`Enter amount in ${amountCurrency === 'CRYPTO' ? fromCurrency : amountCurrency}`}
                 />
                 <Select
                   value={amountCurrency}
                   onValueChange={handleAmountCurrencyChange}
                 >
-                  <SelectTrigger className="absolute right-0 top-0 h-full w-24 border-l bg-white dark:bg-gray-800">
+                  <SelectTrigger className="absolute right-0 top-0 h-full w-24 border-l bg-black/90 text-white border-orange-800/50">
                     <SelectValue placeholder="Currency" />
                   </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-gray-800">
+                  <SelectContent className="bg-black/90 border-orange-800/50">
                     {fromCurrency && (
                       <SelectItem 
                         value="CRYPTO"
-                        className="hover:bg-green-600 hover:text-white transition-colors"
+                        className="text-white hover:bg-green-600 hover:text-white data-[highlighted]:text-white data-[highlighted]:bg-green-600"
                       >
                         {fromCurrency}
                       </SelectItem>
                     )}
                     <SelectItem 
                       value="NGN"
-                      className="hover:bg-green-600 hover:text-white transition-colors"
+                      className="text-white hover:bg-green-600 hover:text-white data-[highlighted]:text-white data-[highlighted]:bg-green-600"
                     >
                       NGN
                     </SelectItem>
                     <SelectItem 
                       value="USD"
-                      className="hover:bg-green-600 hover:text-white transition-colors"
+                      className="text-white hover:bg-green-600 hover:text-white data-[highlighted]:text-white data-[highlighted]:bg-green-600"
                     >
                       USD
                     </SelectItem>
@@ -1159,22 +1159,22 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
 
             {/* To Section */}
             <div className="space-y-2">
-              <Label>To</Label>
+              <Label className="text-white">To</Label>
               <Select
                 value={toCurrency}
                 onValueChange={setToCurrency}
               >
-                <SelectTrigger className="w-full h-12 bg-white dark:bg-gray-800 border shadow-sm">
+                <SelectTrigger className="w-full h-12 bg-black/90 text-white border-orange-800/50">
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
-                <SelectContent className="bg-white dark:bg-gray-800 max-h-[200px] overflow-hidden">
-                  <div className="sticky top-0 z-10 bg-white dark:bg-gray-800 p-2 border-b">
+                <SelectContent className="bg-black/90 border-orange-800/50">
+                  <div className="sticky top-0 z-10 bg-black/90 p-2 border-b border-orange-800/50">
                     <Input
                       type="text"
                       placeholder="Search currencies..."
                       value={toSearchQuery}
                       onChange={(e) => setToSearchQuery(e.target.value)}
-                      className="h-9"
+                      className="h-9 bg-black/90 text-white border-orange-800/50"
                     />
                   </div>
                   <div className="overflow-y-auto max-h-[160px]">
@@ -1188,11 +1188,11 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
                         <SelectItem 
                           key={currency.value} 
                           value={currency.value}
-                          className="hover:bg-green-600 hover:text-white transition-colors"
+                          className="text-white hover:bg-green-600 hover:text-white data-[highlighted]:text-white data-[highlighted]:bg-green-600"
                         >
                           <div className="flex items-center justify-between w-full">
                             <span className="font-medium">{currency.value}</span>
-                            <span className="text-muted-foreground">
+                            <span className="text-white/70">
                               {currency.label}
                             </span>
                           </div>
@@ -1209,7 +1209,7 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
               type="submit"
               onClick={handleGetQuote}
               disabled={!isValid || isLoading}
-              className="w-full bg-green-600 hover:bg-green-700"
+              className="w-full bg-orange-600 hover:bg-orange-700 text-white"
             >
               {isLoading ? (
                 <>
