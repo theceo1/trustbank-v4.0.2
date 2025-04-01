@@ -40,7 +40,7 @@ const NETWORKS_BY_CURRENCY: Record<string, Array<{
   fee?: string;
   isFiat?: boolean;
 }>> = {
-  btc: [{ id: 'bitcoin', name: 'Bitcoin Network', isRecommended: true }],
+  btc: [{ id: 'btc', name: 'Bitcoin Network', isRecommended: true }],
   eth: [
     { id: 'erc20', name: 'Ethereum Network (ERC20)', isRecommended: true },
     { id: 'ethereum', name: 'Ethereum Network', fee: '10-20 USDT' }
@@ -234,6 +234,7 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
 
       console.log('[DepositModal] Fetching address for:', { currency, network });
       
+      // First try to get existing addresses
       const response = await fetch(
         `/api/wallet/address?currency=${currency}&network=${network}`,
         { method: 'GET' }
@@ -243,6 +244,30 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
       console.log('[DepositModal] Address API response:', data);
 
       if (!response.ok) {
+        // If the error indicates an address already exists, try to fetch it
+        if (data.error?.includes('Address already generated')) {
+          console.log('[DepositModal] Address exists, fetching existing address...');
+          
+          // Add a small delay to allow for any race conditions
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          const existingResponse = await fetch(
+            `/api/wallet/address?currency=${currency}&network=${network}&fetch_existing=true`,
+            { method: 'GET' }
+          );
+          
+          const existingData = await existingResponse.json();
+          console.log('[DepositModal] Existing address response:', existingData);
+          
+          if (existingResponse.ok && existingData.data?.deposit_address) {
+            setAddress(existingData.data.deposit_address);
+            if (existingData.data.destination_tag) {
+              setDestinationTag(existingData.data.destination_tag);
+            }
+            return;
+          }
+        }
+        
         const errorMessage = data.error || data.message || 'Failed to fetch deposit address';
         console.error('[DepositModal] API error:', { status: response.status, error: errorMessage });
         throw new Error(errorMessage);
@@ -323,6 +348,7 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
       }, 100);
     }
   }, [isOpen, wallet?.currency]);
+
 
   const handleNetworkChange = (network: string) => {
     setSelectedNetwork(network);

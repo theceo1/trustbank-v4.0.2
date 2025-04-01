@@ -5,7 +5,7 @@ import { QuidaxServerService } from '@/lib/quidax';
 
 // Define supported networks for each currency
 const CURRENCY_NETWORKS: Record<string, string[]> = {
-  btc: ['bitcoin'],
+  btc: ['btc', 'bitcoin'],
   eth: ['erc20', 'ethereum'],
   usdt: ['erc20', 'trc20', 'bep20'],
   usdc: ['erc20', 'trc20', 'bep20'],
@@ -193,7 +193,7 @@ export async function GET(request: Request) {
     try {
       console.log('[WalletAddress] Fetching address for:', { 
         currency, 
-        network, 
+        network: targetNetwork,
         userId: profile.quidax_id,
         apiUrl: process.env.NEXT_PUBLIC_QUIDAX_API_URL,
         hasSecretKey: !!process.env.QUIDAX_SECRET_KEY
@@ -202,7 +202,13 @@ export async function GET(request: Request) {
       // First try to get existing address
       const existingAddressResponse = await quidaxService.request(
         `/users/${profile.quidax_id}/wallets/${currency}/address`
-      );
+      ).catch(error => {
+        console.error('[WalletAddress] Error fetching existing address:', {
+          error: error.response?.data || error.message,
+          status: error.response?.status
+        });
+        return null;
+      });
 
       console.log('[WalletAddress] Raw existing address response:', JSON.stringify(existingAddressResponse, null, 2));
 
@@ -226,7 +232,13 @@ export async function GET(request: Request) {
           {
             method: 'POST'
           }
-        );
+        ).catch(error => {
+          console.error('[WalletAddress] Error creating new address:', {
+            error: error.response?.data || error.message,
+            status: error.response?.status
+          });
+          throw error;
+        });
 
         console.log('[WalletAddress] Raw new address response:', JSON.stringify(newAddressResponse, null, 2));
 

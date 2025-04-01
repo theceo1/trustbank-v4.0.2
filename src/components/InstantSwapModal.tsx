@@ -255,7 +255,7 @@ function TradePreviewModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/30 dark:to-amber-900/30 backdrop-blur-sm">
+      <DialogContent className="sm:max-w-md bg-gradient-to-br from-amber-950 via-orange-900 to-black border-orange-800/50">
         <DialogHeader>
           <DialogTitle>Confirm Swap</DialogTitle>
           <DialogDescription>
@@ -1072,7 +1072,7 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
   return (
     <>
       <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-md bg-white dark:bg-gray-800">
+        <DialogContent className="sm:max-w-md bg-gradient-to-br from-amber-950 via-orange-900 to-black border-orange-800/50">
           <DialogHeader>
             <DialogTitle>Instant Swap</DialogTitle>
             <DialogDescription>

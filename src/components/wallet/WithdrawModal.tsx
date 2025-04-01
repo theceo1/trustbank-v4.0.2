@@ -15,6 +15,7 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import type { Database } from "@/types/database.types";
 import { WithdrawPreview } from './WithdrawPreview';
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 
 interface WithdrawModalProps {
   isOpen: boolean;
@@ -347,18 +348,18 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
   };
 
   const renderCryptoWithdraw = () => (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <label className="text-sm font-medium">Select Currency</label>
+    <div className="space-y-4">
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-white">Select Currency</label>
         <Select value={currency} onValueChange={setCurrency}>
-          <SelectTrigger>
+          <SelectTrigger className="bg-black text-white border-green-800/50 h-8 text-xs">
             <SelectValue placeholder="Select currency" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="bg-black border-green-800/50">
             {walletData?.wallets
               .filter((w: any) => parseFloat(w.balance) > 0 || CORE_CURRENCIES.includes(w.currency.toUpperCase()))
               .map((w: any) => (
-                <SelectItem key={w.currency} value={w.currency.toUpperCase()}>
+                <SelectItem key={w.currency} value={w.currency.toUpperCase()} className="text-white text-xs">
                   {w.currency.toUpperCase()}
                 </SelectItem>
               ))}
@@ -367,36 +368,34 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
       </div>
 
       {currency && (
-        <>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Network</label>
-            <Select value={selectedNetwork} onValueChange={(value) => setSelectedNetwork(value as NetworkType)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select network" />
-              </SelectTrigger>
-              <SelectContent>
-                {networkConfig[currency as keyof NetworkConfig]?.map((net) => (
-                  <SelectItem key={net} value={net}>
-                    {net}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-white">Network</label>
+          <Select value={selectedNetwork} onValueChange={(value) => setSelectedNetwork(value as NetworkType)}>
+            <SelectTrigger className="bg-black text-white border-green-800/50 h-8 text-xs">
+              <SelectValue placeholder="Select network" />
+            </SelectTrigger>
+            <SelectContent className="bg-black border-green-800/50">
+              {networkConfig[currency as keyof NetworkConfig]?.map((net) => (
+                <SelectItem key={net} value={net} className="text-white text-xs">
+                  {net}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       )}
 
-      <div className="space-y-2">
+      <div className="space-y-1">
         <div className="flex items-center justify-between">
-          <label className="text-sm font-medium">Amount</label>
+          <label className="text-xs font-medium text-white">Amount</label>
           <Select value={inputCurrency} onValueChange={(value) => setInputCurrency(value as InputCurrency)}>
-            <SelectTrigger className="w-[110px]">
+            <SelectTrigger className="w-[90px] bg-black text-white border-green-800/50 h-8 text-xs">
               <SelectValue placeholder="Currency" />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="CRYPTO">{currency}</SelectItem>
-              <SelectItem value="NGN">NGN</SelectItem>
-              <SelectItem value="USD">USD</SelectItem>
+            <SelectContent className="bg-black border-green-800/50">
+              <SelectItem value="CRYPTO" className="text-white text-xs">{currency}</SelectItem>
+              <SelectItem value="NGN" className="text-white text-xs">NGN</SelectItem>
+              <SelectItem value="USD" className="text-white text-xs">USD</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -408,39 +407,41 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
             placeholder={inputCurrency === 'NGN' ? '₦0.00' : inputCurrency === 'USD' ? '$0.00' : '0.00'}
             min="0"
             step="any"
+            className="bg-black text-white border-green-800/50 h-8 text-xs"
           />
           <Button
             variant="ghost"
             size="sm"
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-xs"
+            className="absolute right-1 top-1/2 -translate-y-1/2 text-[10px] text-green-400 h-6 px-2"
             onClick={handleMaxAmount}
           >
             MAX
           </Button>
         </div>
-        <p className="text-sm text-green-600">
+        <p className="text-[10px] text-green-400">
           {inputCurrency === 'CRYPTO' ? (
             `≈ ₦${formatCurrency(parseFloat(amount || '0') * rate, 'NGN')}`
           ) : inputCurrency === 'NGN' ? (
-            `≈ ${formatCurrency(amountInCrypto, currency)}`
+            `≈ ${amountInCrypto.toFixed(8)} ${currency}`
           ) : (
-            `≈ ${formatCurrency(amountInCrypto, currency)} (₦${formatCurrency(parseFloat(amount || '0') * 1585.23, 'NGN')})`
+            `≈ ${amountInCrypto.toFixed(8)} ${currency} (₦${formatCurrency(parseFloat(amount || '0') * 1585.23, 'NGN')})`
           )}
         </p>
       </div>
 
-      <div className="space-y-2">
-        <label className="text-sm font-medium">Withdrawal Address</label>
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-white">Withdrawal Address</label>
         <Input
           value={address}
           onChange={(e) => setAddress(e.target.value)}
           placeholder={`Enter ${selectedNetwork} wallet address`}
+          className="bg-black text-white border-green-800/50 h-8 text-xs"
         />
       </div>
 
-      <Alert className="bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
-        <Icons.warning className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-        <AlertDescription className="text-yellow-600 dark:text-yellow-400">
+      <Alert className="bg-yellow-900/20 border-yellow-800/50 py-2">
+        <Icons.warning className="h-3 w-3 text-yellow-400" />
+        <AlertDescription className="text-[10px] text-yellow-100">
           Please ensure you have entered the correct withdrawal address and selected the appropriate network.
           Transactions cannot be reversed once processed.
         </AlertDescription>
@@ -449,16 +450,16 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
   );
 
   const renderNGNWithdraw = () => (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <label className="text-sm font-medium">Select Cryptocurrency</label>
+    <div className="space-y-4">
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-white">Select Cryptocurrency</label>
         <Select value={selectedNetwork} onValueChange={(value) => setSelectedNetwork(value as NetworkType)}>
-          <SelectTrigger>
+          <SelectTrigger className="bg-black text-white border-green-800/50 h-8 text-xs">
             <SelectValue placeholder="Select cryptocurrency" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="bg-black border-green-800/50">
             {networkConfig[currency as keyof NetworkConfig]?.map((net) => (
-              <SelectItem key={net} value={net}>
+              <SelectItem key={net} value={net} className="text-white text-xs">
                 {net}
               </SelectItem>
             ))}
@@ -466,8 +467,8 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
         </Select>
       </div>
 
-      <div className="space-y-2">
-        <label className="text-sm font-medium">Amount (NGN)</label>
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-white">Amount (NGN)</label>
         <div className="relative">
           <Input
             type="number"
@@ -476,32 +477,33 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
             placeholder="₦0.00"
             min="0"
             step="any"
+            className="bg-black text-white border-green-800/50 h-8 text-xs"
           />
           <Button
             variant="ghost"
             size="sm"
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-xs"
+            className="absolute right-1 top-1/2 -translate-y-1/2 text-[10px] text-green-400 h-6 px-2"
             onClick={handleMaxAmount}
           >
             MAX
           </Button>
         </div>
         {rate > 0 && (
-          <p className="text-sm text-green-600">
-            ≈ {formatCurrency(amountInCrypto, selectedNetwork)}
+          <p className="text-[10px] text-green-400">
+            ≈ {amountInCrypto.toFixed(8)} {selectedNetwork}
           </p>
         )}
       </div>
 
-      <div className="space-y-2">
-        <label className="text-sm font-medium">Bank Name</label>
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-white">Bank Name</label>
         <Select value={selectedBank} onValueChange={(value) => setSelectedBank(value)}>
-          <SelectTrigger>
+          <SelectTrigger className="bg-black text-white border-green-800/50 h-8 text-xs">
             <SelectValue placeholder="Select your bank" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="bg-black border-green-800/50">
             {SUPPORTED_BANKS.map((bank) => (
-              <SelectItem key={bank.id} value={bank.id}>
+              <SelectItem key={bank.id} value={bank.id} className="text-white text-xs">
                 {bank.name}
               </SelectItem>
             ))}
@@ -509,8 +511,8 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
         </Select>
       </div>
 
-      <div className="space-y-2">
-        <label className="text-sm font-medium">Account Number</label>
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-white">Account Number</label>
         <Input
           value={accountNumber}
           onChange={(e) => {
@@ -520,37 +522,39 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
           }}
           placeholder="Enter 10-digit account number"
           maxLength={10}
+          className="bg-black text-white border-green-800/50 h-8 text-xs"
         />
       </div>
 
       {isValidatingAccount && (
-        <div className="flex items-center justify-center py-2">
-          <Icons.spinner className="h-4 w-4 animate-spin text-muted-foreground" />
-          <span className="ml-2 text-sm text-muted-foreground">Validating account...</span>
+        <div className="flex items-center justify-center py-1">
+          <Icons.spinner className="h-3 w-3 animate-spin text-green-400" />
+          <span className="ml-2 text-[10px] text-white/70">Validating account...</span>
         </div>
       )}
 
       {accountName && (
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Account Name</label>
-          <div className="rounded-md border bg-muted px-3 py-2">
-            <p className="text-sm">{accountName}</p>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-white">Account Name</label>
+          <div className="rounded-md border border-green-800/50 bg-black/50 px-3 py-1.5">
+            <p className="text-xs text-white">{accountName}</p>
           </div>
         </div>
       )}
 
-      <div className="space-y-2">
-        <label className="text-sm font-medium">Reference (Optional)</label>
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-white">Reference (Optional)</label>
         <Input
           value={reference}
           onChange={(e) => setReference(e.target.value)}
           placeholder="Add a reference for this withdrawal"
+          className="bg-black text-white border-green-800/50 h-8 text-xs"
         />
       </div>
 
-      <Alert className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-        <Icons.info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-        <AlertDescription className="text-blue-600 dark:text-blue-400">
+      <Alert className="bg-blue-900/20 border-blue-800/50 py-2">
+        <Icons.info className="h-3 w-3 text-blue-400" />
+        <AlertDescription className="text-[10px] text-blue-100">
           Bank transfers are typically processed within 3-7 minutes after confirmation.
           Please ensure your bank account details are correct before proceeding.
         </AlertDescription>
@@ -576,57 +580,60 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <span>Withdraw</span>
-            {isLoading && <Icons.spinner className="h-4 w-4 animate-spin" />}
-          </DialogTitle>
-          <DialogDescription className="flex items-center justify-between">
-            <span>
-              Available balance: {formatCurrency(balance, currency)}
-              {currency !== 'NGN' && rate > 0 && (
-                <span className="text-green-600">
-                  {' '}(≈ {formatCurrency(balanceInNGN, 'NGN')})
-                </span>
-              )}
-            </span>
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-[425px] max-h-[80vh] sm:max-h-[85vh] overflow-y-auto bg-gradient-to-br from-indigo-950 via-purple-900 to-black border-purple-800/50">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <DialogHeader className="space-y-0.5">
+            <DialogTitle className="text-base font-semibold text-white">
+              Withdraw {currency?.toUpperCase()}
+            </DialogTitle>
+            <DialogDescription className="text-xs text-white/70">
+              {currency.toLowerCase() === 'ngn' 
+                ? "Enter your bank details to withdraw"
+                : "Select a network and enter withdrawal details"
+              }
+            </DialogDescription>
+          </DialogHeader>
 
-        {currency.toLowerCase() === 'ngn' ? (
-          renderNGNWithdraw()
-        ) : (
-          <Tabs defaultValue="crypto" className="w-full" onValueChange={(value) => setSelectedNetwork(value as NetworkType)}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="crypto">Crypto Withdrawal</TabsTrigger>
-              <TabsTrigger value="ngn">NGN Withdrawal</TabsTrigger>
-            </TabsList>
-            <TabsContent value="crypto" className="mt-4">
-              {renderCryptoWithdraw()}
-            </TabsContent>
-            <TabsContent value="ngn" className="mt-4">
-              {renderNGNWithdraw()}
-            </TabsContent>
-          </Tabs>
-        )}
-
-        <DialogFooter>
-          <Button
-            onClick={handleWithdraw}
-            disabled={isLoading || !amount || (!address && !accountNumber) || (!selectedNetwork && currency.toLowerCase() !== 'ngn')}
-            className="w-full bg-green-600 hover:bg-green-700 text-white"
-          >
-            {isLoading ? (
-              <>
-                <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
-                Processing...
-              </>
+          <div className="space-y-3 mt-2">
+            {currency.toLowerCase() === 'ngn' ? (
+              renderNGNWithdraw()
             ) : (
-              'Withdraw'
+              <Tabs defaultValue="crypto" className="w-full" onValueChange={(value) => setSelectedNetwork(value as NetworkType)}>
+                <TabsList className="grid w-full grid-cols-2 bg-black/20 h-8">
+                  <TabsTrigger value="crypto" className="text-xs text-white data-[state=active]:bg-green-600">Crypto Withdrawal</TabsTrigger>
+                  <TabsTrigger value="ngn" className="text-xs text-white data-[state=active]:bg-green-600">NGN Withdrawal</TabsTrigger>
+                </TabsList>
+                <TabsContent value="crypto" className="mt-3">
+                  {renderCryptoWithdraw()}
+                </TabsContent>
+                <TabsContent value="ngn" className="mt-3">
+                  {renderNGNWithdraw()}
+                </TabsContent>
+              </Tabs>
             )}
-          </Button>
-        </DialogFooter>
+
+            <DialogFooter>
+              <Button
+                onClick={handleWithdraw}
+                disabled={isLoading || !amount || (!address && !accountNumber) || (!selectedNetwork && currency.toLowerCase() !== 'ngn')}
+                className="w-full bg-green-600 hover:bg-green-700 text-white text-sm h-9"
+              >
+                {isLoading ? (
+                  <>
+                    <Icons.spinner className="mr-2 h-3 w-3 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  'Withdraw'
+                )}
+              </Button>
+            </DialogFooter>
+          </div>
+        </motion.div>
       </DialogContent>
     </Dialog>
   );

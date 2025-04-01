@@ -51,7 +51,7 @@ export class QuidaxService {
         data = JSON.parse(responseText);
       } catch (e) {
         console.error('[QuidaxService] Failed to parse response as JSON:', e);
-        throw new Error('Invalid response format from API');
+        throw new Error(`Invalid response format from API: ${responseText.substring(0, 100)}`);
       }
 
       if (!response.ok) {
@@ -61,16 +61,24 @@ export class QuidaxService {
           data
         });
         
-        throw new Error(data.message || data.error || 'Request failed');
+        const error = new Error(data.message || data.error || 'Request failed');
+        (error as any).response = { status: response.status, data };
+        throw error;
+      }
+
+      if (!data || (typeof data === 'object' && !('data' in data))) {
+        console.error('[QuidaxService] Invalid response structure:', data);
+        throw new Error('Invalid response structure from API');
       }
 
       return data;
     } catch (error: any) {
       console.error('[QuidaxService] Request error:', {
         endpoint,
-        error: error.message || error
+        error: error.message || error,
+        response: error.response
       });
-      throw new Error(error.message || 'Failed to process request');
+      throw error;
     }
   }
 

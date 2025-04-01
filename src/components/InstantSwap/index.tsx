@@ -202,7 +202,7 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
   return (
     <>
       <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-md bg-white dark:bg-gray-800">
+        <DialogContent className="sm:max-w-md bg-gradient-to-br from-amber-950 via-orange-900 to-black border-orange-800/50">
           <DialogHeader>
             <DialogTitle>Instant Swap</DialogTitle>
             <DialogDescription>

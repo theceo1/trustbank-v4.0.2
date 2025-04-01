@@ -359,7 +359,7 @@ export default function ClientDashboard({
               className="w-full justify-start bg-white dark:bg-gray-800 hover:bg-green-600 hover:text-white transition-all duration-200 h-12" 
               asChild
             >
-              <Link href="/trades">
+              <Link href="/trade">
                 <ArrowRightLeft className="h-5 w-5 mr-3" />
                 <div>
                   <span className="font-medium">Trade Crypto</span>
@@ -372,7 +372,7 @@ export default function ClientDashboard({
               className="w-full justify-start bg-white dark:bg-gray-800 hover:bg-green-600 hover:text-white transition-all duration-200 h-12" 
               asChild
             >
-              <Link href="/trades/p2p">
+              <Link href="/trade/p2p">
                 <Users className="h-5 w-5 mr-3" />
                 <div>
                   <span className="font-medium">P2P Trading</span>
