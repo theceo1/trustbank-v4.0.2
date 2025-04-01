@@ -47,65 +47,74 @@ export function Header() {
   const pathname = usePathname();
   const supabase = createClientComponentClient();
 
+  const getInitialSession = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log('[Header] Getting initial session:', session?.user?.id);
+      
+      if (session?.user) {
+        setUser(session.user);
+        setLoading(false);
+        if (!pathname.startsWith('/auth')) {
+          await router.refresh();
+        }
+      } else {
+        setUser(null);
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error('[Header] Error getting initial session:', error);
+      setUser(null);
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     let mounted = true;
-
-    const getInitialSession = async () => {
-      try {
-        setLoading(true);
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (error) throw error;
-        
-        if (mounted) {
-          console.log('[Header] Initial session loaded:', session?.user ? `User ${session.user.id}` : 'No user');
-          setUser(session?.user || null);
-          
-          // Only refresh if we have a session and we're not on the auth pages
-          if (session?.user && !pathname?.startsWith('/auth')) {
-            await router.refresh();
-          }
-        }
-      } catch (error) {
-        console.error('[Header] Error getting initial session:', error);
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    };
-
+    
     getInitialSession();
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return;
-      
       console.log('[Header] Auth state change:', event, session?.user?.id);
-      
-      // Update user state immediately
-      setUser(session?.user || null);
-      setLoading(false);
-      
-      // Handle different auth events
+
+      if (!mounted) return;
+
       switch (event) {
         case 'SIGNED_IN':
-          if (!pathname?.startsWith('/auth')) {
-            await router.refresh();
+          if (session?.user) {
+            setUser(session.user);
+            setLoading(false);
+            if (!pathname.startsWith('/auth')) {
+              await router.refresh();
+            }
           }
           break;
         case 'SIGNED_OUT':
           setUser(null);
+          setLoading(false);
           await router.refresh();
           router.push('/');
           break;
         case 'TOKEN_REFRESHED':
         case 'USER_UPDATED':
-          await router.refresh();
+          if (session?.user) {
+            setUser(session.user);
+            setLoading(false);
+            if (!pathname.startsWith('/auth')) {
+              await router.refresh();
+            }
+          }
           break;
         case 'INITIAL_SESSION':
-          // Don't do anything special for initial session as it's handled by getInitialSession
+          if (session?.user) {
+            setUser(session.user);
+            setLoading(false);
+            if (!pathname.startsWith('/auth')) {
+              await router.refresh();
+            }
+          }
           break;
       }
     });
@@ -115,13 +124,6 @@ export function Header() {
       subscription.unsubscribe();
     };
   }, [supabase, router, pathname]);
-
-  // Remove the separate pathname effect since we handle it in the auth state changes
-  useEffect(() => {
-    if (pathname && user && !pathname.startsWith('/auth')) {
-      router.refresh();
-    }
-  }, [pathname, user, router]);
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
@@ -146,6 +148,16 @@ export function Header() {
   };
 
   const handleInstantSwap = () => {
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to access instant swap.",
+        variant: "destructive",
+        className: "bg-red-100 dark:bg-red-900 border-red-200 dark:border-red-800",
+      });
+      router.push('/auth/login');
+      return;
+    }
     setIsSwapModalOpen(true);
   };
 
