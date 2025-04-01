@@ -19,7 +19,7 @@ import { SpeedInsights } from '@vercel/speed-insights/next'
 export const metadata = {
   title: {
     default: 'trustBank - CRYPTO | SIMPLIFIED',
-    template: '%s | trustBank'
+    // template: '%s | trustBank'
   },
   description: 'simplifying crypto adoption in emerging markets.',
   keywords: ['crypto', 'cryptocurrency', 'bitcoin', 'ethereum', 'trading', 'exchange', 'wallet', 'blockchain', 'trustBank', 'trustbank', 'trust bank tech', 'trust bank crypto', 'trust bank cryptocurrency', 'trust bank exchange'],
