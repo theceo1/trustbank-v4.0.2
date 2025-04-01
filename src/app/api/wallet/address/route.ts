@@ -152,10 +152,11 @@ export async function GET(request: Request) {
       return NextResponse.json(
         { 
           status: 'error',
-          message: 'Account setup incomplete',
-          error: 'Please complete your account setup'
+          message: 'Your account is still being set up',
+          error: 'Please wait a few minutes for your account setup to complete',
+          code: 'ACCOUNT_SETUP_PENDING'
         },
-        { status: 404 }
+        { status: 202 }
       );
     }
 

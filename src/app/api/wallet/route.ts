@@ -63,11 +63,19 @@ export async function GET(request: Request) {
 
     const profile = profileData as UserProfile;
     if (!profile?.quidax_id) {
-      console.error('No Quidax ID found in profile:', {
+      console.log('No Quidax ID found for user:', {
         profile,
         userId: session.user.id
       });
-      return NextResponse.json({ error: 'User has no Quidax ID' }, { status: 400 });
+      return NextResponse.json({
+        wallets: [],
+        marketData: [],
+        transactions: [],
+        totalValueNGN: 0,
+        totalValueUSD: 0,
+        status: 'pending',
+        message: 'Your account is being set up. Please check back in a few minutes.'
+      });
     }
 
     console.log('Found user profile:', {
@@ -78,7 +86,11 @@ export async function GET(request: Request) {
     // Initialize Quidax service
     const quidaxSecretKey = process.env.QUIDAX_SECRET_KEY;
     if (!quidaxSecretKey) {
-      throw new Error('QUIDAX_SECRET_KEY is not configured');
+      console.error('QUIDAX_SECRET_KEY not configured');
+      return NextResponse.json({ 
+        error: 'Service configuration error',
+        details: 'Missing API key'
+      }, { status: 500 });
     }
     
     const quidax = new QuidaxServerService(quidaxSecretKey);
@@ -86,12 +98,22 @@ export async function GET(request: Request) {
     try {
       // Fetch data in parallel
       const [walletsResponse, marketDataResponse] = await Promise.all([
-        quidax.request(`/users/${profile.quidax_id}/wallets`),
-        quidax.getMarketTickers()
+        quidax.request(`/users/${profile.quidax_id}/wallets`).catch(error => {
+          console.error('Error fetching wallets:', error);
+          return { data: [] };
+        }),
+        quidax.getMarketTickers().catch(error => {
+          console.error('Error fetching market data:', error);
+          return { data: {} };
+        })
       ]);
 
       // Get recent swap transactions
-      const transactionsResponse = await quidax.request(`/users/${profile.quidax_id}/swap_transactions`);
+      const transactionsResponse = await quidax.request(`/users/${profile.quidax_id}/swap_transactions`)
+        .catch(error => {
+          console.error('Error fetching transactions:', error);
+          return { data: [] };
+        });
 
       // Transform market data
       const transformedMarketData: MarketData[] = [];

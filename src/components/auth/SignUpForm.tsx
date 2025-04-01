@@ -90,10 +90,16 @@ export function SignUpForm() {
       toast({
         title: "Success",
         description: "Your account has been created successfully.",
-        className: "bg-green-500/90 text-white border-green-600",
+        className: "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-600 dark:text-green-400"
       });
 
-      // Redirect to dashboard after successful signup
+      // Force a router refresh to update auth state
+      router.refresh();
+      
+      // Small delay to ensure auth state is updated
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Redirect to dashboard
       router.push('/dashboard');
     } catch (error) {
       console.error('Signup error:', error);

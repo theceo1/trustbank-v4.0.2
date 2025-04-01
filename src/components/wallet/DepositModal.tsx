@@ -244,28 +244,15 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
       console.log('[DepositModal] Address API response:', data);
 
       if (!response.ok) {
-        // If the error indicates an address already exists, try to fetch it
-        if (data.error?.includes('Address already generated')) {
-          console.log('[DepositModal] Address exists, fetching existing address...');
-          
-          // Add a small delay to allow for any race conditions
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          const existingResponse = await fetch(
-            `/api/wallet/address?currency=${currency}&network=${network}&fetch_existing=true`,
-            { method: 'GET' }
-          );
-          
-          const existingData = await existingResponse.json();
-          console.log('[DepositModal] Existing address response:', existingData);
-          
-          if (existingResponse.ok && existingData.data?.deposit_address) {
-            setAddress(existingData.data.deposit_address);
-            if (existingData.data.destination_tag) {
-              setDestinationTag(existingData.data.destination_tag);
-            }
-            return;
-          }
+        // If the error indicates account setup is pending, show a more user-friendly message
+        if (data.code === 'ACCOUNT_SETUP_PENDING') {
+          toast({
+            title: "Account Setup in Progress",
+            description: "Your account is still being set up. Please try again in a few minutes.",
+            variant: "default"
+          });
+          onClose();
+          return;
         }
         
         const errorMessage = data.error || data.message || 'Failed to fetch deposit address';

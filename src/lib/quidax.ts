@@ -33,6 +33,7 @@ export class QuidaxService {
       console.log('[QuidaxService] Making request:', {
         url: `${this.baseUrl}${endpoint}`,
         method: options.method || 'GET',
+        body: options.body ? JSON.parse(options.body as string) : undefined,
         hasSecretKey: !!this.secretKey,
         requiresAuth
       });
@@ -44,6 +45,7 @@ export class QuidaxService {
 
       if (requiresAuth) {
         if (!this.secretKey) {
+          console.error('[QuidaxService] No secret key provided for authenticated endpoint');
           throw new Error('Secret key is required for authenticated endpoints');
         }
         headers['Authorization'] = `Bearer ${this.secretKey}`;
@@ -51,47 +53,108 @@ export class QuidaxService {
         headers['Authorization'] = `Bearer ${this.publicKey}`;
       }
 
-      const response = await fetch(`${this.baseUrl}${endpoint}`, {
-        ...options,
-        headers,
-      });
+      // Add timeout and retry logic
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-      const responseText = await response.text();
-      console.log('[QuidaxService] Raw response:', responseText);
-
-      let data;
       try {
-        data = JSON.parse(responseText);
-      } catch (e) {
-        console.error('[QuidaxService] Failed to parse response as JSON:', e);
-        throw new Error(`Invalid response format from API: ${responseText.substring(0, 100)}`);
-      }
+        const response = await fetch(`${this.baseUrl}${endpoint}`, {
+          ...options,
+          headers,
+          signal: controller.signal,
+        });
 
-      if (!response.ok) {
-        console.error('[QuidaxService] Request failed:', {
+        clearTimeout(timeoutId);
+
+        const responseText = await response.text();
+        console.log('[QuidaxService] Raw response:', {
           status: response.status,
           statusText: response.statusText,
-          data
+          body: responseText.substring(0, 1000) // Log first 1000 chars to avoid huge logs
         });
+
+        let data;
+        try {
+          data = JSON.parse(responseText);
+        } catch (e) {
+          console.error('[QuidaxService] Failed to parse response as JSON:', {
+            error: e,
+            responseText: responseText.substring(0, 1000)
+          });
+          throw new Error(`Invalid response format from API: ${responseText.substring(0, 100)}`);
+        }
+
+        // Check for API-specific error responses
+        if (data.status === 'error' || data.error) {
+          console.error('[QuidaxService] API returned error:', {
+            status: response.status,
+            endpoint,
+            error: data.error || data.message
+          });
+          
+          const error = new Error(data.message || data.error || 'API returned an error response');
+          (error as any).response = { 
+            status: response.status, 
+            data,
+            statusText: response.statusText
+          };
+          throw error;
+        }
+
+        if (!response.ok) {
+          console.error('[QuidaxService] Request failed:', {
+            status: response.status,
+            statusText: response.statusText,
+            endpoint,
+            data
+          });
+          
+          const error = new Error(data.message || data.error || 'Request failed');
+          (error as any).response = { 
+            status: response.status, 
+            data,
+            statusText: response.statusText
+          };
+          throw error;
+        }
+
+        // For successful responses, ensure we have the expected structure
+        if (!data || (typeof data === 'object' && !('data' in data) && !('status' in data))) {
+          console.error('[QuidaxService] Invalid response structure:', {
+            endpoint,
+            data: JSON.stringify(data, null, 2)
+          });
+          throw new Error('Invalid response structure from API');
+        }
+
+        return data;
+      } catch (error: any) {
+        clearTimeout(timeoutId);
         
-        const error = new Error(data.message || data.error || 'Request failed');
-        (error as any).response = { status: response.status, data };
+        if (error.name === 'AbortError') {
+          throw new Error('Request timed out after 30 seconds');
+        }
         throw error;
       }
-
-      if (!data || (typeof data === 'object' && !('data' in data))) {
-        console.error('[QuidaxService] Invalid response structure:', data);
-        throw new Error('Invalid response structure from API');
-      }
-
-      return data;
     } catch (error: any) {
       console.error('[QuidaxService] Request error:', {
         endpoint,
+        method: options.method || 'GET',
         error: error.message || error,
-        response: error.response
+        response: error.response,
+        stack: error.stack
       });
-      throw error;
+
+      // Enhance error with more context
+      const enhancedError = new Error(
+        error.response?.data?.message || 
+        error.response?.data?.error || 
+        error.message || 
+        'An error occurred while making the request'
+      );
+      (enhancedError as any).response = error.response;
+      (enhancedError as any).originalError = error;
+      throw enhancedError;
     }
   }
 

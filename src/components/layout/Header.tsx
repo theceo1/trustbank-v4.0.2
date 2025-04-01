@@ -48,23 +48,41 @@ export function Header() {
   const supabase = createClientComponentClient();
 
   useEffect(() => {
-    const getUser = async () => {
+    const getInitialSession = async () => {
       try {
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
-        setUser(currentUser);
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('[Header] Error getting initial session:', error);
+          return;
+        }
+        setUser(session?.user || null);
+        console.log('[Header] Initial session loaded:', session?.user?.id || 'No user');
       } catch (error) {
-        console.error('Error getting user:', error);
+        console.error('[Header] Error in getInitialSession:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    getUser();
+    // Get initial session
+    getInitialSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user ?? null);
-      if (event === 'SIGNED_OUT') {
+    // Set up auth state change listener
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('[Header] Auth state change:', event, session?.user?.id);
+      
+      // Update user state immediately
+      setUser(session?.user || null);
+      
+      // Force router refresh for auth-dependent components
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
         router.refresh();
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+        router.refresh();
+        router.push('/');
       }
     });
 
@@ -72,6 +90,13 @@ export function Header() {
       subscription.unsubscribe();
     };
   }, [supabase, router]);
+
+  // Force revalidation when pathname changes
+  useEffect(() => {
+    if (pathname && user) {
+      router.refresh();
+    }
+  }, [pathname, user, router]);
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
@@ -89,7 +114,7 @@ export function Header() {
       router.push('/');
       router.refresh();
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error('[Header] Error signing out:', error);
     } finally {
       setIsSigningOut(false);
     }
