@@ -30,9 +30,11 @@ import {
   Cookie,
 } from "lucide-react";
 import { MetaLogo, SnapchatLogo, TikTokLogo, InstagramLogo, TwitterLogo, ThreadsLogo, TelegramLogo } from "../icons";
-import { useAuth } from '@/contexts/AuthContext';
-import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks/useAuth';
+import { useRouter, usePathname } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useProfile } from '@/hooks/useProfile';
 
 interface LinkItem {
   name: string;
@@ -88,21 +90,96 @@ const socialLinks: SocialLink[] = [
 
 export function Footer() {
   const [showInstantSwap, setShowInstantSwap] = useState(false);
-  const { session } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+  const supabase = createClientComponentClient();
+  const { user, isInitialized: isAuthInitialized } = useAuth();
+  const { profile, isInitialized: isProfileInitialized } = useProfile();
   const { toast } = useToast();
 
-  const handleAuthenticatedNavigation = (path: string) => {
-    if (!session) {
+  const handleInstantSwap = async () => {
+    try {
+      console.log('[Footer] Checking session for instant swap...');
+      if (!isAuthInitialized || !isProfileInitialized) {
+        console.log('[Footer] Session or profile not yet initialized');
+        toast({
+          title: "Please wait",
+          description: "Initializing your session...",
+          className: "bg-yellow-50 dark:bg-yellow-900 border-yellow-200 dark:border-yellow-800 text-yellow-600 dark:text-yellow-400"
+        });
+        return;
+      }
+
+      if (!user) {
+        console.log('[Footer] No session found');
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to access instant swap.",
+          className: "bg-red-50 dark:bg-red-900 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400"
+        });
+        return;
+      }
+
+      if (!profile?.quidax_id) {
+        console.log('[Footer] No Quidax ID found');
+        toast({
+          title: "Account Setup Required",
+          description: "Please wait while your account is being set up.",
+          className: "bg-yellow-50 dark:bg-yellow-900 border-yellow-200 dark:border-yellow-800 text-yellow-600 dark:text-yellow-400"
+        });
+        return;
+      }
+      
+      console.log('[Footer] Opening swap modal');
+      setShowInstantSwap(true);
+    } catch (error) {
+      console.error('[Footer] Error checking session:', error);
       toast({
-        title: "Authentication Required",
-        description: "Please sign in to access this feature.",
-        variant: "destructive",
+        title: "Error",
+        description: "Unable to verify authentication status. Please try again.",
+        className: "bg-red-50 dark:bg-red-900 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400"
       });
-      router.push('/auth/login');
-      return;
     }
-    router.push(path);
+  };
+
+  const handleAuthenticatedNavigation = async (path: string) => {
+    try {
+      if (!isAuthInitialized || !isProfileInitialized) {
+        toast({
+          title: "Please wait",
+          description: "Initializing your session...",
+          className: "bg-yellow-50 dark:bg-yellow-900 border-yellow-200 dark:border-yellow-800 text-yellow-600 dark:text-yellow-400"
+        });
+        return;
+      }
+
+      if (!user) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to access this feature.",
+          className: "bg-red-50 dark:bg-red-900 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400"
+        });
+        return;
+      }
+
+      if (!profile?.quidax_id) {
+        toast({
+          title: "Account Setup Required",
+          description: "Please wait while your account is being set up.",
+          className: "bg-yellow-50 dark:bg-yellow-900 border-yellow-200 dark:border-yellow-800 text-yellow-600 dark:text-yellow-400"
+        });
+        return;
+      }
+
+      router.push(path);
+    } catch (error) {
+      console.error('[Footer] Error in navigation:', error);
+      toast({
+        title: "Error",
+        description: "Unable to navigate. Please try again.",
+        className: "bg-red-50 dark:bg-red-900 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400"
+      });
+    }
   };
 
   const quickLinks: LinkItem[] = [
@@ -124,7 +201,7 @@ export function Footer() {
       name: "Instant Swap", 
       href: "#", 
       icon: <ArrowLeftRight className="w-4 h-4" />,
-      onClick: () => setShowInstantSwap(true),
+      onClick: handleInstantSwap,
       isNew: true
     },
   ];

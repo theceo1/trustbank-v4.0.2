@@ -704,11 +704,10 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
       if (!session) {
         toast({
           title: "Authentication Required",
-          description: "Please sign in to access instant swap features.",
-          variant: "destructive"
+          description: "Please sign in to access instant swap.",
+          className: "bg-red-50 dark:bg-red-900 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400"
         });
         onClose();
-        router.push('/auth/login');
         return;
       }
 

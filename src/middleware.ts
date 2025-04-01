@@ -41,7 +41,6 @@ const AUTH_REQUIRED_PATHS = [
   '/trade/p2p',          // P2P trading
   '/trade/p2p/offers',   // P2P offers
   '/trade/p2p/orders',   // P2P orders
-  '/trade/swap',         // Instant swap
   '/trade/history',      // Trade history
   '/trade/guide',        // Trading guide
   
@@ -55,12 +54,10 @@ const AUTH_REQUIRED_PATHS = [
   '/api/trades',         // All trade endpoints
   '/api/trades/spot',    // Spot trading endpoints
   '/api/trades/p2p',     // P2P trading endpoints
-  '/api/trades/swap',    // Swap endpoints
   '/api/trades/history', // Trading history
   '/api/user',          // User data endpoints
   '/api/admin',         // Admin endpoints
   '/api/config',        // Protected config endpoints
-  '/api/swap',          // Swap endpoints
 ];
 
 // Public paths that don't require authentication

@@ -137,7 +137,7 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
       toast({
         title: "Error",
         description: "Failed to get quote. Please try again.",
-        variant: "destructive",
+        className: "bg-red-50 dark:bg-red-900 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400"
       });
     } finally {
       setIsLoading(false);

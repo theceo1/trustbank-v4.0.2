@@ -31,7 +31,7 @@ const securityHeaders = [
       default-src 'self';
       script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.vercel-scripts.com;
       style-src 'self' 'unsafe-inline';
-      img-src 'self' data: blob: https:;
+      img-src 'self' data: blob: https: http://localhost:3000 https://www.trustbank.tech https://trustbank.tech;
       font-src 'self' data:;
       object-src 'none';
       base-uri 'self';
@@ -115,7 +115,7 @@ const nextConfig = {
               default-src 'self';
               script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.vercel-scripts.com;
               style-src 'self' 'unsafe-inline';
-              img-src 'self' data: blob: https:;
+              img-src 'self' data: blob: https: http://localhost:3000 https://www.trustbank.tech https://trustbank.tech;
               font-src 'self' data:;
               object-src 'none';
               base-uri 'self';

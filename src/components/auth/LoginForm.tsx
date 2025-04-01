@@ -60,12 +60,7 @@ export function LoginForm() {
         throw new Error(data.error || 'Failed to sign in');
       }
 
-      toast({
-        title: "Welcome back! 👋",
-        description: "Successfully signed in to your account.",
-      });
-
-      router.replace(redirectTo);
+      // Remove router.replace and let auth context handle navigation
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to sign in';
       setError(errorMessage);

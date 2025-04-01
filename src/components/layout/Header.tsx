@@ -18,6 +18,8 @@ import { useRouter, usePathname } from 'next/navigation';
 import type { User } from '@supabase/auth-helpers-nextjs';
 import { InstantSwapModal } from "@/components/InstantSwapModal";
 import { toast } from "@/components/ui/use-toast";
+import { useAuth } from '@/hooks/useAuth';
+import { useProfile } from '@/hooks/useProfile';
 
 const waveAnimation = `
 @keyframes wave {
@@ -36,7 +38,6 @@ const waveAnimation = `
 ` as const;
 
 export function Header() {
-  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -46,88 +47,58 @@ export function Header() {
   const router = useRouter();
   const pathname = usePathname();
   const supabase = createClientComponentClient();
+  
+  const { user, isInitialized: isAuthInitialized } = useAuth();
+  const { profile, isInitialized: isProfileInitialized } = useProfile();
 
-  const getInitialSession = async () => {
+  const handleInstantSwap = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      console.log('[Header] Getting initial session:', session?.user?.id);
-      
-      if (session?.user) {
-        setUser(session.user);
-        setLoading(false);
-        if (!pathname.startsWith('/auth')) {
-          await router.refresh();
-        }
-      } else {
-        setUser(null);
-        setLoading(false);
+      console.log('[Header] Checking session for instant swap...');
+      if (!isAuthInitialized || !isProfileInitialized) {
+        console.log('[Header] Session or profile not yet initialized');
+        toast({
+          title: "Please wait",
+          description: "Initializing your session...",
+          className: "bg-yellow-50 dark:bg-yellow-900 border-yellow-200 dark:border-yellow-800 text-yellow-600 dark:text-yellow-400"
+        });
+        return;
       }
+
+      if (!user) {
+        console.log('[Header] No session found');
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to access instant swap.",
+          className: "bg-red-50 dark:bg-red-900 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400"
+        });
+        return;
+      }
+
+      if (!profile?.quidax_id) {
+        console.log('[Header] No Quidax ID found');
+        toast({
+          title: "Account Setup Required",
+          description: "Please wait while your account is being set up.",
+          className: "bg-yellow-50 dark:bg-yellow-900 border-yellow-200 dark:border-yellow-800 text-yellow-600 dark:text-yellow-400"
+        });
+        return;
+      }
+      
+      console.log('[Header] Opening swap modal');
+      setIsSwapModalOpen(true);
     } catch (error) {
-      console.error('[Header] Error getting initial session:', error);
-      setUser(null);
-      setLoading(false);
+      console.error('[Header] Error checking session:', error);
+      toast({
+        title: "Error",
+        description: "Unable to verify authentication status. Please try again.",
+        className: "bg-red-50 dark:bg-red-900 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400"
+      });
     }
   };
 
   useEffect(() => {
-    let mounted = true;
-    
-    getInitialSession();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('[Header] Auth state change:', event, session?.user?.id);
-
-      if (!mounted) return;
-
-      switch (event) {
-        case 'SIGNED_IN':
-          if (session?.user) {
-            setUser(session.user);
-            setLoading(false);
-            if (!pathname.startsWith('/auth')) {
-              await router.refresh();
-            }
-          }
-          break;
-        case 'SIGNED_OUT':
-          setUser(null);
-          setLoading(false);
-          await router.refresh();
-          router.push('/');
-          break;
-        case 'TOKEN_REFRESHED':
-        case 'USER_UPDATED':
-          if (session?.user) {
-            setUser(session.user);
-            setLoading(false);
-            if (!pathname.startsWith('/auth')) {
-              await router.refresh();
-            }
-          }
-          break;
-        case 'INITIAL_SESSION':
-          if (session?.user) {
-            setUser(session.user);
-            setLoading(false);
-            if (!pathname.startsWith('/auth')) {
-              await router.refresh();
-            }
-          }
-          break;
-      }
-    });
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, [supabase, router, pathname]);
-
-  const toggleMenu = () => {
-    setIsMenuOpen(!isMenuOpen);
-  };
+    setLoading(!isAuthInitialized || !isProfileInitialized);
+  }, [isAuthInitialized, isProfileInitialized]);
 
   const handleSignOut = async () => {
     try {
@@ -136,7 +107,7 @@ export function Header() {
       toast({
         title: "Goodbye! 👋",
         description: "You have been successfully signed out.",
-        className: "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-600 dark:text-green-400"
+        className: "bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-800 text-green-600 dark:text-green-400"
       });
       router.push('/');
       router.refresh();
@@ -147,18 +118,8 @@ export function Header() {
     }
   };
 
-  const handleInstantSwap = () => {
-    if (!user) {
-      toast({
-        title: "Authentication Required",
-        description: "Please sign in to access instant swap.",
-        variant: "destructive",
-        className: "bg-red-100 dark:bg-red-900 border-red-200 dark:border-red-800",
-      });
-      router.push('/auth/login');
-      return;
-    }
-    setIsSwapModalOpen(true);
+  const toggleMenu = () => {
+    setIsMenuOpen(!isMenuOpen);
   };
 
   return (
