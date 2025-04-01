@@ -1,17 +1,35 @@
 import { NextResponse } from 'next/server';
-import { quidaxService } from '@/lib/quidax';
+
+const QUIDAX_API_URL = process.env.NEXT_PUBLIC_QUIDAX_API_URL || 'https://www.quidax.com/api/v1';
 
 export async function GET() {
   try {
-    const response = await quidaxService.getMarketTickers();
+    const response = await fetch(`${QUIDAX_API_URL}/markets/tickers`, {
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+    });
     
-    if (!response?.data) {
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Quidax API error:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText
+      });
+      throw new Error(`Failed to fetch market tickers: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    
+    if (!data?.data) {
       throw new Error('Invalid response from Quidax API');
     }
 
     return NextResponse.json({
       status: 'success',
-      data: response.data
+      data: data.data
     });
   } catch (error) {
     console.error('Error fetching market tickers:', error);

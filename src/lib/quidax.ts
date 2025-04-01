@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { cookies } from 'next/headers';
 
-const QUIDAX_API_URL = (process.env.NEXT_PUBLIC_QUIDAX_API_URL || 'https://api.quidax.com/v1') as string;
+const QUIDAX_API_URL = (process.env.NEXT_PUBLIC_QUIDAX_API_URL || 'https://www.quidax.com/api/v1') as string;
 const QUIDAX_PUBLIC_KEY = process.env.NEXT_PUBLIC_QUIDAX_PUBLIC_KEY || '';
 
 // Configure a single axios instance for client-side requests
@@ -16,31 +16,44 @@ const quidaxApi = axios.create({
 export class QuidaxService {
   protected baseUrl: string;
   protected secretKey?: string;
+  protected publicKey: string;
 
-  constructor(baseUrl = QUIDAX_API_URL, secretKey?: string) {
+  constructor(baseUrl = QUIDAX_API_URL, secretKey?: string, publicKey = QUIDAX_PUBLIC_KEY) {
     this.baseUrl = baseUrl;
     this.secretKey = secretKey;
+    this.publicKey = publicKey;
   }
 
   async getMarketTickers() {
-    return this.request('/markets/tickers');
+    return this.request('/markets/tickers', {}, false);
   }
 
-  async request(endpoint: string, options: RequestInit = {}) {
+  async request(endpoint: string, options: RequestInit = {}, requiresAuth = true) {
     try {
       console.log('[QuidaxService] Making request:', {
         url: `${this.baseUrl}${endpoint}`,
         method: options.method || 'GET',
-        hasSecretKey: !!this.secretKey
+        hasSecretKey: !!this.secretKey,
+        requiresAuth
       });
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...options.headers as Record<string, string>,
+      };
+
+      if (requiresAuth) {
+        if (!this.secretKey) {
+          throw new Error('Secret key is required for authenticated endpoints');
+        }
+        headers['Authorization'] = `Bearer ${this.secretKey}`;
+      } else {
+        headers['Authorization'] = `Bearer ${this.publicKey}`;
+      }
 
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.secretKey}`,
-          ...options.headers,
-        },
+        headers,
       });
 
       const responseText = await response.text();

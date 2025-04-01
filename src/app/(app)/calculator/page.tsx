@@ -242,7 +242,7 @@ export default function CalculatorPage() {
                     <SelectTrigger className="h-12">
                       <SelectValue placeholder="From" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800">
                       {currencies.map((currency) => (
                         <SelectItem key={currency.value} value={currency.value}>
                           {currency.label}
@@ -264,7 +264,7 @@ export default function CalculatorPage() {
                     <SelectTrigger className="h-12">
                       <SelectValue placeholder="To" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800">
                       {currencies.map((currency) => (
                         <SelectItem key={currency.value} value={currency.value}>
                           {currency.label}
@@ -320,6 +320,54 @@ export default function CalculatorPage() {
 
                     {competitors.length > 0 && (
                       <div className="space-y-4">
+                        <h3 className="text-sm font-semibold flex items-center gap-2">
+                          Market Comparison
+                          <span className="text-xs text-muted-foreground">(Real-time rates)</span>
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          {competitors.map((competitor, index) => (
+                            <motion.div
+                              initial={{ opacity: 0, y: 20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: index * 0.1 }}
+                              key={competitor.name}
+                              className={`relative overflow-hidden rounded-lg ${
+                                competitor.name === 'trustBank'
+                                  ? 'bg-gradient-to-br from-green-600 to-green-700 text-white'
+                                  : 'bg-white/50 dark:bg-black/40 border border-gray-100 dark:border-gray-800'
+                              } p-4`}
+                            >
+                              <div className="flex justify-between items-start mb-2">
+                                <div className={`font-semibold ${competitor.name === 'trustBank' ? 'text-lg' : 'text-base'}`}>
+                                  {competitor.name}
+                                </div>
+                                {competitor.name === 'trustBank' && (
+                                  <span className="px-2 py-0.5 bg-white/20 rounded-full text-xs font-semibold">
+                                    Best Rate
+                                  </span>
+                                )}
+                              </div>
+                              
+                              <div className={`text-xl font-bold mt-2 ${competitor.name === 'trustBank' ? '' : 'text-gray-900 dark:text-gray-100'}`}>
+                                {formatNumber(competitor.rate, toCurrency)} {toCurrency}
+                              </div>
+                              
+                              <div className={`space-y-1 mt-3 text-sm ${
+                                competitor.name === 'trustBank' ? 'text-white/90' : 'text-gray-600 dark:text-gray-400'
+                              }`}>
+                                {competitor.features.map((feature, idx) => (
+                                  <div key={idx} className="flex items-center gap-2">
+                                    <div className={`w-1 h-1 rounded-full ${
+                                      competitor.name === 'trustBank' ? 'bg-white/80' : 'bg-gray-400'
+                                    }`} />
+                                    {feature}
+                                  </div>
+                                ))}
+                              </div>
+                            </motion.div>
+                          ))}
+                        </div>
+
                         <div className="bg-gradient-to-br from-green-100 to-blue-100 dark:from-green-900/40 dark:to-blue-900/40 p-6 rounded-lg border border-green-200 dark:border-green-800">
                           <h3 className="text-lg font-semibold text-green-800 dark:text-green-200 mb-4">
                             Why trust<span className="text-green-600">Bank</span> Offers the Best Rates
@@ -370,54 +418,6 @@ export default function CalculatorPage() {
                               </div>
                             </motion.div>
                           </div>
-                        </div>
-
-                        <h3 className="text-sm font-semibold flex items-center gap-2">
-                          Market Comparison
-                          <span className="text-xs text-muted-foreground">(Real-time rates)</span>
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                          {competitors.map((competitor, index) => (
-                            <motion.div
-                              initial={{ opacity: 0, y: 20 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ delay: index * 0.1 }}
-                              key={competitor.name}
-                              className={`relative overflow-hidden rounded-lg ${
-                                competitor.name === 'trustBank'
-                                  ? 'bg-gradient-to-br from-green-600 to-green-700 text-white'
-                                  : 'bg-white/50 dark:bg-black/40 border border-gray-100 dark:border-gray-800'
-                              } p-4`}
-                            >
-                              <div className="flex justify-between items-start mb-2">
-                                <div className={`font-semibold ${competitor.name === 'trustBank' ? 'text-lg' : 'text-base'}`}>
-                                  {competitor.name}
-                                </div>
-                                {competitor.name === 'trustBank' && (
-                                  <span className="px-2 py-0.5 bg-white/20 rounded-full text-xs font-semibold">
-                                    Best Rate
-                                  </span>
-                                )}
-                              </div>
-                              
-                              <div className={`text-xl font-bold mt-2 ${competitor.name === 'trustBank' ? '' : 'text-gray-900 dark:text-gray-100'}`}>
-                                {formatNumber(competitor.rate, toCurrency)} {toCurrency}
-                              </div>
-                              
-                              <div className={`space-y-1 mt-3 text-sm ${
-                                competitor.name === 'trustBank' ? 'text-white/90' : 'text-gray-600 dark:text-gray-400'
-                              }`}>
-                                {competitor.features.map((feature, idx) => (
-                                  <div key={idx} className="flex items-center gap-2">
-                                    <div className={`w-1 h-1 rounded-full ${
-                                      competitor.name === 'trustBank' ? 'bg-white/80' : 'bg-gray-400'
-                                    }`} />
-                                    {feature}
-                                  </div>
-                                ))}
-                              </div>
-                            </motion.div>
-                          ))}
                         </div>
                       </div>
                     )}
