@@ -248,22 +248,22 @@ export async function POST(request: Request) {
       );
     }
 
-    // Sign in the user immediately
+    // Sign in the user immediately after successful signup
     const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
       email,
       password
     });
 
     if (signInError) {
-      console.error('Error signing in after signup:', signInError);
+      console.error('[Signup] Error signing in after signup:', signInError);
       return NextResponse.json(
         { error: 'Failed to sign in after signup' },
         { status: 500 }
       );
     }
 
-    // Return success with session
-    return NextResponse.json({
+    // Set the session cookie
+    const response = NextResponse.json({
       success: true,
       data: {
         user: signInData.user,
@@ -271,6 +271,19 @@ export async function POST(request: Request) {
         quidax_id: quidaxId
       }
     });
+
+    // Ensure auth cookie is set
+    if (signInData.session) {
+      const sessionStr = JSON.stringify(signInData.session);
+      response.cookies.set('sb-auth-token', sessionStr, {
+        path: '/',
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 60 * 60 * 24 * 7 // 1 week
+      });
+    }
+
+    return response;
 
   } catch (error) {
     console.error('Signup error:', error);

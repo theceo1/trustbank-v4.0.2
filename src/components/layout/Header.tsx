@@ -48,52 +48,77 @@ export function Header() {
   const supabase = createClientComponentClient();
 
   useEffect(() => {
+    let mounted = true;
+
     const getInitialSession = async () => {
       try {
+        setLoading(true);
         const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) {
-          console.error('[Header] Error getting initial session:', error);
-          return;
+        
+        if (error) throw error;
+        
+        if (mounted) {
+          console.log('[Header] Initial session loaded:', session?.user ? `User ${session.user.id}` : 'No user');
+          setUser(session?.user || null);
+          
+          // Only refresh if we have a session and we're not on the auth pages
+          if (session?.user && !pathname?.startsWith('/auth')) {
+            await router.refresh();
+          }
         }
-        setUser(session?.user || null);
-        console.log('[Header] Initial session loaded:', session?.user?.id || 'No user');
       } catch (error) {
-        console.error('[Header] Error in getInitialSession:', error);
+        console.error('[Header] Error getting initial session:', error);
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     };
 
-    // Get initial session
     getInitialSession();
 
-    // Set up auth state change listener
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+      
       console.log('[Header] Auth state change:', event, session?.user?.id);
       
       // Update user state immediately
       setUser(session?.user || null);
+      setLoading(false);
       
-      // Force router refresh for auth-dependent components
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-        router.refresh();
-      } else if (event === 'SIGNED_OUT') {
-        setUser(null);
-        router.refresh();
-        router.push('/');
+      // Handle different auth events
+      switch (event) {
+        case 'SIGNED_IN':
+          if (!pathname?.startsWith('/auth')) {
+            await router.refresh();
+          }
+          break;
+        case 'SIGNED_OUT':
+          setUser(null);
+          await router.refresh();
+          router.push('/');
+          break;
+        case 'TOKEN_REFRESHED':
+        case 'USER_UPDATED':
+          await router.refresh();
+          break;
+        case 'INITIAL_SESSION':
+          // Don't do anything special for initial session as it's handled by getInitialSession
+          break;
       }
     });
 
     return () => {
+      mounted = false;
       subscription.unsubscribe();
     };
-  }, [supabase, router]);
+  }, [supabase, router, pathname]);
 
-  // Force revalidation when pathname changes
+  // Remove the separate pathname effect since we handle it in the auth state changes
   useEffect(() => {
-    if (pathname && user) {
+    if (pathname && user && !pathname.startsWith('/auth')) {
       router.refresh();
     }
   }, [pathname, user, router]);
