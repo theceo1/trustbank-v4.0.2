@@ -21,6 +21,7 @@ export function useAuth() {
 
         if (session?.user) {
           setUser(session.user);
+          // Don't show welcome toast on initial session
         }
         setIsInitialized(true);
       } catch (error) {
@@ -37,17 +38,22 @@ export function useAuth() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
 
+      console.log('Auth state changed:', { event, session });
+
       switch (event) {
         case 'SIGNED_IN':
           if (session?.user) {
             setUser(session.user);
-            await router.refresh();
-            router.push('/dashboard');
-            toast({
-              title: "Welcome back! 👋",
-              description: "You have successfully signed in.",
-              className: "bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-800 text-green-600 dark:text-green-400"
-            });
+            // Wait for state update before navigation
+            setTimeout(async () => {
+              await router.refresh();
+              router.push('/dashboard');
+              toast({
+                title: "Welcome back! 👋",
+                description: "You have successfully signed in.",
+                className: "bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-800 text-green-600 dark:text-green-400"
+              });
+            }, 0);
           }
           break;
         case 'SIGNED_OUT':

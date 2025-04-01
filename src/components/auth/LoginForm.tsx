@@ -36,6 +36,7 @@ export function LoginForm() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams?.get('redirect') || '/dashboard';
   const { toast } = useToast();
+  const supabase = createClientComponentClient();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,24 +44,16 @@ export function LoginForm() {
     setError(null);
 
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email,
-          password,
-        }),
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to sign in');
+      if (error) {
+        throw error;
       }
 
-      // Remove router.replace and let auth context handle navigation
+      // Auth state change will handle navigation
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to sign in';
       setError(errorMessage);
@@ -79,8 +72,6 @@ export function LoginForm() {
     setError(null);
     
     try {
-      const supabase = createClientComponentClient<Database>();
-      
       toast({
         title: "Connecting to Google",
         description: "Please complete the sign in process in the popup window...",
