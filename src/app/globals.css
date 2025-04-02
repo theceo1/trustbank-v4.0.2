@@ -88,7 +88,27 @@
     @apply border-border;
   }
 
+   /* Improve mobile input behavior */
+   input, textarea, select {
+    @apply appearance-none;
+    font-size: 16px !important; /* Prevent iOS zoom */
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* Prevent scroll when mobile menu is open */
+  body.menu-open {
+    @apply overflow-hidden fixed inset-0;
+  }
+
+  /* Ensure proper sizing on mobile */
+  html {
+    @apply h-full;
+    -webkit-tap-highlight-color: transparent;
+  }
+
   body {
+    @apply h-full overflow-x-hidden;
+    overscroll-behavior-y: none;
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
     font-family: var(--font-geist-sans);

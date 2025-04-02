@@ -6,6 +6,16 @@ create table if not exists public.users (
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
+-- Create health_checks table
+create table if not exists public.health_checks (
+  id uuid default uuid_generate_v4() primary key,
+  status text not null default 'healthy',
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Insert initial health check record
+insert into public.health_checks (status) values ('healthy');
+
 -- Create user_profiles table
 create table if not exists public.user_profiles (
   id uuid default uuid_generate_v4() primary key,
@@ -16,6 +26,7 @@ create table if not exists public.user_profiles (
   kyc_level text default 'basic' check (kyc_level in ('basic', 'intermediate', 'advanced')),
   quidax_user_id text,
   quidax_sn text,
+  role text default 'user' check (role in ('user', 'admin', 'support')),
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
@@ -87,7 +98,7 @@ create table if not exists public.security_settings (
   unique(user_id)
 );
 
--- Create RLS policies
+-- Enable RLS
 alter table public.users enable row level security;
 alter table public.user_profiles enable row level security;
 alter table public.wallets enable row level security;
@@ -95,11 +106,119 @@ alter table public.transactions enable row level security;
 alter table public.kyc_records enable row level security;
 alter table public.security_settings enable row level security;
 
--- Users policies
+-- Drop existing policies if they exist
+do $$ 
+begin
+  -- Users policies
+  if exists (
+    select 1 from pg_policies 
+    where schemaname = 'public' 
+    and tablename = 'users' 
+    and policyname = 'Users can view own record'
+  ) then
+    drop policy "Users can view own record" on public.users;
+  end if;
+
+  -- User profiles policies
+  if exists (
+    select 1 from pg_policies 
+    where schemaname = 'public' 
+    and tablename = 'user_profiles' 
+    and policyname = 'Users can view own profile'
+  ) then
+    drop policy "Users can view own profile" on public.user_profiles;
+  end if;
+
+  if exists (
+    select 1 from pg_policies 
+    where schemaname = 'public' 
+    and tablename = 'user_profiles' 
+    and policyname = 'Users can update own profile'
+  ) then
+    drop policy "Users can update own profile" on public.user_profiles;
+  end if;
+
+  if exists (
+    select 1 from pg_policies 
+    where schemaname = 'public' 
+    and tablename = 'user_profiles' 
+    and policyname = 'Users can insert own profile'
+  ) then
+    drop policy "Users can insert own profile" on public.user_profiles;
+  end if;
+
+  -- Wallets policies
+  if exists (
+    select 1 from pg_policies 
+    where schemaname = 'public' 
+    and tablename = 'wallets' 
+    and policyname = 'Users can view own wallets'
+  ) then
+    drop policy "Users can view own wallets" on public.wallets;
+  end if;
+
+  -- Transactions policies
+  if exists (
+    select 1 from pg_policies 
+    where schemaname = 'public' 
+    and tablename = 'transactions' 
+    and policyname = 'Users can view own transactions'
+  ) then
+    drop policy "Users can view own transactions" on public.transactions;
+  end if;
+
+  -- KYC records policies
+  if exists (
+    select 1 from pg_policies 
+    where schemaname = 'public' 
+    and tablename = 'kyc_records' 
+    and policyname = 'Users can view own KYC records'
+  ) then
+    drop policy "Users can view own KYC records" on public.kyc_records;
+  end if;
+
+  -- Security settings policies
+  if exists (
+    select 1 from pg_policies 
+    where schemaname = 'public' 
+    and tablename = 'security_settings' 
+    and policyname = 'Users can view own security settings'
+  ) then
+    drop policy "Users can view own security settings" on public.security_settings;
+  end if;
+
+  if exists (
+    select 1 from pg_policies 
+    where schemaname = 'public' 
+    and tablename = 'security_settings' 
+    and policyname = 'Users can update own security settings'
+  ) then
+    drop policy "Users can update own security settings" on public.security_settings;
+  end if;
+
+  if exists (
+    select 1 from pg_policies 
+    where schemaname = 'public' 
+    and tablename = 'security_settings' 
+    and policyname = 'Admins can view all security settings'
+  ) then
+    drop policy "Admins can view all security settings" on public.security_settings;
+  end if;
+
+  if exists (
+    select 1 from pg_policies 
+    where schemaname = 'public' 
+    and tablename = 'security_settings' 
+    and policyname = 'Admins can update all security settings'
+  ) then
+    drop policy "Admins can update all security settings" on public.security_settings;
+  end if;
+end $$;
+
+-- Create new policies
 create policy "Users can view own record" on public.users
   for select using (auth.uid() = id);
 
--- User profiles policies
 create policy "Users can view own profile" on public.user_profiles
   for select using (auth.uid() = user_id);
 create policy "Users can update own profile" on public.user_profiles
@@ -107,19 +226,15 @@ create policy "Users can update own profile" on public.user_profiles
 create policy "Users can insert own profile" on public.user_profiles
   for insert with check (auth.uid() = user_id);
 
--- Wallets policies
 create policy "Users can view own wallets" on public.wallets
   for select using (auth.uid() = user_id);
 
--- Transactions policies
 create policy "Users can view own transactions" on public.transactions
   for select using (auth.uid() = user_id);
 
--- KYC records policies
 create policy "Users can view own KYC records" on public.kyc_records
   for select using (auth.uid() = user_id);
 
--- Security settings policies
 create policy "Users can view own security settings" on public.security_settings
   for select using (auth.uid() = user_id);
 create policy "Users can update own security settings" on public.security_settings
@@ -167,6 +282,7 @@ begin
 end;
 $$ language plpgsql security definer;
 
+drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user(); 

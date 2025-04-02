@@ -3,6 +3,43 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { authenticator } from 'otplib'
 import { adminMiddleware } from './middleware/admin'
+import { Redis } from '@upstash/redis'
+
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL!,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+});
+
+// Rate limiting configuration
+const RATE_LIMIT_WINDOW = 60; // 1 minute
+const API_RATE_LIMIT = 1000; // Increased to 1000 requests per minute
+const AUTH_RATE_LIMIT = 5; // 5 login attempts per minute
+const MARKET_RATE_LIMIT = 1500; // Higher limit for market endpoints
+
+async function checkRateLimit(ip: string, path: string): Promise<boolean> {
+  // Skip rate limiting for health checks
+  if (path === '/api/health') {
+    return true;
+  }
+
+  const isMarketEndpoint = path.startsWith('/api/markets/');
+  const isAuth = path.startsWith('/api/auth');
+  const limit = isAuth ? AUTH_RATE_LIMIT : isMarketEndpoint ? MARKET_RATE_LIMIT : API_RATE_LIMIT;
+  
+  const key = `rate_limit:${ip}:${path}`;
+
+  try {
+    const multi = redis.multi();
+    multi.incr(key);
+    multi.expire(key, RATE_LIMIT_WINDOW);
+    const [current] = await multi.exec();
+    
+    return (current as number) <= limit;
+  } catch (error) {
+    console.error('Rate limit check failed:', error);
+    return true; // Allow request if Redis fails
+  }
+}
 
 // Routes that require 2FA
 const PROTECTED_ROUTES = [
@@ -120,6 +157,30 @@ const ADMIN_ROUTES = /^\/admin(?:\/.*)?$/;
 
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next()
+  
+  // Check rate limit
+  const ip = req.ip || 'unknown';
+  const path = req.nextUrl.pathname;
+  
+  if (path.startsWith('/api/')) {
+    const allowed = await checkRateLimit(ip, path);
+    if (!allowed) {
+      return new NextResponse(
+        JSON.stringify({
+          error: 'Too many requests',
+          message: 'Please try again later'
+        }),
+        {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            'Retry-After': RATE_LIMIT_WINDOW.toString()
+          }
+        }
+      );
+    }
+  }
+
   const supabase = createMiddlewareClient({ req, res })
 
   // Check if the path is public

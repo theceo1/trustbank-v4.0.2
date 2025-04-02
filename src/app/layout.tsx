@@ -16,10 +16,10 @@ import { AuthProvider } from '@/contexts/AuthContext'
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 
-export const metadata = {
+export const metadata: Metadata = {
   title: {
-    default: 'trustBank - CRYPTO | SIMPLIFIED',
-    // template: '%s | trustBank'
+    default: 'trustBank - CRYPTO | SIMPLIFIED.',
+    template: '%s | '
   },
   description: 'simplifying crypto adoption in emerging markets.',
   keywords: ['crypto', 'cryptocurrency', 'bitcoin', 'ethereum', 'trading', 'exchange', 'wallet', 'blockchain', 'trustBank', 'trustbank', 'trust bank tech', 'trust bank crypto', 'trust bank cryptocurrency', 'trust bank exchange'],
@@ -35,7 +35,15 @@ export const metadata = {
     shortcut: '/favicon.ico',
     apple: '/apple-touch-icon.png',
   },
-  manifest: '/site.webmanifest'
+  manifest: '/site.webmanifest',
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+    viewportFit: 'cover',
+  },
+  themeColor: '#16A34A'
 }
 
 interface RootLayoutProps {
@@ -45,12 +53,9 @@ interface RootLayoutProps {
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <meta charSet="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-      </head>
+      <head />
       <body className={cn(
-        'min-h-screen bg-background font-sans antialiased',
+        'min-h-screen bg-background font-sans antialiased overflow-x-hidden',
         GeistSans.variable,
         GeistMono.variable
       )}>
@@ -65,10 +70,14 @@ export default function RootLayout({ children }: RootLayoutProps) {
               <SupabaseProvider>
                 <ProfileProvider>
                   <LanguageProvider>
-                    <Header />
-                    {children}
-                    <Footer />
-                    <Toaster />
+                    <div className="flex min-h-screen flex-col">
+                      <Header />
+                      <main className="flex-1">
+                        {children}
+                      </main>
+                      <Footer />
+                      <Toaster />
+                    </div>
                   </LanguageProvider>
                 </ProfileProvider>
               </SupabaseProvider>

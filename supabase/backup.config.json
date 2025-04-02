@@ -1,0 +1,58 @@
+{
+  "backups": {
+    "enabled": true,
+    "schedule": {
+      "full": "0 0 * * 0",
+      "incremental": "0 */6 * * *"
+    },
+    "retention": {
+      "full": "30d",
+      "incremental": "7d"
+    },
+    "storage": {
+      "type": "s3",
+      "bucket": "trustbank-backups",
+      "path": "database-backups"
+    },
+    "encryption": {
+      "enabled": true,
+      "type": "AES-256"
+    },
+    "notifications": {
+      "enabled": true,
+      "channels": ["email", "slack"],
+      "events": ["success", "failure", "warning"]
+    }
+  },
+  "monitoring": {
+    "enabled": true,
+    "metrics": [
+      "backup_size",
+      "backup_duration",
+      "backup_success_rate"
+    ],
+    "alerts": {
+      "backup_failed": {
+        "threshold": 1,
+        "window": "24h"
+      },
+      "backup_size_increase": {
+        "threshold": 50,
+        "window": "24h"
+      }
+    }
+  },
+  "recovery": {
+    "test_schedule": "0 0 1 * *",
+    "procedures": {
+      "point_in_time": {
+        "enabled": true,
+        "retention": "7d"
+      },
+      "snapshot": {
+        "enabled": true,
+        "retention": "30d"
+      }
+    }
+  }
+} 
