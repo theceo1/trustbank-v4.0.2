@@ -183,16 +183,21 @@ export async function middleware(req: NextRequest) {
 
   const supabase = createMiddlewareClient({ req, res })
 
-  // Check if the path is public
-  const isPublicPath = PUBLIC_PATHS.some(path => req.nextUrl.pathname.startsWith(path));
-  if (isPublicPath) {
-    return res;
-  }
-
   try {
-    // Refresh session if expired
+    // Check if the path is an admin route
+    if (ADMIN_ROUTES.test(req.nextUrl.pathname) || path.startsWith('/api/admin')) {
+      return adminMiddleware(req);
+    }
+
+    // Regular user authentication flow
     const { data: { session }, error } = await supabase.auth.getSession();
-    
+
+    // Check if the path is public
+    const isPublicPath = PUBLIC_PATHS.some(path => req.nextUrl.pathname.startsWith(path));
+    if (isPublicPath) {
+      return res;
+    }
+
     if (error) {
       console.error('Session error:', error);
       // Clear any invalid session data
@@ -222,11 +227,30 @@ export async function middleware(req: NextRequest) {
 
     // Set session cookie for client-side access
     if (session) {
+      const maxAge = 30 * 24 * 60 * 60; // 30 days in seconds
+      
       res.cookies.set('sb-access-token', session.access_token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
-        maxAge: 3600 // 1 hour
+        maxAge,
+        path: '/'
+      });
+
+      res.cookies.set('sb-refresh-token', session.refresh_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge,
+        path: '/'
+      });
+
+      res.cookies.set('sb-session', JSON.stringify(session), {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge,
+        path: '/'
       });
     }
 

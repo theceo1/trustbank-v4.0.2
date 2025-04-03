@@ -62,6 +62,10 @@ export function usePermissions() {
     return requiredPermissions.some(permission => can(permission));
   };
 
+  const isAdmin = userRole === UserRole.ADMIN || userRole === UserRole.SUPER_ADMIN;
+  const isSuperAdmin = userRole === UserRole.SUPER_ADMIN;
+  const isVerified = userRole === UserRole.VERIFIED_USER || isAdmin;
+
   return {
     loading,
     userRole,
@@ -69,8 +73,8 @@ export function usePermissions() {
     can,
     canAll,
     canAny,
-    isAdmin: () => userRole === UserRole.ADMIN || userRole === UserRole.SUPER_ADMIN,
-    isSuperAdmin: () => userRole === UserRole.SUPER_ADMIN,
-    isVerified: () => userRole === UserRole.VERIFIED_USER || userRole === UserRole.ADMIN || userRole === UserRole.SUPER_ADMIN,
+    isAdmin,
+    isSuperAdmin,
+    isVerified,
   };
 } 

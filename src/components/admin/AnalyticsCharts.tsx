@@ -16,63 +16,48 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
-const data = [
-  { name: 'Jan', transactions: 4000, users: 2400 },
-  { name: 'Feb', transactions: 3000, users: 2210 },
-  { name: 'Mar', transactions: 2000, users: 2290 },
-  { name: 'Apr', transactions: 2780, users: 2000 },
-  { name: 'May', transactions: 1890, users: 2181 },
-  { name: 'Jun', transactions: 2390, users: 2500 },
-  { name: 'Jul', transactions: 3490, users: 2100 },
-];
+interface AnalyticsChartsProps {
+  className?: string;
+}
 
-export function AnalyticsCharts() {
+export function AnalyticsCharts({ className }: AnalyticsChartsProps) {
+  // Sample data - replace with actual data from your API
+  const data = [
+    { month: 'Jan', transactions: 65, users: 1200 },
+    { month: 'Feb', transactions: 59, users: 1300 },
+    { month: 'Mar', transactions: 80, users: 1400 },
+    { month: 'Apr', transactions: 81, users: 1500 },
+    { month: 'May', transactions: 56, users: 1700 },
+    { month: 'Jun', transactions: 55, users: 1800 },
+    { month: 'Jul', transactions: 40, users: 2000 },
+  ];
+
   return (
-    <Card>
+    <Card className={className}>
       <CardHeader>
         <CardTitle>Analytics Overview</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart
-              data={data}
-              margin={{
-                top: 5,
-                right: 10,
-                left: 10,
-                bottom: 0,
-              }}
-            >
+            <LineChart data={data}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis
-                dataKey="name"
-                stroke="#888888"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                stroke="#888888"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(value) => `${value}`}
-              />
+              <XAxis dataKey="month" />
+              <YAxis yAxisId="left" />
+              <YAxis yAxisId="right" orientation="right" />
               <Tooltip />
               <Line
+                yAxisId="left"
                 type="monotone"
                 dataKey="transactions"
-                stroke="#16a34a"
-                strokeWidth={2}
-                dot={false}
+                stroke="#8884d8"
+                activeDot={{ r: 8 }}
               />
               <Line
+                yAxisId="right"
                 type="monotone"
                 dataKey="users"
-                stroke="#2563eb"
-                strokeWidth={2}
-                dot={false}
+                stroke="#82ca9d"
               />
             </LineChart>
           </ResponsiveContainer>

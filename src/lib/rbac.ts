@@ -30,7 +30,10 @@ export enum Permission {
   // Admin permissions
   VIEW_ADMIN_DASHBOARD = 'view_admin_dashboard',
   MANAGE_SETTINGS = 'manage_settings',
-  VIEW_LOGS = 'view_logs'
+  VIEW_LOGS = 'view_logs',
+  
+  // Special permissions
+  ALL = 'all'
 }
 
 interface DatabaseRole {

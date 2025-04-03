@@ -2,21 +2,46 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { Permission } from '@/lib/rbac';
-import { hasPermission } from '@/lib/rbac';
+
+interface AdminRole {
+  name: string;
+  permissions: Permission[];
+}
+
+interface AdminData {
+  admin_roles: AdminRole;
+}
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
+    const cookieStore = cookies();
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
     
     // Get the current user's session
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
     if (sessionError || !session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user has permission to view users
-    const hasAccess = await hasPermission(session.user.id, Permission.VIEW_USERS);
-    if (!hasAccess) {
+    // Check if user has admin role and permissions
+    const { data: adminData, error: adminError } = await supabase
+      .from('admin_users')
+      .select(`
+        admin_roles (
+          name,
+          permissions
+        )
+      `)
+      .eq('user_id', session.user.id)
+      .single() as { data: AdminData | null, error: any };
+
+    // Check if user is admin and has VIEW_USERS permission
+    if (adminError || 
+        !adminData?.admin_roles?.name || 
+        !['admin', 'super_admin'].includes(adminData.admin_roles.name.toLowerCase()) ||
+        (!adminData.admin_roles.permissions?.includes(Permission.ALL) && 
+         !adminData.admin_roles.permissions?.includes(Permission.VIEW_USERS))) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -31,7 +56,7 @@ export async function GET(request: NextRequest) {
       .from('user_profiles')
       .select(`
         *,
-        user_roles (
+        roles:user_roles!user_profiles_user_id_fkey (
           role
         ),
         kyc_submissions (
@@ -43,7 +68,7 @@ export async function GET(request: NextRequest) {
 
     // Apply filters
     if (role && role !== 'all') {
-      query = query.eq('user_roles.role', role);
+      query = query.eq('roles.role', role);
     }
     if (status && status !== 'all') {
       query = query.eq('status', status);
@@ -70,7 +95,7 @@ export async function GET(request: NextRequest) {
       id: user.user_id,
       email: user.email,
       name: user.full_name,
-      role: user.user_roles?.role || 'user',
+      role: user.roles?.role || 'user',
       status: user.status,
       lastLogin: user.last_login,
       avatarUrl: user.avatar_url,

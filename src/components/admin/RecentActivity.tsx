@@ -8,6 +8,10 @@ import {
 } from '@/components/ui/card';
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
+interface RecentActivityProps {
+  className?: string;
+}
+
 const activities = [
   {
     id: 1,
@@ -51,9 +55,9 @@ const activities = [
   },
 ];
 
-export function RecentActivity() {
+export function RecentActivity({ className }: RecentActivityProps) {
   return (
-    <Card>
+    <Card className={className}>
       <CardHeader>
         <CardTitle>Recent Activity</CardTitle>
       </CardHeader>

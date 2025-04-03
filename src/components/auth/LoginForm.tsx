@@ -12,6 +12,15 @@ import type { Database } from '@/types/database';
 import { useToast } from "@/components/ui/use-toast";
 import { Shield, Lock, User, EyeOff, Eye, Loader2 } from "lucide-react";
 
+interface AdminRole {
+  name: string;
+  permissions: string[];
+}
+
+interface AdminData {
+  admin_roles: AdminRole;
+}
+
 // Waving hand animation variants
 const waveVariants = {
   wave: {
@@ -53,7 +62,7 @@ export function LoginForm() {
         throw error;
       }
 
-      // Auth state change will handle navigation
+      router.push(redirectTo);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to sign in';
       setError(errorMessage);

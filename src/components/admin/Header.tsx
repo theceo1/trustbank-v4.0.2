@@ -14,7 +14,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Bell, Settings, LogOut, User } from 'lucide-react';
 
-export function Header() {
+interface HeaderProps {
+  isAdmin?: boolean;
+}
+
+export function Header({ isAdmin = false }: HeaderProps) {
   const { user, signOut } = useAuth();
   const [notifications] = useState<number>(3); // Example notification count
 

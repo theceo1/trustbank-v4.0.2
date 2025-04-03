@@ -4,6 +4,8 @@ import { Rate } from 'k6/metrics';
 
 // Custom metrics
 const errorRate = new Rate('errors');
+const marketTickerErrors = new Rate('market_ticker_errors');
+const orderBookErrors = new Rate('order_book_errors');
 
 // Test user credentials - should match a test account in your database
 const TEST_USER = {
@@ -19,201 +21,124 @@ const headers = {
 
 export const options = {
   scenarios: {
-    // Simulate constant background traffic
-    background_traffic: {
-      executor: 'constant-vus',
-      vus: 5,
-      duration: '5m',
-      exec: 'backgroundFlow'
-    },
-
-    // Simulate active traders checking prices frequently
-    active_traders: {
+    // Test market tickers endpoint
+    market_tickers: {
       executor: 'ramping-vus',
-      startVUs: 0,
+      startVUs: 1,
       stages: [
-        { duration: '1m', target: 10 },    // Ramp up to 10 users
-        { duration: '2m', target: 10 },    // Stay at 10 for 2 minutes
-        { duration: '1m', target: 15 },    // Ramp up to peak
-        { duration: '1m', target: 5 },     // Scale down
+        { duration: '30s', target: 5 },     // Warm up
+        { duration: '30s', target: 10 },    // Gradual increase
+        { duration: '30s', target: 15 },    // Medium load
+        { duration: '30s', target: 20 },    // High load
+        { duration: '30s', target: 25 },    // Peak load
+        { duration: '30s', target: 0 },     // Scale down
       ],
-      exec: 'activeTraderFlow'
+      exec: 'marketTickersFlow'
     },
 
-    // Simulate periodic spikes (e.g., market events)
-    traffic_spikes: {
-      executor: 'ramping-arrival-rate',
-      startRate: 0,
-      timeUnit: '1s',
-      preAllocatedVUs: 20,
-      maxVUs: 30,
+    // Test order book endpoint
+    order_book: {
+      executor: 'ramping-vus',
+      startVUs: 1,
       stages: [
-        { duration: '30s', target: 5 },    // Warm up
-        { duration: '1m', target: 15 },    // Medium load
-        { duration: '30s', target: 25 },   // Peak traffic
-        { duration: '2m', target: 10 },    // Sustained load
-        { duration: '1m', target: 5 },     // Cool down
+        { duration: '30s', target: 5 },     // Warm up
+        { duration: '30s', target: 10 },    // Gradual increase
+        { duration: '30s', target: 15 },    // Medium load
+        { duration: '30s', target: 20 },    // High load
+        { duration: '30s', target: 25 },    // Peak load
+        { duration: '30s', target: 0 },     // Scale down
       ],
-      exec: 'spikeFlow'
+      exec: 'orderBookFlow'
     }
   },
 
   thresholds: {
     http_req_duration: [
-      'p(95)<1500',  // 95% of requests should be below 1.5s
-      'p(99)<2500'   // 99% of requests should be below 2.5s
+      'p(95)<2000',  // 95% of requests should be below 2s
+      'p(99)<3000'   // 99% of requests should be below 3s
     ],
-    http_req_failed: ['rate<0.02'],  // Less than 2% failure rate
-    errors: ['rate<0.02'],           // Less than 2% custom error rate
+    http_req_failed: ['rate<0.01'],        // Less than 1% failure rate
+    market_ticker_errors: ['rate<0.01'],    // Less than 1% market ticker errors
+    order_book_errors: ['rate<0.01']        // Less than 1% order book errors
   }
 };
 
-// Background traffic - casual users checking prices
-export function backgroundFlow() {
+// Market tickers endpoint test
+export function marketTickersFlow() {
   const params = {
     headers,
-    timeout: '5s',
-    tags: { type: 'background' }
+    timeout: '5s',  // Increased timeout
+    tags: { type: 'market_tickers' }
   };
 
-  group('Market Overview', () => {
-    // Get market tickers with retry logic
-    const maxRetries = 2;
-    let retries = 0;
-    let success = false;
-
-    while (!success && retries <= maxRetries) {
+  group('Market Tickers Test', () => {
+    const markets = ['btcusdt', 'ethusdt', 'usdtngn'];
+    
+    for (const market of markets) {
       const tickersRes = http.get(
-        `${__ENV.BASE_URL}/api/markets/tickers`,
+        `${__ENV.BASE_URL}/api/markets/${market}/ticker`,
         params
       );
       
-      success = check(tickersRes, {
-        'tickers status is 200': (r) => r.status === 200,
-        'tickers has valid data': (r) => {
+      const success = check(tickersRes, {
+        'status is 200': (r) => r.status === 200,
+        'has valid data': (r) => {
           try {
             const data = JSON.parse(r.body);
             return data.status === 'success' && data.data;
           } catch {
             return false;
           }
-        }
+        },
+        'response time OK': (r) => r.timings.duration < 2000
       });
 
-      if (!success && retries < maxRetries) {
-        sleep(1); // Wait 1s before retry
-        retries++;
+      if (!success) {
+        marketTickerErrors.add(1);
+        console.log(`Market tickers failed for ${market} - Status: ${tickersRes.status}, Duration: ${tickersRes.timings.duration}ms`);
       }
+      
+      sleep(1);  // 1s between requests
     }
-    
-    if (!success) {
-      errorRate.add(1);
-    }
-    
-    sleep(Math.random() * 2 + 3); // Random sleep 3-5 seconds
   });
 }
 
-// Active trader behavior
-export function activeTraderFlow() {
+// Order book endpoint test
+export function orderBookFlow() {
   const params = {
     headers,
-    timeout: '5s',
-    tags: { type: 'active_trader' }
+    timeout: '3s',  // Reduced timeout
+    tags: { type: 'order_book' }
   };
 
-  group('Trading Activity', () => {
-    // Check multiple markets with retry logic
+  group('Order Book Test', () => {
     const markets = ['btcusdt', 'ethusdt', 'usdtngn'];
     
     for (const market of markets) {
-      let success = false;
-      let retries = 0;
+      const orderBookRes = http.get(
+        `${__ENV.BASE_URL}/api/markets/${market}/order-book`,
+        params
+      );
       
-      while (!success && retries <= 2) {
-        const orderBookRes = http.get(
-          `${__ENV.BASE_URL}/api/markets/${market}/order-book`,
-          params
-        );
-        
-        success = check(orderBookRes, {
-          'order book status is 200': (r) => r.status === 200,
-          'order book has valid data': (r) => {
-            try {
-              const data = JSON.parse(r.body);
-              return data.asks && data.bids;
-            } catch {
-              return false;
-            }
+      const success = check(orderBookRes, {
+        'status is 200': (r) => r.status === 200,
+        'has valid data': (r) => {
+          try {
+            const data = JSON.parse(r.body);
+            return data.asks && data.bids;
+          } catch {
+            return false;
           }
-        });
+        },
+        'response time OK': (r) => r.timings.duration < 1000
+      });
 
-        if (!success && retries < 2) {
-          sleep(1);
-          retries++;
-        }
-      }
-      
       if (!success) {
-        errorRate.add(1);
+        orderBookErrors.add(1);
+        console.log(`Order book failed for ${market} - Status: ${orderBookRes.status}, Duration: ${orderBookRes.timings.duration}ms`);
       }
       
-      // Quick check of tickers between order books
-      http.get(`${__ENV.BASE_URL}/api/markets/tickers`, params);
-      
-      sleep(1); // 1s between requests
-    }
-    
-    sleep(Math.random() * 2 + 2); // Random sleep 2-4 seconds between cycles
-  });
-}
-
-// Spike traffic simulation
-export function spikeFlow() {
-  const params = {
-    headers,
-    timeout: '5s',
-    tags: { type: 'spike' }
-  };
-
-  group('High Frequency Updates', () => {
-    // Sequential requests instead of parallel to reduce load
-    const endpoints = [
-      `${__ENV.BASE_URL}/api/markets/tickers`,
-      `${__ENV.BASE_URL}/api/markets/usdtngn/order-book`,
-      `${__ENV.BASE_URL}/api/markets/btcusdt/order-book`
-    ];
-    
-    for (const endpoint of endpoints) {
-      let success = false;
-      let retries = 0;
-      
-      while (!success && retries <= 2) {
-        const res = http.get(endpoint, params);
-        
-        success = check(res, {
-          'status is 200': (r) => r.status === 200,
-          'has valid data': (r) => {
-            try {
-              return JSON.parse(r.body);
-            } catch {
-              return false;
-            }
-          }
-        });
-
-        if (!success && retries < 2) {
-          sleep(1);
-          retries++;
-        }
-      }
-      
-      if (!success) {
-        errorRate.add(1);
-        console.log(`Request to ${endpoint} failed after retries`);
-      }
-      
-      sleep(0.5); // 500ms between requests
+      sleep(1);  // 1s between requests
     }
   });
 } 

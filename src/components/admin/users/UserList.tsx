@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Table,
   TableBody,
@@ -37,6 +37,13 @@ export function UserList({ filters }: UserListProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     fetchUsers();
@@ -60,17 +67,23 @@ export function UserList({ filters }: UserListProps) {
         throw new Error(data.error || 'Failed to fetch users');
       }
 
-      setUsers(data.users);
+      if (isMounted.current) {
+        setUsers(data.users);
+      }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'An error occurred while fetching users';
-      setError(message);
-      toast({
-        title: "Error",
-        description: message,
-        variant: "destructive",
-      });
+      if (isMounted.current) {
+        const message = err instanceof Error ? err.message : 'An error occurred while fetching users';
+        setError(message);
+        toast({
+          title: "Error",
+          description: message,
+          variant: "destructive",
+        });
+      }
     } finally {
-      setLoading(false);
+      if (isMounted.current) {
+        setLoading(false);
+      }
     }
   };
 

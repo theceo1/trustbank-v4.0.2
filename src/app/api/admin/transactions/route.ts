@@ -2,7 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { Permission } from '@/lib/rbac';
-import { hasPermission } from '@/lib/rbac';
+
+interface AdminRole {
+  name: string;
+  permissions: Permission[];
+}
+
+interface AdminData {
+  admin_roles: AdminRole;
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,9 +22,23 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user has permission to view transactions
-    const hasAccess = await hasPermission(session.user.id, Permission.VIEW_TRANSACTIONS);
-    if (!hasAccess) {
+    // Check if user has admin role and permissions
+    const { data: adminData, error: adminError } = await supabase
+      .from('admin_users')
+      .select(`
+        admin_roles (
+          name,
+          permissions
+        )
+      `)
+      .eq('user_id', session.user.id)
+      .single() as { data: AdminData | null, error: any };
+
+    // Check if user has VIEW_TRANSACTIONS permission
+    if (adminError || 
+        !adminData?.admin_roles?.permissions || 
+        (!adminData.admin_roles.permissions.includes(Permission.ALL) && 
+         !adminData.admin_roles.permissions.includes(Permission.VIEW_TRANSACTIONS))) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
