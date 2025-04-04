@@ -77,6 +77,20 @@ export function formatCurrency(
 ): string {
   const numericValue = typeof value === 'string' ? parseFloat(value) : value;
   
+  // List of supported cryptocurrencies that are not ISO currency codes
+  const cryptoCurrencies = ['BTC', 'ETH', 'USDT', 'USDC', 'SOL', 'BNB', 'XRP', 'ADA', 'DOGE', 'MATIC'];
+  
+  if (cryptoCurrencies.includes(currency.toUpperCase())) {
+    // For cryptocurrencies, use decimal style and append the currency code
+    return new Intl.NumberFormat('en-US', {
+      style: 'decimal',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 8,
+      ...options
+    }).format(numericValue) + ' ' + currency.toUpperCase();
+  }
+  
+  // For fiat currencies, use currency style
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,

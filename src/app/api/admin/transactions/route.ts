@@ -1,43 +1,61 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
-import { Database } from '@/types/supabase';
-import { QuidaxServerService } from '@/lib/quidax';
-
-type TransactionType = 'deposit' | 'withdrawal' | 'transfer' | 'buy' | 'sell' | 'trade' | 'referral_bonus' | 'referral_commission';
-type TransactionStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+import { createQuidaxServer } from '@/lib/quidax';
+import { Permission } from '@/lib/rbac';
 
 interface AdminRole {
   name: string;
+  permissions: Permission[];
 }
 
 interface AdminData {
   admin_roles: AdminRole;
 }
 
-interface Profile {
+interface QuidaxUser {
   id: string;
-  full_name: string | null;
-  email: string | null;
+  first_name: string;
+  last_name: string;
+  email: string;
 }
 
-interface FormattedTransaction {
+interface QuidaxTransaction {
   id: string;
-  type: TransactionType;
+  from_amount: string;
+  from_currency: string;
+  to_currency: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  execution_price: string;
+  user?: QuidaxUser;
+}
+
+interface Transaction {
+  id: string;
+  type: string;
   amount: number;
-  status: TransactionStatus;
-  userId: string;
+  currency: string;
+  status: string;
+  userId?: string;
   userName: string;
-  userEmail: string;
+  userEmail?: string;
   createdAt: string;
   updatedAt: string;
-  description: string | null;
+  metadata: {
+    description: string;
+    reference: string;
+    destination: string;
+    source: string;
+    notes?: string;
+  };
 }
 
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
     const cookieStore = cookies();
-    const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
     const quidaxSecretKey = process.env.QUIDAX_SECRET_KEY;
 
     if (!quidaxSecretKey) {
@@ -47,116 +65,191 @@ export async function GET(request: NextRequest) {
         details: 'Missing API key'
       }, { status: 500 });
     }
-    
-    // Get the current user's session
+
+    // Get current session
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    
-    console.log('Admin transactions: Session check', {
-      hasSession: !!session,
-      userId: session?.user?.id,
-      error: sessionError?.message
-    });
 
     if (sessionError || !session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Verify admin status using admin_users table
+    // Get user's role from admin_users table
     const { data: adminData, error: adminError } = await supabase
       .from('admin_users')
       .select(`
         admin_roles (
-          name
+          name,
+          permissions
         )
       `)
       .eq('user_id', session.user.id)
-      .single() as { data: AdminData | null; error: any };
+      .single() as { data: AdminData | null, error: any };
 
     if (adminError || !adminData?.admin_roles) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return NextResponse.json({ error: 'Not an admin user' }, { status: 403 });
     }
 
     const role = adminData.admin_roles.name.toLowerCase();
+
+    // Check if user has admin or super_admin role
     if (!['admin', 'super_admin'].includes(role)) {
       return NextResponse.json({ error: 'Invalid admin role' }, { status: 403 });
     }
 
     // Initialize Quidax service
-    const quidax = new QuidaxServerService(quidaxSecretKey);
+    const quidax = createQuidaxServer(quidaxSecretKey);
 
     // Get query parameters
-    const searchParams = request.nextUrl.searchParams;
+    const searchParams = new URL(req.url).searchParams;
     const type = searchParams.get('type');
     const status = searchParams.get('status');
     const search = searchParams.get('search');
     const from = searchParams.get('from');
     const to = searchParams.get('to');
-    const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 50;
 
-    try {
-      // Fetch all swap transactions
-      const swapTransactionsResponse = await quidax.request('/users/me/swap_transactions');
-      let transactions = swapTransactionsResponse.data || [];
+    // Fetch all sub-accounts first
+    const { data: users } = await quidax.request('/users');
 
-      // Apply filters
-      if (type && type !== 'all') {
-        transactions = transactions.filter((tx: any) => tx.type === type);
+    // Fetch platform transactions (main account)
+    const { data: platformTransactions } = await quidax.request('/users/me/swap_transactions');
+
+    // Create array to store all transactions
+    let allTransactions = [];
+
+    // Add platform transactions
+    allTransactions.push(...platformTransactions.map((tx: any) => ({
+      ...tx,
+      user: {
+        id: 'platform',
+        first_name: 'Platform',
+        last_name: 'Account',
+        email: 'platform@trustbank.com'
       }
-      if (status && status !== 'all') {
-        transactions = transactions.filter((tx: any) => tx.status === status);
+    })));
+
+    // Fetch transactions for each sub-account
+    for (const user of users) {
+      try {
+        const { data: userTransactions } = await quidax.request(`/users/${user.id}/swap_transactions`);
+        allTransactions.push(...userTransactions.map((tx: any) => ({
+          ...tx,
+          user
+        })));
+      } catch (error) {
+        console.error(`Error fetching transactions for user ${user.id}:`, error);
       }
-      if (from && to) {
-        transactions = transactions.filter((tx: any) => {
-          const txDate = new Date(tx.created_at);
-          return txDate >= new Date(from) && txDate <= new Date(to);
-        });
+    }
+
+    // Transform transactions
+    let transactions = allTransactions.map((tx: any) => ({
+      id: tx.id,
+      type: 'swap',
+      amount: parseFloat(tx.from_amount || '0'),
+      currency: tx.from_currency,
+      status: tx.status,
+      userId: tx.user.id,
+      userName: tx.user.id === 'platform' 
+        ? 'Platform Account'
+        : `${tx.user.first_name} ${tx.user.last_name}`,
+      userEmail: tx.user.email,
+      createdAt: tx.created_at,
+      updatedAt: tx.updated_at,
+      metadata: {
+        description: `Swap ${tx.from_currency.toUpperCase()} to ${tx.to_currency.toUpperCase()}`,
+        reference: tx.id,
+        destination: tx.to_currency,
+        source: tx.from_currency,
+        notes: `Execution price: ${tx.execution_price}`
       }
-      if (search) {
-        const searchLower = search.toLowerCase();
-        transactions = transactions.filter((tx: any) => 
-          tx.id.toLowerCase().includes(searchLower) ||
-          tx.from_currency.toLowerCase().includes(searchLower) ||
-          tx.to_currency.toLowerCase().includes(searchLower) ||
-          tx.user?.email?.toLowerCase().includes(searchLower) ||
-          tx.user?.first_name?.toLowerCase().includes(searchLower) ||
-          tx.user?.last_name?.toLowerCase().includes(searchLower)
-        );
-      }
+    }));
 
-      // Sort by created_at in descending order
-      transactions.sort((a: any, b: any) => 
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
+    // Apply filters
+    if (type) {
+      transactions = transactions.filter((tx: Transaction) => tx.type.toLowerCase() === type.toLowerCase());
+    }
 
-      // Apply limit
-      transactions = transactions.slice(0, limit);
+    if (status) {
+      transactions = transactions.filter((tx: Transaction) => tx.status.toLowerCase() === status.toLowerCase());
+    }
 
-      // Format transactions
-      const formattedTransactions: FormattedTransaction[] = transactions.map((tx: any) => ({
-        id: tx.id,
-        type: tx.type as TransactionType,
-        amount: parseFloat(tx.from_amount),
-        status: tx.status as TransactionStatus,
-        userId: tx.user?.id || 'unknown',
-        userName: tx.user ? `${tx.user.first_name} ${tx.user.last_name}` : 'Unknown User',
-        userEmail: tx.user?.email || 'unknown@email.com',
-        createdAt: tx.created_at,
-        updatedAt: tx.updated_at,
-        description: `${tx.from_currency.toUpperCase()} to ${tx.to_currency.toUpperCase()} swap`
-      }));
-
-      return NextResponse.json({ transactions: formattedTransactions });
-    } catch (error) {
-      console.error('Error fetching Quidax transactions:', error);
-      return NextResponse.json(
-        { error: 'Failed to fetch transactions' },
-        { status: 500 }
+    if (search) {
+      const searchLower = search.toLowerCase();
+      transactions = transactions.filter((tx: Transaction) => 
+        tx.id.toLowerCase().includes(searchLower) ||
+        tx.userName.toLowerCase().includes(searchLower) ||
+        (tx.userEmail?.toLowerCase() || '').includes(searchLower) ||
+        tx.metadata.reference.toLowerCase().includes(searchLower)
       );
     }
+
+    if (from) {
+      const fromDate = new Date(from);
+      transactions = transactions.filter((tx: Transaction) => new Date(tx.createdAt) >= fromDate);
+    }
+
+    if (to) {
+      const toDate = new Date(to);
+      transactions = transactions.filter((tx: Transaction) => new Date(tx.createdAt) <= toDate);
+    }
+
+    // Sort transactions by date (newest first)
+    transactions.sort((a: Transaction, b: Transaction) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    // Calculate statistics for current period and previous period
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+
+    const currentPeriodTxs = transactions.filter((tx: Transaction) => 
+      new Date(tx.createdAt) >= thirtyDaysAgo
+    );
+    const previousPeriodTxs = transactions.filter((tx: Transaction) => 
+      new Date(tx.createdAt) >= sixtyDaysAgo && new Date(tx.createdAt) < thirtyDaysAgo
+    );
+
+    // Calculate current period stats
+    const currentVolume = currentPeriodTxs.reduce((sum: number, tx: Transaction) => sum + tx.amount, 0);
+    const currentSuccessful = currentPeriodTxs.filter((tx: Transaction) => tx.status === 'completed').length;
+    const currentFailed = currentPeriodTxs.filter((tx: Transaction) => tx.status === 'failed').length;
+    const currentTotal = currentPeriodTxs.length;
+
+    // Calculate previous period stats
+    const previousVolume = previousPeriodTxs.reduce((sum: number, tx: Transaction) => sum + tx.amount, 0);
+    const previousSuccessful = previousPeriodTxs.filter((tx: Transaction) => tx.status === 'completed').length;
+    const previousFailed = previousPeriodTxs.filter((tx: Transaction) => tx.status === 'failed').length;
+    const previousTotal = previousPeriodTxs.length;
+
+    // Calculate percentage changes
+    const volumeChange = previousVolume === 0 ? 100 : ((currentVolume - previousVolume) / previousVolume) * 100;
+    const successRateChange = previousTotal === 0 ? 0 : 
+      ((currentSuccessful / currentTotal) - (previousSuccessful / previousTotal)) * 100;
+    const failureRateChange = previousTotal === 0 ? 0 : 
+      ((currentFailed / currentTotal) - (previousFailed / previousTotal)) * 100;
+
+    const stats = {
+      totalVolume: transactions.reduce((sum: number, tx: Transaction) => sum + tx.amount, 0),
+      successfulTransactions: transactions.filter((tx: Transaction) => tx.status === 'completed').length,
+      failedTransactions: transactions.filter((tx: Transaction) => tx.status === 'failed').length,
+      pendingTransactions: transactions.filter((tx: Transaction) => tx.status === 'pending').length,
+      volumeChange: Math.round(volumeChange * 100) / 100,
+      successRateChange: Math.round(successRateChange * 100) / 100,
+      failureRateChange: Math.round(failureRateChange * 100) / 100
+    };
+
+    return NextResponse.json({
+      transactions,
+      stats,
+      pagination: {
+        total: transactions.length,
+        page: 1,
+        perPage: transactions.length
+      }
+    });
+
   } catch (error) {
-    console.error('Error in transactions endpoint:', error);
+    console.error('Error fetching transactions:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Failed to fetch transactions' },
       { status: 500 }
     );
   }

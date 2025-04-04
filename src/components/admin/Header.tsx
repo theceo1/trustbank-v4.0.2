@@ -13,66 +13,66 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Bell, Settings, LogOut, User } from 'lucide-react';
+import { User as SupabaseUser } from '@supabase/auth-helpers-nextjs';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useTheme } from 'next-themes';
+import { Moon, Sun } from 'lucide-react';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useRouter } from 'next/navigation';
 
 interface HeaderProps {
-  isAdmin?: boolean;
+  user: SupabaseUser;
 }
 
-export function Header({ isAdmin = false }: HeaderProps) {
-  const { user, signOut } = useAuth();
-  const [notifications] = useState<number>(3); // Example notification count
+export function Header({ user }: HeaderProps) {
+  const { setTheme, theme } = useTheme();
+  const router = useRouter();
+  const supabase = createClientComponentClient();
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.push('/auth/login');
+  };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
-      <div className="flex h-16 items-center px-4 md:px-6">
-        <Link href="/admin" className="flex items-center gap-2 font-semibold">
-          <span className="text-green-600 text-xl">trustBank</span>
-          <span className="text-sm text-gray-500 dark:text-gray-400">Admin</span>
-        </Link>
-
-        <div className="ml-auto flex items-center space-x-4">
+    <header className="sticky top-0 z-40 w-full border-b bg-background">
+      <div className="container flex h-16 items-center justify-between py-4">
+        <div />
+        <div className="flex items-center gap-4">
           <Button
             variant="ghost"
             size="icon"
-            className="relative"
-            aria-label="Notifications"
+            onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
           >
-            <Bell className="h-5 w-5" />
-            {notifications > 0 && (
-              <span className="absolute top-0 right-0 h-4 w-4 text-xs flex items-center justify-center bg-green-600 text-white rounded-full">
-                {notifications}
-              </span>
-            )}
+            <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+            <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+            <span className="sr-only">Toggle theme</span>
           </Button>
-
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                className="relative h-8 w-8 rounded-full"
-              >
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100 dark:bg-green-900">
-                  <User className="h-4 w-4 text-green-600" />
-                </div>
+              <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={user?.user_metadata?.avatar_url} alt={user?.email || ''} />
+                  <AvatarFallback>
+                    <User className="h-4 w-4" />
+                  </AvatarFallback>
+                </Avatar>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56" align="end" forceMount>
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">{user?.email}</p>
+                  <p className="text-sm font-medium leading-none">
+                    {user?.user_metadata?.full_name || user?.email}
+                  </p>
                   <p className="text-xs leading-none text-muted-foreground">
-                    Administrator
+                    {user?.email}
                   </p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <Settings className="mr-2 h-4 w-4" />
-                <span>Settings</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => signOut()}>
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Log out</span>
+              <DropdownMenuItem onClick={handleSignOut}>
+                Log out
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

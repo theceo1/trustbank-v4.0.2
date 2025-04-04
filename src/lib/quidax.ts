@@ -1,8 +1,9 @@
-import axios from 'axios';
+import axios, { AxiosInstance } from 'axios';
 import { cookies } from 'next/headers';
 
 const QUIDAX_API_URL = (process.env.NEXT_PUBLIC_QUIDAX_API_URL || 'https://www.quidax.com/api/v1') as string;
 const QUIDAX_PUBLIC_KEY = process.env.NEXT_PUBLIC_QUIDAX_PUBLIC_KEY || '';
+const QUIDAX_SECRET_KEY = process.env.QUIDAX_SECRET_KEY;
 
 // Configure a single axios instance for client-side requests
 const quidaxApi = axios.create({
@@ -14,27 +15,52 @@ const quidaxApi = axios.create({
 });
 
 export class QuidaxService {
-  protected baseUrl: string;
-  protected secretKey?: string;
-  protected publicKey: string;
+  protected client: AxiosInstance;
 
-  constructor(baseUrl = QUIDAX_API_URL, secretKey?: string, publicKey = QUIDAX_PUBLIC_KEY) {
-    this.baseUrl = baseUrl;
-    this.secretKey = secretKey;
-    this.publicKey = publicKey;
+  constructor(secretKey: string = QUIDAX_SECRET_KEY!) {
+    this.client = axios.create({
+      baseURL: QUIDAX_API_URL,
+      headers: {
+        Authorization: `Bearer ${secretKey}`,
+        'Content-Type': 'application/json',
+      },
+    });
+  }
+
+  async get(endpoint: string, config = {}) {
+    const response = await this.client.get(endpoint, config);
+    return response.data;
+  }
+
+  async post(endpoint: string, data = {}, config = {}) {
+    const response = await this.client.post(endpoint, data, config);
+    return response.data;
+  }
+
+  async getWallets() {
+    return this.request('/wallets');
+  }
+
+  async getMarketTicker(market: string) {
+    return this.request(`/markets/${market}/ticker`);
+  }
+
+  async getTrades(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return this.request(`/trades${queryString ? `?${queryString}` : ''}`);
   }
 
   async getMarketTickers() {
-    return this.request('/markets/tickers', {}, false);
+    return this.request('/markets/tickers');
   }
 
   async request(endpoint: string, options: RequestInit = {}, requiresAuth = true) {
     try {
       console.log('[QuidaxService] Making request:', {
-        url: `${this.baseUrl}${endpoint}`,
+        url: `${QUIDAX_API_URL}${endpoint}`,
         method: options.method || 'GET',
         body: options.body ? JSON.parse(options.body as string) : undefined,
-        hasSecretKey: !!this.secretKey,
+        hasSecretKey: !!this.client.defaults.headers.Authorization,
         requiresAuth
       });
 
@@ -44,98 +70,49 @@ export class QuidaxService {
       };
 
       if (requiresAuth) {
-        if (!this.secretKey) {
+        if (!this.client.defaults.headers.Authorization) {
           console.error('[QuidaxService] No secret key provided for authenticated endpoint');
           throw new Error('Secret key is required for authenticated endpoints');
         }
-        headers['Authorization'] = `Bearer ${this.secretKey}`;
-      } else {
-        headers['Authorization'] = `Bearer ${this.publicKey}`;
+        headers['Authorization'] = String(this.client.defaults.headers.Authorization);
       }
 
-      // Add timeout and retry logic
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      const response = await fetch(`${QUIDAX_API_URL}${endpoint}`, {
+        ...options,
+        headers,
+      });
 
+      const responseText = await response.text();
+      console.log('[QuidaxService] Raw response:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: responseText
+      });
+
+      let data;
       try {
-        const response = await fetch(`${this.baseUrl}${endpoint}`, {
-          ...options,
-          headers,
-          signal: controller.signal,
+        data = JSON.parse(responseText);
+      } catch (error) {
+        console.error('[QuidaxService] Failed to parse response as JSON:', {
+          error,
+          responseText
         });
+        throw new Error('Invalid response format from API: ' + responseText.substring(0, 50));
+      }
 
-        clearTimeout(timeoutId);
-
-        const responseText = await response.text();
-        console.log('[QuidaxService] Raw response:', {
+      // Check for error responses
+      if (!response.ok || data.status === 'error') {
+        const errorMessage = data.message || data.error || 'Unknown error occurred';
+        const error = new Error(errorMessage);
+        (error as any).response = {
           status: response.status,
-          statusText: response.statusText,
-          body: responseText.substring(0, 1000) // Log first 1000 chars to avoid huge logs
-        });
-
-        let data;
-        try {
-          data = JSON.parse(responseText);
-        } catch (e) {
-          console.error('[QuidaxService] Failed to parse response as JSON:', {
-            error: e,
-            responseText: responseText.substring(0, 1000)
-          });
-          throw new Error(`Invalid response format from API: ${responseText.substring(0, 100)}`);
-        }
-
-        // Check for API-specific error responses
-        if (data.status === 'error' || data.error) {
-          console.error('[QuidaxService] API returned error:', {
-            status: response.status,
-            endpoint,
-            error: data.error || data.message
-          });
-          
-          const error = new Error(data.message || data.error || 'API returned an error response');
-          (error as any).response = { 
-            status: response.status, 
-            data,
-            statusText: response.statusText
-          };
-          throw error;
-        }
-
-        if (!response.ok) {
-          console.error('[QuidaxService] Request failed:', {
-            status: response.status,
-            statusText: response.statusText,
-            endpoint,
-            data
-          });
-          
-          const error = new Error(data.message || data.error || 'Request failed');
-          (error as any).response = { 
-            status: response.status, 
-            data,
-            statusText: response.statusText
-          };
-          throw error;
-        }
-
-        // For successful responses, ensure we have the expected structure
-        if (!data || (typeof data === 'object' && !('data' in data) && !('status' in data))) {
-          console.error('[QuidaxService] Invalid response structure:', {
-            endpoint,
-            data: JSON.stringify(data, null, 2)
-          });
-          throw new Error('Invalid response structure from API');
-        }
-
-        return data;
-      } catch (error: any) {
-        clearTimeout(timeoutId);
-        
-        if (error.name === 'AbortError') {
-          throw new Error('Request timed out after 30 seconds');
-        }
+          data,
+          statusText: response.statusText
+        };
         throw error;
       }
+
+      return data;
     } catch (error: any) {
       console.error('[QuidaxService] Request error:', {
         endpoint,
@@ -159,8 +136,7 @@ export class QuidaxService {
   }
 
   async getOrderBook(market: string) {
-    const response = await quidaxApi.get(`/markets/${market}/order_book`);
-    return response.data;
+    return this.request(`/markets/${market}/order_book`);
   }
 
   // Add other methods from QuidaxService class here...
@@ -170,17 +146,20 @@ export class QuidaxService {
 export const quidaxService = new QuidaxService();
 
 // Helper to create server-side instance
-export function createQuidaxServer(secretKey: string) {
-  return new QuidaxServerService(secretKey);
+export function createQuidaxServer(secretKey: string = QUIDAX_SECRET_KEY!) {
+  if (!secretKey) {
+    throw new Error('QUIDAX_SECRET_KEY is not configured');
+  }
+  return new QuidaxService(secretKey);
 }
 
 // Server-side service that uses the secret key
 export class QuidaxServerService extends QuidaxService {
   constructor(secretKey: string) {
-    super(QUIDAX_API_URL, secretKey);
+    super(secretKey);
   }
 
-  async getWallets(userId: string) {
+  async getUserWallets(userId: string) {
     return this.request(`/users/${userId}/wallets`);
   }
 
@@ -415,4 +394,20 @@ interface SwapQuotationResponse {
   to_amount: string;
   confirmed: boolean;
   expires_at: string;
+}
+
+export function getQuidaxClient() {
+  const secretKey = process.env.QUIDAX_SECRET_KEY;
+
+  if (!secretKey) {
+    throw new Error('QUIDAX_SECRET_KEY is not set in environment variables');
+  }
+
+  return axios.create({
+    baseURL: 'https://www.quidax.com/api/v1',
+    headers: {
+      Authorization: `Bearer ${secretKey}`,
+      'Content-Type': 'application/json',
+    },
+  });
 }

@@ -3,20 +3,21 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { User, Session } from '@supabase/auth-helpers-nextjs';
-import { checkAndRefreshSession, validateSession, handleAuthError } from '@/lib/auth';
+import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 
 interface AuthContextType {
   user: User | null;
-  session: Session | null;
-  loading: boolean;
+  isLoading: boolean;
+  isAuthenticated: boolean;
   signOut: () => Promise<void>;
   refreshSession: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
-  session: null,
-  loading: true,
+  isLoading: true,
+  isAuthenticated: false,
   signOut: async () => {},
   refreshSession: async () => {},
 });
@@ -28,9 +29,10 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children, initialSession }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(initialSession?.user || null);
-  const [session, setSession] = useState<Session | null>(initialSession);
-  const [loading, setLoading] = useState(!initialSession);
+  const [isLoading, setIsLoading] = useState(!initialSession);
+  const [isAuthenticated, setIsAuthenticated] = useState(!!initialSession?.user);
   const supabase = createClientComponentClient();
+  const router = useRouter();
 
   const refreshSession = async () => {
     try {
@@ -38,68 +40,56 @@ export function AuthProvider({ children, initialSession }: AuthProviderProps) {
       if (error) throw error;
       
       if (newSession) {
-        setSession(newSession);
         setUser(newSession.user);
+        setIsAuthenticated(true);
       }
     } catch (error) {
       console.error('Error refreshing session:', error);
-      // If refresh fails, sign out the user
       await signOut();
+    }
+  };
+
+  const checkUser = async () => {
+    try {
+      const { data: { user: currentUser }, error } = await supabase.auth.getUser();
+      if (error) throw error;
+
+      if (currentUser) {
+        setUser(currentUser);
+        setIsAuthenticated(true);
+      } else {
+        setUser(null);
+        setIsAuthenticated(false);
+      }
+    } catch (error) {
+      console.error('Error checking auth status:', error);
+      setUser(null);
+      setIsAuthenticated(false);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   useEffect(() => {
     if (initialSession) {
       setUser(initialSession.user);
-      setSession(initialSession);
-      setLoading(false);
+      setIsAuthenticated(true);
+      setIsLoading(false);
     } else {
-      const checkUser = async () => {
-        try {
-          const { data: { session: currentSession }, error } = await supabase.auth.getSession();
-          if (error) throw error;
-
-          if (currentSession) {
-            // Validate and refresh session if needed
-            const refreshedSession = await checkAndRefreshSession(currentSession);
-            if (refreshedSession && validateSession(refreshedSession)) {
-              setSession(refreshedSession);
-              setUser(refreshedSession.user);
-            } else {
-              // Invalid or expired session
-              await signOut();
-            }
-          }
-        } catch (error) {
-          console.error('Error checking auth status:', error);
-          const { type, message } = handleAuthError(error);
-          if (type === 'expired') {
-            await signOut();
-          }
-          setUser(null);
-          setSession(null);
-        } finally {
-          setLoading(false);
-        }
-      };
-
       checkUser();
     }
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', { event, session });
-      
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (session) {
-          setSession(session);
           setUser(session.user);
+          setIsAuthenticated(true);
         }
-        setLoading(false);
+        setIsLoading(false);
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
-        setSession(null);
-        setLoading(false);
+        setIsAuthenticated(false);
+        setIsLoading(false);
       }
     });
 
@@ -110,17 +100,21 @@ export function AuthProvider({ children, initialSession }: AuthProviderProps) {
 
   const signOut = async () => {
     try {
-      setLoading(true);
+      setIsLoading(true);
       await supabase.auth.signOut();
       setUser(null);
-      setSession(null);
+      setIsAuthenticated(false);
+      router.push('/login');
+    } catch (error) {
+      console.error('Error signing out:', error);
+      toast.error('Failed to sign out');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signOut, refreshSession }}>
+    <AuthContext.Provider value={{ user, isLoading, isAuthenticated, signOut, refreshSession }}>
       {children}
     </AuthContext.Provider>
   );
