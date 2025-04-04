@@ -2,21 +2,13 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Shield, EyeOff, Eye } from "lucide-react";
-import { Permission } from '@/lib/rbac';
-
-interface AdminRole {
-  name: string;
-  permissions: Permission[];
-}
-
-interface AdminData {
-  admin_roles: AdminRole;
-}
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import type { Database } from '@/types/database';
+import { useAdminAuth } from '@/hooks/useAdminAuth';
 
 export default function AdminLoginPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -26,7 +18,7 @@ export default function AdminLoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   
   const router = useRouter();
-  const supabase = createClientComponentClient();
+  const supabase = createClientComponentClient<Database>();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,36 +26,45 @@ export default function AdminLoginPage() {
     setError(null);
 
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      // First sign in the user
+      const { data: { session }, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (signInError) throw signInError;
 
-      // Check if user is admin
-      const { data: adminData, error: adminError } = await supabase
-        .from('admin_users')
-        .select(`
-          admin_roles (
-            name,
-            permissions
-          )
-        `)
-        .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
-        .single() as { data: AdminData | null, error: any };
+      if (!session) {
+        throw new Error('No session after sign in');
+      }
 
-      if (adminError || !adminData?.admin_roles?.name) {
+      // Check admin status using the admin check endpoint
+      const response = await fetch('/api/admin/auth/check', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (!response.ok) {
+        // If not an admin, sign out and show error
+        await supabase.auth.signOut();
         throw new Error('Unauthorized access');
       }
 
-      const role = adminData.admin_roles.name.toLowerCase();
-      if (!['admin', 'super_admin'].includes(role)) {
-        throw new Error('Insufficient permissions');
+      const data = await response.json();
+      
+      if (!data.isAdmin) {
+        await supabase.auth.signOut();
+        throw new Error('Not an admin user');
       }
 
+      // If successful, redirect to admin dashboard
       router.push('/admin');
+      router.refresh();
     } catch (error) {
+      console.error('Login error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to sign in';
       setError(errorMessage);
     } finally {
@@ -96,6 +97,7 @@ export default function AdminLoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                disabled={isLoading}
               />
             </div>
 
@@ -108,11 +110,13 @@ export default function AdminLoginPage() {
                 className="pr-10"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                disabled={isLoading}
               >
                 {showPassword ? (
                   <EyeOff className="h-4 w-4" />
@@ -125,10 +129,10 @@ export default function AdminLoginPage() {
 
           <Button
             type="submit"
-            className="w-full bg-green-600 hover:bg-green-700 text-white"
+            className="w-full"
             disabled={isLoading}
           >
-            {isLoading ? 'Signing in...' : 'Sign In'}
+            {isLoading ? 'Signing in...' : 'Sign in'}
           </Button>
         </form>
       </div>

@@ -10,22 +10,32 @@ import { Copy, ExternalLink } from 'lucide-react';
 
 interface WalletBalance {
   currency: string;
-  balance: string;
-  usdValue: number;
-  address: string;
-  network?: string;
+  balance: number;
+  percentage: number;
+  quidaxFee: number;
+}
+
+interface WalletBalancesResponse {
+  balances: WalletBalance[];
+  total: number;
+  totalQuidaxFee: number;
 }
 
 export function WalletBalances() {
   const [balances, setBalances] = useState<WalletBalance[]>([]);
+  const [total, setTotal] = useState<number>(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchBalances() {
       try {
         const response = await fetch('/api/admin/wallets/balances');
-        const data = await response.json();
-        setBalances(data);
+        if (!response.ok) {
+          throw new Error('Failed to fetch balances');
+        }
+        const data: WalletBalancesResponse = await response.json();
+        setBalances(data.balances);
+        setTotal(data.total);
       } catch (error) {
         console.error('Error fetching balances:', error);
       } finally {
@@ -62,7 +72,10 @@ export function WalletBalances() {
     <Card>
       <CardHeader>
         <CardTitle>Wallet Balances</CardTitle>
-        <CardDescription>Current balances across all supported cryptocurrencies</CardDescription>
+        <CardDescription>
+          Current balances across all supported cryptocurrencies
+          {total > 0 && ` (Total: ${formatCurrency(total, 'USD')})`}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <Table>
@@ -70,28 +83,24 @@ export function WalletBalances() {
             <TableRow>
               <TableHead>Currency</TableHead>
               <TableHead>Balance</TableHead>
-              <TableHead>USD Value</TableHead>
-              <TableHead>Address</TableHead>
-              <TableHead>Network</TableHead>
+              <TableHead>Percentage</TableHead>
+              <TableHead>Quidax Fee</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {balances.map((balance) => (
               <TableRow key={balance.currency}>
-                <TableCell className="font-medium">{balance.currency.toUpperCase()}</TableCell>
+                <TableCell className="font-medium">{balance.currency}</TableCell>
                 <TableCell>{balance.balance}</TableCell>
-                <TableCell>{formatCurrency(balance.usdValue, 'USD')}</TableCell>
-                <TableCell className="font-mono text-sm">
-                  {balance.address.slice(0, 8)}...{balance.address.slice(-8)}
-                </TableCell>
-                <TableCell>{balance.network || '-'}</TableCell>
+                <TableCell>{balance.percentage}%</TableCell>
+                <TableCell>{balance.quidaxFee}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => copyToClipboard(balance.address)}
+                      onClick={() => copyToClipboard(balance.currency)}
                     >
                       <Copy className="h-4 w-4" />
                     </Button>
@@ -101,7 +110,7 @@ export function WalletBalances() {
                       asChild
                     >
                       <a
-                        href={`https://www.blockchain.com/explorer/addresses/${balance.currency.toLowerCase()}/${balance.address}`}
+                        href={`https://www.blockchain.com/explorer/addresses/${balance.currency.toLowerCase()}`}
                         target="_blank"
                         rel="noopener noreferrer"
                       >

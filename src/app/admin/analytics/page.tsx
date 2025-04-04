@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LineChart, BarChart } from "@/components/charts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-export default function AdminAnalyticsPage() {
+export default function AnalyticsPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -13,9 +13,9 @@ export default function AdminAnalyticsPage() {
 
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="transactions">Transactions</TabsTrigger>
-          <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="overview" className="data-[state=active]:text-green-600">Overview</TabsTrigger>
+          <TabsTrigger value="transactions" className="data-[state=active]:text-green-600">Transactions</TabsTrigger>
+          <TabsTrigger value="users" className="data-[state=active]:text-green-600">Users</TabsTrigger>
         </TabsList>
         
         <TabsContent value="overview" className="space-y-4">

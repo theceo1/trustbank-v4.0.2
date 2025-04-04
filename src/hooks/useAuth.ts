@@ -44,7 +44,22 @@ export function useAuth() {
         case 'SIGNED_IN':
           if (session?.user) {
             setUser(session.user);
-            // Wait for state update before navigation
+            // Check if this is an admin login
+            try {
+              const response = await fetch('/api/admin/auth/check');
+              const data = await response.json();
+              
+              if (data.isAdmin) {
+                // Skip the default redirect for admin users
+                await router.refresh();
+                return;
+              }
+            } catch (error) {
+              // If admin check fails, proceed with normal user flow
+              console.error('Admin check error:', error);
+            }
+
+            // Wait for state update before navigation for regular users
             setTimeout(async () => {
               await router.refresh();
               router.push('/dashboard');

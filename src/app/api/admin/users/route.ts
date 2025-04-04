@@ -12,6 +12,24 @@ interface AdminData {
   admin_roles: AdminRole;
 }
 
+interface UserProfile {
+  full_name: string | null;
+  role: string | null;
+  avatar_url: string | null;
+  phone: string | null;
+  country: string | null;
+  address: string | null;
+}
+
+interface DatabaseUser {
+  id: string;
+  email: string;
+  user_metadata: any;
+  created_at: string;
+  last_sign_in_at: string | null;
+  user_profiles: UserProfile | null;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const cookieStore = cookies();
@@ -48,39 +66,39 @@ export async function GET(request: NextRequest) {
     // Get query parameters
     const searchParams = request.nextUrl.searchParams;
     const role = searchParams.get('role');
-    const status = searchParams.get('status');
     const search = searchParams.get('search');
 
     // Build the query
     let query = supabase
-      .from('user_profiles')
+      .from('users')
       .select(`
-        *,
-        roles:user_roles!user_profiles_user_id_fkey (
-          role
-        ),
-        kyc_submissions (
-          status,
-          submitted_at,
-          verified_at
+        id,
+        email,
+        user_metadata,
+        created_at,
+        last_sign_in_at,
+        user_profiles (
+          full_name,
+          role,
+          avatar_url,
+          phone,
+          country,
+          address
         )
       `);
 
     // Apply filters
     if (role && role !== 'all') {
-      query = query.eq('roles.role', role);
-    }
-    if (status && status !== 'all') {
-      query = query.eq('status', status);
+      query = query.eq('user_profiles.role', role);
     }
     if (search) {
-      query = query.or(`email.ilike.%${search}%,full_name.ilike.%${search}%`);
+      query = query.or(`email.ilike.%${search}%,user_profiles.full_name.ilike.%${search}%`);
     }
 
     // Execute the query
     const { data: users, error: usersError } = await query
       .order('created_at', { ascending: false })
-      .limit(50);
+      .limit(50) as { data: DatabaseUser[] | null, error: any };
 
     if (usersError) {
       console.error('Error fetching users:', usersError);
@@ -91,26 +109,20 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform the data to match the frontend interface
-    const transformedUsers = users.map(user => ({
-      id: user.user_id,
+    const transformedUsers = (users || []).map(user => ({
+      id: user.id,
       email: user.email,
-      name: user.full_name,
-      role: user.roles?.role || 'user',
-      status: user.status,
-      lastLogin: user.last_login,
-      avatarUrl: user.avatar_url,
+      name: user.user_profiles?.full_name || 'Unknown',
+      role: user.user_profiles?.role || 'user',
+      status: 'active', // Default status since we don't have this in the database
+      lastLogin: user.last_sign_in_at,
+      avatarUrl: user.user_profiles?.avatar_url,
       createdAt: user.created_at,
-      updatedAt: user.updated_at,
       metadata: {
-        phone: user.phone,
-        country: user.country,
-        address: user.address
-      },
-      kyc: user.kyc_submissions?.[0] ? {
-        status: user.kyc_submissions[0].status,
-        submittedAt: user.kyc_submissions[0].submitted_at,
-        verifiedAt: user.kyc_submissions[0].verified_at
-      } : undefined
+        phone: user.user_profiles?.phone,
+        country: user.user_profiles?.country,
+        address: user.user_profiles?.address
+      }
     }));
 
     return NextResponse.json({ users: transformedUsers });

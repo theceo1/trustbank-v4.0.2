@@ -29,8 +29,20 @@ export async function adminMiddleware(request: NextRequest) {
       return res;
     }
 
-    // Get current session
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    // Get current session with timeout
+    const sessionPromise = supabase.auth.getSession();
+    const timeoutPromise = new Promise<never>((_, reject) => 
+      setTimeout(() => reject(new Error('Session check timed out')), 10000)
+    );
+
+    type SessionResult = Awaited<ReturnType<typeof supabase.auth.getSession>>;
+    const { data: { session }, error: sessionError } = await Promise.race([
+      sessionPromise,
+      timeoutPromise,
+    ]).catch(error => {
+      console.error('[ADMIN MIDDLEWARE] Session check error:', error);
+      return { data: { session: null }, error } as SessionResult;
+    });
     
     console.log('[ADMIN MIDDLEWARE] Session check:', {
       hasSession: !!session,
@@ -46,8 +58,8 @@ export async function adminMiddleware(request: NextRequest) {
       return NextResponse.redirect(redirectUrl);
     }
 
-    // Get user's role from admin_users table
-    const { data: adminData, error: adminError } = await supabase
+    // Get user's role from admin_users table with timeout
+    const adminCheckPromise = supabase
       .from('admin_users')
       .select(`
         id,
@@ -61,7 +73,18 @@ export async function adminMiddleware(request: NextRequest) {
         )
       `)
       .eq('user_id', session.user.id)
-      .single() as { data: AdminData | null, error: any };
+      .single();
+
+    type AdminCheckResult = { data: AdminData | null, error: any };
+    const { data: adminData, error: adminError } = await Promise.race([
+      adminCheckPromise,
+      new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Admin check timed out')), 10000)
+      ),
+    ]).catch(error => {
+      console.error('[ADMIN MIDDLEWARE] Admin check error:', error);
+      return { data: null, error } as AdminCheckResult;
+    }) as AdminCheckResult;
 
     console.log('[ADMIN MIDDLEWARE] Admin check:', {
       hasAdminData: !!adminData,
