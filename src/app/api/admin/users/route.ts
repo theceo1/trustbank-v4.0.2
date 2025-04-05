@@ -107,8 +107,18 @@ export async function GET(req: NextRequest) {
     const status = searchParams.get('status');
 
     try {
-      // Fetch all sub-accounts
-      const usersResponse = await quidax.request('/sub_accounts');
+      // Fetch all users (corrected endpoint)
+      const usersResponse = await quidax.request('/users');
+      if (!usersResponse || !usersResponse.data) {
+        console.error('Invalid users response:', usersResponse);
+        return NextResponse.json(
+          { 
+            error: 'Failed to fetch users',
+            details: usersResponse?.error || 'No data returned'
+          }, 
+          { status: 500 }
+        );
+      }
       const users = usersResponse.data || [];
 
       // Create a map to store user transactions
@@ -119,6 +129,9 @@ export async function GET(req: NextRequest) {
         users.map(async (user: QuidaxUser) => {
           try {
             const transactionsResponse = await quidax.request(`/users/${user.id}/trades`);
+            if (!transactionsResponse || !transactionsResponse.data) {
+              throw new Error(transactionsResponse?.error || 'No transaction data');
+            }
             userTransactions.set(user.id, transactionsResponse.data || []);
           } catch (error) {
             console.error(`Error fetching transactions for user ${user.id}:`, error);
@@ -145,6 +158,9 @@ export async function GET(req: NextRequest) {
 
           try {
             const walletsResponse = await quidax.request(`/users/${user.id}/wallets`);
+            if (!walletsResponse || !walletsResponse.data) {
+              throw new Error(walletsResponse?.error || 'No wallet data');
+            }
             const wallets = walletsResponse.data || [];
             const totalWallets = wallets.length;
             const totalBalance = wallets.reduce(

@@ -80,68 +80,74 @@ export async function GET(req: NextRequest) {
     // Initialize Quidax service
     const quidax = createQuidaxServer(quidaxSecretKey);
 
-    // First, fetch all sub-accounts
-    const allUsersResponse = await quidax.request('/users');
-    const allUsers = allUsersResponse.data as QuidaxUser[];
+    try {
+      // First, fetch all sub-accounts
+      const allUsersResponse = await quidax.request('/users');
+      const allUsers = allUsersResponse.data as QuidaxUser[];
 
-    // Get the date 30 days ago
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      // Get the date 30 days ago
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    // Initialize daily stats
-    const dailyStats: { [key: string]: DailyStats } = {};
-    for (let i = 0; i < 30; i++) {
-      const date = new Date(thirtyDaysAgo);
-      date.setDate(date.getDate() + i);
-      const dateStr = date.toISOString().split('T')[0];
-      dailyStats[dateStr] = {
-        date: dateStr,
-        transactions: 0,
-        volume: 0,
-        newUsers: 0
-      };
-    }
-
-    // Process each user's data
-    for (const user of allUsers) {
-      try {
-        // Count new users per day
-        const userCreatedDate = new Date(user.created_at).toISOString().split('T')[0];
-        if (dailyStats[userCreatedDate]) {
-          dailyStats[userCreatedDate].newUsers++;
-        }
-
-        // Fetch and process user's transactions
-        const transactionsResponse = await quidax.request(`/users/${user.id}/swap_transactions`);
-        const transactions = transactionsResponse.data as QuidaxTransaction[];
-
-        for (const tx of transactions) {
-          const txDate = new Date(tx.created_at).toISOString().split('T')[0];
-          if (dailyStats[txDate]) {
-            dailyStats[txDate].transactions++;
-            dailyStats[txDate].volume += parseFloat(tx.from_amount || '0');
-          }
-        }
-      } catch (error) {
-        console.error(`Error processing user ${user.id}:`, error);
-        // Continue with next user
+      // Initialize daily stats
+      const dailyStats: { [key: string]: DailyStats } = {};
+      for (let i = 0; i < 30; i++) {
+        const date = new Date(thirtyDaysAgo);
+        date.setDate(date.getDate() + i);
+        const dateStr = date.toISOString().split('T')[0];
+        dailyStats[dateStr] = {
+          date: dateStr,
+          transactions: 0,
+          volume: 0,
+          newUsers: 0
+        };
       }
+
+      // Process each user's data
+      for (const user of allUsers) {
+        try {
+          // Count new users per day
+          const userCreatedDate = new Date(user.created_at).toISOString().split('T')[0];
+          if (dailyStats[userCreatedDate]) {
+            dailyStats[userCreatedDate].newUsers++;
+          }
+
+          // Fetch and process user's transactions
+          const transactionsResponse = await quidax.request(`/users/${user.id}/swap_transactions`);
+          const transactions = transactionsResponse.data as QuidaxTransaction[];
+
+          for (const tx of transactions) {
+            const txDate = new Date(tx.created_at).toISOString().split('T')[0];
+            if (dailyStats[txDate]) {
+              dailyStats[txDate].transactions++;
+              dailyStats[txDate].volume += parseFloat(tx.from_amount || '0');
+            }
+          }
+        } catch (error) {
+          console.error(`Error processing user ${user.id}:`, error);
+          // Continue with next user
+        }
+      }
+
+      // Convert dailyStats object to array and sort by date
+      const chartData = Object.values(dailyStats).sort((a, b) => 
+        new Date(a.date).getTime() - new Date(b.date).getTime()
+      );
+
+      return NextResponse.json({
+        chartData: chartData.map(day => ({
+          date: day.date,
+          transactions: day.transactions,
+          volume: day.volume,
+          newUsers: day.newUsers
+        }))
+      });
+    } catch (quidaxError) {
+      console.error('Quidax API failed, using fallback data:', quidaxError);
+      
+      // Return empty array as fallback
+      return NextResponse.json({ chartData: [] });
     }
-
-    // Convert dailyStats object to array and sort by date
-    const chartData = Object.values(dailyStats).sort((a, b) => 
-      new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
-
-    return NextResponse.json({
-      chartData: chartData.map(day => ({
-        date: day.date,
-        transactions: day.transactions,
-        volume: day.volume,
-        newUsers: day.newUsers
-      }))
-    });
-
   } catch (error) {
     console.error('Error fetching chart data:', error);
     return NextResponse.json(
@@ -149,4 +155,4 @@ export async function GET(req: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}

@@ -65,31 +65,40 @@ export default function UsersPage() {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams();
-      if (search) params.append('search', search);
-      if (status !== 'all') params.append('status', status);
-
-      const response = await fetch(`/api/admin/users?${params.toString()}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch users');
-      }
-
-      const data: ApiResponse = await response.json();
-      setUsers(data.users);
-      setStats(data.stats);
+      
+      const response = await fetch('/api/admin/users');
+      if (!response.ok) throw new Error('Failed to fetch users');
+      
+      const data = await response.json();
+      if (!Array.isArray(data?.users)) throw new Error('Invalid users data format');
+      
+      // Process users to ensure stats exists
+      const processedUsers = data.users.map(user => ({
+        ...user,
+        stats: user.stats || {
+          totalTransactions: 0,
+          totalVolume: 0,
+          successfulTransactions: 0,
+          failedTransactions: 0
+        }
+      }));
+      
+      setUsers(processedUsers);
     } catch (error) {
       console.error('Error fetching users:', error);
       toast({
         title: 'Error',
-        description: 'Failed to fetch users. Please try again.',
+        description: error instanceof Error ? error.message : 'Failed to fetch users',
         variant: 'destructive',
       });
+      setUsers([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status?: string) => {
+    if (!status) return 'bg-gray-500';
     switch (status.toLowerCase()) {
       case 'active':
         return 'bg-green-500';
@@ -204,11 +213,13 @@ export default function UsersPage() {
                   <TableCell className="font-medium">{user.name}</TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>
-                    <Badge className={getStatusColor(user.status)}>{user.status}</Badge>
+                    <Badge className={getStatusColor(user?.status || 'inactive')}>
+                      {user?.status || 'Inactive'}
+                    </Badge>
                   </TableCell>
                   <TableCell>{user.role}</TableCell>
-                  <TableCell>{formatNumber(user.stats.totalTransactions)}</TableCell>
-                  <TableCell>₦{formatNumber(user.stats.totalVolume)}</TableCell>
+                  <TableCell>{formatNumber(user.stats?.totalTransactions || 0)}</TableCell>
+                  <TableCell>₦{formatNumber(user.stats?.totalVolume || 0)}</TableCell>
                   <TableCell>{formatDate(user.lastLogin)}</TableCell>
                   <TableCell>{formatDate(user.createdAt)}</TableCell>
                 </TableRow>
@@ -219,4 +230,4 @@ export default function UsersPage() {
       </div>
     </div>
   );
-} 
+}

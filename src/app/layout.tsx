@@ -53,7 +53,9 @@ interface RootLayoutProps {
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head />
+      <head>
+        <link rel="icon" href="/favicon.ico" />
+      </head>
       <body className={cn(
         'min-h-screen bg-background font-sans antialiased overflow-x-hidden',
         GeistSans.variable,

@@ -1,11 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatNumber } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { RefreshCw } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
-import {
+import { 
+  Alert,
+  AlertDescription,
+  AlertTitle 
+} from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
+import { ErrorBoundary } from 'react-error-boundary';
+import { 
   LineChart,
   Line,
   XAxis,
@@ -14,9 +22,11 @@ import {
   Tooltip,
   ResponsiveContainer,
   BarChart,
+  Bar,
+  Legend
 } from 'recharts';
 
-interface DashboardStats {
+interface DashboardStatsResponse {
   totalUsers: number;
   activeUsers: number;
   totalTransactions: number;
@@ -29,186 +39,177 @@ interface DashboardStats {
 
 interface ChartData {
   date: string;
-  transactions: number;
-  volume: number;
-  users: number;
+  users?: number;
+  transactions?: number;
+  volume?: number;
+}
+
+interface ChartResponse {
+  data: ChartData[];
+}
+
+type DashboardStats = {
+  totalUsers: number;
+  activeUsers: number;
+  totalTransactions: number;
+  totalVolume: number;
+  totalWallets: number;
+  lastUpdated?: string;
+};
+
+function ChartErrorFallback({ error }: { error: Error }) {
+  return (
+    <div className="h-[350px] flex items-center justify-center">
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>Chart Error</AlertTitle>
+        <AlertDescription>{error.message}</AlertDescription>
+      </Alert>
+    </div>
+  );
 }
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    activeUsers: 0,
+    totalTransactions: 0,
+    totalVolume: 0,
+    totalWallets: 0,
+    lastUpdated: ''
+  });
+  
   const [chartData, setChartData] = useState<ChartData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
-
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
 
   const fetchDashboardData = async () => {
     try {
+      console.log('[UI] Starting stats fetch');
       setLoading(true);
-      const [statsResponse, chartsResponse] = await Promise.all([
-        fetch('/api/admin/dashboard/stats'),
-        fetch('/api/admin/dashboard/charts'),
-      ]);
+      setError(null);
+      
+      const response = await fetch('/api/admin/platform/stats');
+      const data = await response.json();
 
-      if (!statsResponse.ok || !chartsResponse.ok) {
-        throw new Error('Failed to fetch dashboard data');
+      if (data.status === 'success') {
+        setStats({
+          totalUsers: data.data.totalUsers || 0,
+          activeUsers: data.data.activeUsers || 0,
+          totalTransactions: data.data.totalTransactions || 0,
+          totalVolume: data.data.totalVolume || 0,
+          totalWallets: data.data.totalWallets || 0,
+          lastUpdated: data.lastUpdated || ''
+        });
       }
-
-      const [statsData, chartsData] = await Promise.all([
-        statsResponse.json(),
-        chartsResponse.json(),
-      ]);
-
-      setStats(statsData);
-      setChartData(chartsData.data);
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch dashboard data. Please try again.',
-        variant: 'destructive',
+      console.error('[UI] Fetch error:', error);
+      setError(error instanceof Error ? error.message : 'Failed to load dashboard data');
+      
+      // Set fallback empty state
+      setStats({
+        totalUsers: 0,
+        activeUsers: 0,
+        totalTransactions: 0,
+        totalVolume: 0,
+        totalWallets: 0,
+        lastUpdated: ''
       });
+      setChartData([]);
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  // Helper function to format numbers
+  const formatNumber = (num: number) => {
+    return new Intl.NumberFormat('en-US').format(num);
+  };
+
   return (
-    <div className="p-6 space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {loading ? <Skeleton className="h-8 w-20" /> : formatNumber(stats?.totalUsers || 0)}
-            </div>
-            <div className="text-xs text-muted-foreground">
-              {loading ? (
-                <Skeleton className="h-4 w-32" />
-              ) : (
-                `${formatNumber(stats?.activeUsers || 0)} active users`
-              )}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Transactions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {loading ? <Skeleton className="h-8 w-20" /> : formatNumber(stats?.totalTransactions || 0)}
-            </div>
-            <div className="text-xs text-muted-foreground">
-              {loading ? (
-                <Skeleton className="h-4 w-32" />
-              ) : (
-                `₦${formatNumber(stats?.averageTransactionVolume || 0)} average`
-              )}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Volume</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {loading ? <Skeleton className="h-8 w-20" /> : `₦${formatNumber(stats?.totalVolume || 0)}`}
-            </div>
-            <div className="text-xs text-muted-foreground">
-              {loading ? (
-                <Skeleton className="h-4 w-32" />
-              ) : (
-                `₦${formatNumber(stats?.totalRevenue || 0)} revenue`
-              )}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Wallets</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {loading ? <Skeleton className="h-8 w-20" /> : formatNumber(stats?.totalWallets || 0)}
-            </div>
-            <div className="text-xs text-muted-foreground">
-              {loading ? (
-                <Skeleton className="h-4 w-32" />
-              ) : (
-                `₦${formatNumber(stats?.totalBalance || 0)} total balance`
-              )}
-            </div>
-          </CardContent>
-        </Card>
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Platform Statistics</h1>
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={fetchDashboardData}
+          disabled={loading}
+        >
+          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Transaction Volume</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="h-[350px]">
-                <Skeleton className="h-[300px] w-full" />
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-[125px] w-full rounded-xl" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {formatNumber(stats.totalUsers)}
               </div>
-            ) : !chartData || chartData.length === 0 ? (
-              <div className="h-[350px] flex items-center justify-center text-muted-foreground">
-                No transaction data available
+              <div className="text-xs text-muted-foreground">
+                {formatNumber(stats.activeUsers)} active users
               </div>
-            ) : (
-              <div className="h-[350px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={chartData}
-                    categories={['transactions', 'volume', 'users']}
-                    colors={['#10B981', '#6366F1', '#F59E0B']}
-                  />
-                </ResponsiveContainer>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Transactions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {formatNumber(stats.totalTransactions)}
               </div>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>User Growth</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="h-[350px] flex items-center justify-center">
-                <Skeleton className="h-[300px] w-full" />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Volume</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                ₦{formatNumber(stats.totalVolume)}
               </div>
-            ) : chartData.length === 0 ? (
-              <div className="h-[350px] flex items-center justify-center text-muted-foreground">
-                No user data available
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Wallets</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {formatNumber(stats.totalWallets)}
               </div>
-            ) : (
-              <div className="h-[350px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="date" className="text-muted-foreground text-xs" />
-                    <YAxis className="text-muted-foreground text-xs" />
-                    <Tooltip />
-                    <Line
-                      type="monotone"
-                      dataKey="users"
-                      stroke="#16a34a"
-                      strokeWidth={2}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+      {stats.lastUpdated && (
+        <div className="text-sm text-gray-500">
+          Last updated: {new Date(stats.lastUpdated).toLocaleString()}
+        </div>
+      )}
     </div>
   );
 } 
