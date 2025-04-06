@@ -1,111 +1,91 @@
+import { Line, Bar } from 'react-chartjs-2';
 import {
-  BarChart as RechartsBarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
   Tooltip,
-  ResponsiveContainer,
-  PieChart as RechartsPieChart,
-  Pie,
-  Cell,
-} from 'recharts';
+  Legend,
+  ChartData,
+  ChartOptions
+} from 'chart.js';
 
-interface BaseChartProps {
-  data: any[];
-  colors?: string[];
-  valueFormatter?: (value: number) => string;
+// Register Chart.js components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+);
+
+// Common chart options
+const commonOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      position: 'top' as const,
+    },
+  },
+  scales: {
+    y: {
+      beginAtZero: true,
+    },
+  },
+};
+
+// Default empty dataset
+const defaultData = {
+  labels: [],
+  datasets: [{
+    label: 'No Data',
+    data: [],
+    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+    borderColor: 'rgba(75, 192, 192, 1)',
+  }]
+};
+
+interface LineChartProps {
+  data?: ChartData<'line'>;
+  options?: ChartOptions<'line'>;
 }
 
-interface BarChartProps extends BaseChartProps {
-  categories: string[];
+interface BarChartProps {
+  data?: ChartData<'bar'>;
+  options?: ChartOptions<'bar'>;
 }
 
-interface PieChartProps extends BaseChartProps {
-  data: Array<{ name: string; value: number }>;
-}
+export function LineChart({ data = defaultData, options = {} }: LineChartProps) {
+  // Ensure data and datasets exist
+  const safeData = {
+    labels: data?.labels || [],
+    datasets: data?.datasets || defaultData.datasets
+  };
 
-const defaultColors = ['#22C55E', '#16A34A', '#15803D', '#166534'];
-
-export function BarChart({
-  data,
-  categories,
-  colors = defaultColors,
-  valueFormatter = (value: number) => value.toString(),
-}: BarChartProps) {
   return (
-    <ResponsiveContainer width="100%" height={350}>
-      <RechartsBarChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-        <XAxis
-          dataKey="month"
-          tick={{ fontSize: 12 }}
-          tickLine={false}
-          axisLine={false}
-          className="text-muted-foreground"
-        />
-        <YAxis
-          width={80}
-          tick={{ fontSize: 12 }}
-          tickLine={false}
-          axisLine={false}
-          tickFormatter={valueFormatter}
-          className="text-muted-foreground"
-        />
-        <Tooltip
-          formatter={valueFormatter}
-          contentStyle={{
-            backgroundColor: 'hsl(var(--background))',
-            border: '1px solid hsl(var(--border))',
-            borderRadius: '6px',
-          }}
-          labelStyle={{ color: 'hsl(var(--foreground))' }}
-        />
-        {categories.map((category, i) => (
-          <Bar
-            key={category}
-            dataKey={category}
-            fill={colors[i % colors.length]}
-            radius={[4, 4, 0, 0]}
-          />
-        ))}
-      </RechartsBarChart>
-    </ResponsiveContainer>
+    <div style={{ height: '300px' }}>
+      <Line data={safeData} options={{ ...commonOptions, ...options }} />
+    </div>
   );
 }
 
-export function PieChart({
-  data,
-  colors = defaultColors,
-  valueFormatter = (value: number) => value.toString(),
-}: PieChartProps) {
+export function BarChart({ data = defaultData, options = {} }: BarChartProps) {
+  // Ensure data and datasets exist
+  const safeData = {
+    labels: data?.labels || [],
+    datasets: data?.datasets || defaultData.datasets
+  };
+
   return (
-    <ResponsiveContainer width="100%" height={350}>
-      <RechartsPieChart>
-        <Pie
-          data={data}
-          dataKey="value"
-          nameKey="name"
-          cx="50%"
-          cy="50%"
-          outerRadius={120}
-          label={(entry) => entry.name}
-          labelLine={false}
-        >
-          {data.map((entry, index) => (
-            <Cell key={entry.name} fill={colors[index % colors.length]} />
-          ))}
-        </Pie>
-        <Tooltip
-          formatter={valueFormatter}
-          contentStyle={{
-            backgroundColor: 'hsl(var(--background))',
-            border: '1px solid hsl(var(--border))',
-            borderRadius: '6px',
-          }}
-          labelStyle={{ color: 'hsl(var(--foreground))' }}
-        />
-      </RechartsPieChart>
-    </ResponsiveContainer>
+    <div style={{ height: '300px' }}>
+      <Bar data={safeData} options={{ ...commonOptions, ...options }} />
+    </div>
   );
 } 

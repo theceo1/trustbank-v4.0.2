@@ -102,42 +102,79 @@ export default function UsersPage() {
   ]);
   
   const { toast } = useToast();
+  const [error, setError] = useState<string | null>(null);
+
+  const defaultStats = {
+    totalUsers: 0,
+    activeUsers: 0,
+    inactiveUsers: 0,
+    pendingUsers: 0
+  };
+
+  const defaultPagination = {
+    total: 0,
+    page: 1,
+    pageSize: 10,
+    totalPages: 0
+  };
 
   useEffect(() => {
     fetchUsers();
   }, [search, status, kycFilter, sortField, sortOrder, page, pageSize]);
 
   const fetchUsers = async () => {
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      
+      console.log('[Users Page] Fetching users with params:', {
+        page,
+        pageSize,
+        search,
+        status,
+        kycFilter,
+        sortField,
+        sortOrder
+      });
+
       const queryParams = new URLSearchParams({
         page: page.toString(),
         pageSize: pageSize.toString(),
-        search,
-        status: status !== 'all' ? status : '',
-        kycStatus: kycFilter !== 'all' ? kycFilter : '',
+        ...(search && { search }),
+        ...(status && { status }),
+        ...(kycFilter && { kycStatus: kycFilter }),
         sortBy: sortField,
         sortOrder
       });
-      
+
       const response = await fetch(`/api/admin/users?${queryParams}`);
-      if (!response.ok) throw new Error('Failed to fetch users');
-      
       const data = await response.json();
-      
-      setUsers(data.users);
-      setStats(data.stats);
+
+      console.log('[Users Page] API Response:', {
+        status: response.status,
+        users: data.users?.length,
+        stats: data.stats,
+        pagination: data.pagination
+      });
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch users');
+      }
+
+      setUsers(data.users || []);
+      setStats(data.stats || defaultStats);
       setTotalPages(data.pagination.totalPages);
       setTotalRecords(data.pagination.total);
-    } catch (error) {
-      console.error('Error fetching users:', error);
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to fetch users',
-        variant: 'destructive',
+
+      console.log('[Users Page] Updated state:', {
+        usersCount: data.users?.length,
+        stats: data.stats,
+        currentPage: data.pagination?.page,
+        totalPages: data.pagination?.totalPages
       });
-      setUsers([]);
+
+    } catch (error) {
+      console.error('[Users Page] Error fetching users:', error);
+      setError(error instanceof Error ? error.message : 'Failed to fetch users');
     } finally {
       setLoading(false);
     }
@@ -198,16 +235,16 @@ export default function UsersPage() {
   const getStatusColor = (status?: string) => {
     if (!status) return 'border-gray-500 text-gray-500 dark:border-gray-400 dark:text-gray-400';
     switch (status.toLowerCase()) {
-      case 'active':
+      case 'verified':
         return 'border-green-500 text-green-500 dark:border-green-400 dark:text-green-400';
-      case 'inactive':
-        return 'border-gray-500 text-gray-500 dark:border-gray-400 dark:text-gray-400';
       case 'pending':
         return 'border-yellow-500 text-yellow-500 dark:border-yellow-400 dark:text-yellow-400';
+      case 'rejected':
+        return 'border-red-500 text-red-500 dark:border-red-400 dark:text-red-400';
       case 'suspended':
         return 'border-red-500 text-red-500 dark:border-red-400 dark:text-red-400';
       default:
-        return 'border-blue-500 text-blue-500 dark:border-blue-400 dark:text-blue-400';
+        return 'border-gray-500 text-gray-500 dark:border-gray-400 dark:text-gray-400';
     }
   };
 
@@ -304,9 +341,9 @@ export default function UsersPage() {
             </SelectTrigger>
             <SelectContent className="bg-white dark:bg-gray-950 border-2">
               <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
+              <SelectItem value="verified">Verified</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="rejected">Rejected</SelectItem>
               <SelectItem value="suspended">Suspended</SelectItem>
             </SelectContent>
           </Select>

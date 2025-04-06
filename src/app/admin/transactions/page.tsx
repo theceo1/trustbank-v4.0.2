@@ -81,6 +81,16 @@ interface TransactionFilters {
   dateRange?: DateRange;
 }
 
+const defaultStats = {
+  totalVolume: 0,
+  successfulTransactions: 0,
+  failedTransactions: 0,
+  pendingTransactions: 0,
+  volumeChange: 0,
+  successRateChange: 0,
+  failureRateChange: 0
+};
+
 export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [stats, setStats] = useState<TransactionStats | null>(null);
@@ -90,34 +100,52 @@ export default function TransactionsPage() {
     status: 'all',
     search: '',
   });
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchTransactions();
   }, [filters]);
 
   const fetchTransactions = async () => {
+    console.log('[TRANSACTIONS PAGE] Starting to fetch transactions');
     try {
       setLoading(true);
-      const searchParams = new URLSearchParams();
-      if (filters.type !== 'all') searchParams.append('type', filters.type);
-      if (filters.status !== 'all') searchParams.append('status', filters.status);
-      if (filters.search) searchParams.append('search', filters.search);
-      if (filters.dateRange?.from) searchParams.append('from', filters.dateRange.from.toISOString());
-      if (filters.dateRange?.to) searchParams.append('to', filters.dateRange.to.toISOString());
-
-      const response = await fetch(`/api/admin/transactions?${searchParams}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch transactions');
-      }
+      setError(null);
+      
+      console.log('[TRANSACTIONS PAGE] Making API request');
+      const response = await fetch('/api/admin/transactions');
+      console.log('[TRANSACTIONS PAGE] API response status:', response.status);
+      
       const data = await response.json();
-      setTransactions(data.transactions);
-      setStats(data.stats);
+      console.log('[TRANSACTIONS PAGE] API response data:', {
+        status: data.status,
+        error: data.error,
+        transactionCount: data.transactions?.length,
+        stats: data.stats
+      });
+
+      if (!response.ok) {
+        console.error('[TRANSACTIONS PAGE] API error:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: data.error,
+          details: data.details
+        });
+        throw new Error(data.error || 'Failed to fetch transactions');
+      }
+
+      console.log('[TRANSACTIONS PAGE] Setting state with fetched data');
+      setTransactions(data.transactions || []);
+      setStats(data.stats || defaultStats);
+      
     } catch (error) {
-      console.error('Error fetching transactions:', error);
+      console.error('[TRANSACTIONS PAGE] Error in fetchTransactions:', error);
+      setError(error instanceof Error ? error.message : 'Failed to fetch transactions');
+      
       toast({
-        title: "Error",
-        description: "Failed to fetch transactions",
         variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : 'Failed to fetch transactions'
       });
     } finally {
       setLoading(false);

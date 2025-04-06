@@ -14,7 +14,7 @@ import {
 import { AlertCircle } from 'lucide-react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { formatNumber, formatCurrency } from '@/lib/utils';
-import { BarChart, PieChart } from '@/components/ui/charts';
+import { BarChart } from '@/components/ui/charts';
 
 interface RevenueStats {
   totalRevenue: number;
@@ -245,9 +245,16 @@ export default function AdminDashboard() {
             <CardTitle>User Segmentation</CardTitle>
           </CardHeader>
           <CardContent>
-            <PieChart
-              data={userSegmentationData}
-              colors={['#94A3B8', '#64748B', '#475569']}
+            <BarChart
+              data={{
+                labels: userSegmentationData.map(d => d.name),
+                datasets: [{
+                  label: 'Users',
+                  data: userSegmentationData.map(d => d.value),
+                  backgroundColor: ['rgba(34, 197, 94, 0.5)', 'rgba(59, 130, 246, 0.5)', 'rgba(99, 102, 241, 0.5)'],
+                  borderColor: ['#22C55E', '#3B82F6', '#6366F1']
+                }]
+              }}
             />
           </CardContent>
         </Card>
@@ -257,9 +264,21 @@ export default function AdminDashboard() {
             <CardTitle>Revenue Breakdown</CardTitle>
           </CardHeader>
           <CardContent>
-            <PieChart
-              data={revenueBreakdownData}
-              colors={['#22C55E', '#16A34A', '#15803D', '#DC2626']}
+            <BarChart
+              data={{
+                labels: revenueBreakdownData.map(d => d.name),
+                datasets: [{
+                  label: 'Revenue',
+                  data: revenueBreakdownData.map(d => d.value),
+                  backgroundColor: [
+                    'rgba(34, 197, 94, 0.5)',
+                    'rgba(59, 130, 246, 0.5)',
+                    'rgba(99, 102, 241, 0.5)',
+                    'rgba(239, 68, 68, 0.5)'
+                  ],
+                  borderColor: ['#22C55E', '#3B82F6', '#6366F1', '#EF4444']
+                }]
+              }}
             />
           </CardContent>
         </Card>

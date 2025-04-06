@@ -250,9 +250,13 @@ export async function GET(): Promise<NextResponse> {
       tier5: userProfiles?.filter(user => user.kyc_level === 'tier5').length || 0
     };
 
-    // Update active user definition - active if they have any transaction in last 30 days
+    // Update active user definition - active if they have completed KYC and have transactions
     const activeUserIds = new Set(transactions?.map(tx => tx.user_id) || []);
-    const activeUsers = userProfiles?.filter(user => activeUserIds.has(user.user_id));
+    const activeUsers = userProfiles?.filter(user => 
+      activeUserIds.has(user.user_id) && 
+      user.kyc_level && 
+      user.kyc_level !== 'pending'
+    ) || [];
 
     // Calculate user's 30-day trading volume
     const userVolumes = new Map<string, number>();

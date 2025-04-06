@@ -3,7 +3,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nanoid } from 'nanoid';
-import { QuidaxServerService } from '@/lib/quidax';
+import { QuidaxService } from '@/lib/quidax';
 
 export async function POST(request: Request) {
   try {
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       }
 
       console.log('[Signup] Creating Quidax sub-account for:', { email, firstName, lastName });
-      const quidaxService = new QuidaxServerService(quidaxSecretKey);
+      const quidaxService = new QuidaxService(quidaxSecretKey);
       
       // Add retry logic for Quidax account creation
       const maxRetries = 3;
@@ -55,20 +55,20 @@ export async function POST(request: Request) {
         try {
           console.log(`[Signup] Attempt ${attempt} to create Quidax account`);
           
-          const quidaxResponse = await quidaxService.createSubAccount(
+          const quidaxResponse = await quidaxService.createSubAccount({
             email,
-            firstName,
-            lastName || ''
-          );
+            first_name: firstName,
+            last_name: lastName || ''
+          });
 
           console.log('[Signup] Quidax response:', JSON.stringify(quidaxResponse, null, 2));
 
-          if (!quidaxResponse?.data?.id) {
+          if (!quidaxResponse.id) {
             console.error('[Signup] Invalid Quidax response:', quidaxResponse);
             throw new Error('No Quidax ID returned');
           }
 
-          quidaxId = quidaxResponse.data.id;
+          quidaxId = quidaxResponse.id;
           console.log('[Signup] Quidax sub-account created:', quidaxId);
           break; // Success, exit retry loop
           
@@ -189,7 +189,8 @@ export async function POST(request: Request) {
     // Update the user profile with all fields in a single update
     const { error: profileError } = await supabase
       .from('user_profiles')
-      .update({
+      .upsert({
+        user_id: signUpData.user!.id,
         first_name: firstName,
         last_name: lastName || '',
         full_name: `${firstName} ${lastName || ''}`.trim(),

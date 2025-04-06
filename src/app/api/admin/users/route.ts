@@ -1,47 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
-import { Permission } from '@/lib/rbac';
 
 interface AdminRole {
   name: string;
-  permissions: Permission[];
+  permissions: string[];
 }
 
 interface AdminData {
   admin_roles: AdminRole;
 }
 
-interface UserProfileData {
-  user_id: string;
-  full_name: string | null;
-  first_name: string | null;
-  last_name: string | null;
-  status: string;
-  kyc_verified: boolean;
-  kyc_level: string;
-  completed_trades: number;
-  trading_volume_usd: number;
-  role: string;
-}
-
 interface UserProfile {
   id: string;
-  user_id: string;
-  email: string;
   first_name: string | null;
   last_name: string | null;
-  full_name: string | null;
-  kyc_level: string;
-  kyc_verified: boolean;
-  trading_volume_usd: number;
-  daily_volume_usd: number;
-  monthly_volume_usd: number;
-  completed_trades: number;
-  quidax_id: string;
-  role: string;
+  phone_number: string | null;
+  kyc_level: string | null;
+  role: string | null;
   created_at: string;
   updated_at: string;
+}
+
+interface User {
+  id: string;
+  email: string;
+  created_at: string;
+  updated_at: string;
+  user_profiles: UserProfile;
 }
 
 export async function GET(req: NextRequest) {
@@ -99,66 +85,62 @@ export async function GET(req: NextRequest) {
       const startIndex = (page - 1) * pageSize;
       const endIndex = startIndex + pageSize - 1;
 
-      // Build base query
-      console.log('[USERS API] Building query');
+      // Build base query joining users and user_profiles
       let query = supabase
         .from('users')
         .select(`
           id,
           email,
           created_at,
-          updated_at
+          updated_at,
+          user_profiles!left (
+            id,
+            first_name,
+            last_name,
+            phone_number,
+            kyc_level,
+            role,
+            created_at,
+            updated_at
+          )
         `, { count: 'exact' });
-
-      // Fetch user profiles separately
-      let profilesQuery = supabase
-        .from('user_profiles')
-        .select(`
-          user_id,
-          full_name,
-          first_name,
-          last_name,
-          kyc_verified,
-          kyc_level,
-          completed_trades,
-          trading_volume_usd,
-          role
-        `);
 
       // Apply filters
       if (search) {
-        query = query.or(`email.ilike.%${search}%`);
-        profilesQuery = profilesQuery.or(`full_name.ilike.%${search}%`);
+        query = query.or(`email.ilike.%${search}%,user_profiles.first_name.ilike.%${search}%,user_profiles.last_name.ilike.%${search}%`);
       }
 
-      if (status) {
-        profilesQuery = profilesQuery.eq('status', status);
-      }
-
-      if (kycStatus) {
-        profilesQuery = profilesQuery.eq('kyc_verified', kycStatus === 'verified');
+      if (kycStatus && kycStatus !== 'all') {
+        query = query.eq('user_profiles.kyc_level', kycStatus);
       }
 
       // Apply sorting
-      if (sortBy === 'created_at') {
-        query = query.order('created_at', { ascending: sortOrder === 'asc' });
-      } else if (sortBy === 'last_sign_in_at') {
-        query = query.order('last_sign_in_at', { ascending: sortOrder === 'asc', nullsFirst: false });
+      if (sortBy.startsWith('user_profiles.')) {
+        query = query.order(sortBy, { ascending: sortOrder === 'asc' });
+      } else {
+        query = query.order(sortBy, { ascending: sortOrder === 'asc' });
       }
 
       // Apply pagination
       query = query.range(startIndex, endIndex);
 
-      // Execute queries
-      console.log('[USERS API] Executing queries');
-      const [{ data: users, error: usersError, count }, { data: profiles, error: profilesError }] = await Promise.all([
-        query,
-        profilesQuery
-      ]);
+      // Execute query
+      console.log('[USERS API] Executing query');
+      const { data: users, error: usersError, count } = await query as { 
+        data: User[] | null, 
+        error: any, 
+        count: number | null 
+      };
 
-      if (usersError || profilesError) {
-        console.error('[USERS API] Error fetching users or profiles:', usersError || profilesError);
-        throw new Error('Failed to fetch users or profiles');
+      console.log('[USERS API] Raw query results:', {
+        usersCount: users?.length || 0,
+        totalCount: count,
+        error: usersError?.message
+      });
+
+      if (usersError) {
+        console.error('[USERS API] Error fetching users:', usersError);
+        throw new Error('Failed to fetch users');
       }
 
       if (!users) {
@@ -169,12 +151,7 @@ export async function GET(req: NextRequest) {
             totalUsers: 0,
             activeUsers: 0,
             inactiveUsers: 0,
-            pendingUsers: 0,
-            totalTransactions: 0,
-            totalVolume: 0,
-            averageTransactionVolume: 0,
-            kycCompletionRate: 0,
-            userGrowth: 0
+            pendingUsers: 0
           },
           pagination: {
             total: 0,
@@ -185,46 +162,51 @@ export async function GET(req: NextRequest) {
         });
       }
 
-      console.log(`[USERS API] Found ${count || 0} total users`);
-
       // Transform the data
-      const profilesMap = new Map(profiles.map((profile: any) => [profile.user_id, profile]));
-      const transformedUsers = users.map((user: any) => {
-        const profile = profilesMap.get(user.id) || {};
-        return {
+      console.log('[USERS API] Transforming user data for:', users.length, 'users');
+      const transformedUsers = users.map(user => {
+        const transformed = {
           id: user.id,
           email: user.email,
-          name: profile.full_name || `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'N/A',
-          status: profile.status || 'pending',
-          role: profile.role || 'user',
-          lastLogin: user.created_at,
+          name: user.user_profiles ? `${user.user_profiles.first_name || ''} ${user.user_profiles.last_name || ''}`.trim() || 'No Name' : 'No Name',
+          status: user.user_profiles?.kyc_level || 'pending',
+          role: user.user_profiles?.role || 'user',
+          lastLogin: user.updated_at,
           createdAt: user.created_at,
           updatedAt: user.updated_at,
+          kycStatus: user.user_profiles?.kyc_level || 'pending',
           stats: {
-            totalTransactions: profile.completed_trades || 0,
-            totalVolume: profile.trading_volume_usd || 0,
-            successfulTransactions: profile.completed_trades || 0,
+            totalTransactions: 0,
+            totalVolume: 0,
+            successfulTransactions: 0,
             failedTransactions: 0
-          },
-          kycStatus: profile.kyc_verified ? 'verified' : 'pending',
-          verificationLevel: profile.kyc_level || 'level_0'
+          }
         };
+        console.log('[USERS API] Transformed user:', {
+          id: transformed.id,
+          email: transformed.email,
+          status: transformed.status,
+          kycStatus: transformed.kycStatus
+        });
+        return transformed;
       });
 
-      // Calculate stats for the current filtered set
+      // Calculate stats
       const stats = {
         totalUsers: count || 0,
-        activeUsers: transformedUsers.filter(u => u.status === 'active').length,
-        inactiveUsers: transformedUsers.filter(u => u.status === 'inactive').length,
-        pendingUsers: transformedUsers.filter(u => u.status === 'pending').length,
-        totalTransactions: transformedUsers.reduce((acc, user) => acc + user.stats.totalTransactions, 0),
-        totalVolume: transformedUsers.reduce((acc, user) => acc + user.stats.totalVolume, 0),
-        averageTransactionVolume: transformedUsers.reduce((acc, user) => acc + user.stats.totalVolume, 0) / transformedUsers.length || 0,
-        kycCompletionRate: (transformedUsers.filter(u => u.kycStatus === 'verified').length / transformedUsers.length) * 100 || 0,
-        userGrowth: calculateUserGrowth(transformedUsers)
+        activeUsers: transformedUsers.filter(u => u.kycStatus !== 'pending').length,
+        inactiveUsers: transformedUsers.filter(u => u.kycStatus === 'suspended').length,
+        pendingUsers: transformedUsers.filter(u => u.kycStatus === 'pending').length
       };
 
-      console.log('[USERS API] Successfully processed users data');
+      console.log('[USERS API] Final stats:', stats);
+      console.log(`[USERS API] Returning ${transformedUsers.length} users with pagination:`, {
+        total: count || 0,
+        page,
+        pageSize,
+        totalPages: Math.ceil((count || 0) / pageSize)
+      });
+      
       return NextResponse.json({
         users: transformedUsers,
         stats,
@@ -235,30 +217,12 @@ export async function GET(req: NextRequest) {
           totalPages: Math.ceil((count || 0) / pageSize)
         }
       });
-
     } catch (error) {
-      console.error('[USERS API] Error processing users:', error);
-      return NextResponse.json({
-        error: 'Failed to fetch users',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      }, { status: 500 });
+      console.error('[USERS API] Error processing request:', error);
+      return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
   } catch (error) {
-    console.error('[USERS API] Unexpected error:', error);
-    return NextResponse.json({
-      error: 'Internal server error',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+    console.error('[USERS API] Error processing request:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
-}
-
-function calculateUserGrowth(users: any[]): number {
-  const now = new Date();
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-  
-  const recentUsers = users.filter(user => new Date(user.createdAt) > thirtyDaysAgo);
-  const totalUsers = users.length;
-  
-  if (totalUsers === 0) return 0;
-  return (recentUsers.length / totalUsers) * 100;
 }
