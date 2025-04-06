@@ -13,9 +13,13 @@ import {
   ChevronRight,
   LineChart,
   BookOpen,
+  LogOut,
+  BarChart
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 const navigation = [
   {
@@ -44,6 +48,11 @@ const navigation = [
     icon: ArrowLeftRight,
   },
   {
+    name: 'Analytics',
+    href: '/admin/analytics',
+    icon: BarChart,
+  },
+  {
     name: 'Trade Guide',
     href: '/admin/trade-guide',
     icon: BookOpen,
@@ -58,6 +67,13 @@ const navigation = [
 export function Sidebar() {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const router = useRouter();
+  const supabase = createClientComponentClient();
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.push('/admin/login');
+  };
 
   return (
     <div
@@ -108,6 +124,21 @@ export function Sidebar() {
           })}
         </nav>
       </div>
+      
+      {/* Sign Out Button */}
+      <div className="p-2 border-t">
+        <button
+          onClick={handleSignOut}
+          className={cn(
+            'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors w-full text-red-500 hover:bg-red-500/10',
+            isCollapsed && 'justify-center'
+          )}
+        >
+          <LogOut className="h-4 w-4" />
+          {!isCollapsed && <span>Sign Out</span>}
+        </button>
+      </div>
+
       <Button
         variant="ghost"
         size="icon"

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Shield, EyeOff, Eye } from "lucide-react";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { Database } from '@/types/database';
-import { useAdminAuth } from '@/hooks/useAdminAuth';
 
 export default function AdminLoginPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -19,6 +18,26 @@ export default function AdminLoginPage() {
   
   const router = useRouter();
   const supabase = createClientComponentClient<Database>();
+
+  // Check if already logged in
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        // Check if user is admin
+        try {
+          const response = await fetch('/api/admin/auth/check');
+          if (response.ok) {
+            router.push('/admin');
+          }
+        } catch (error) {
+          // Not an admin or error checking admin status
+          console.error('Admin check error:', error);
+        }
+      }
+    };
+    checkSession();
+  }, [router, supabase]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,7 +62,6 @@ export default function AdminLoginPage() {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
         },
       });
 
@@ -67,6 +85,13 @@ export default function AdminLoginPage() {
       console.error('Login error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to sign in';
       setError(errorMessage);
+      
+      // Ensure we sign out if there was an error
+      try {
+        await supabase.auth.signOut();
+      } catch (signOutError) {
+        console.error('Error signing out after failed login:', signOutError);
+      }
     } finally {
       setIsLoading(false);
     }

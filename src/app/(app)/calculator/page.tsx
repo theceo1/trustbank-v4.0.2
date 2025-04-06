@@ -384,7 +384,7 @@ export default function CalculatorPage() {
                               </div>
                               <div>
                                 <h4 className="font-semibold text-green-700 dark:text-green-300">Direct Market Access</h4>
-                                <p className="text-sm text-gray-600 dark:text-gray-400">We source real time rates directly patners and verified order books, ensuring you get the most competitive prices.</p>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">We source real time rates directly from our partners and verified order books, ensuring you get the most competitive prices.</p>
                               </div>
                             </motion.div>
                             

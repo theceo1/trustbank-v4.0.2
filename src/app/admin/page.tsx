@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, TrendingUp, TrendingDown, Users, Wallet } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { 
   Alert,
@@ -13,110 +13,98 @@ import {
 } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { ErrorBoundary } from 'react-error-boundary';
-import { 
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  Legend
-} from 'recharts';
+import { formatNumber, formatCurrency } from '@/lib/utils';
+import { BarChart, PieChart } from '@/components/ui/charts';
 
-interface DashboardStatsResponse {
-  totalUsers: number;
-  activeUsers: number;
-  totalTransactions: number;
-  totalVolume: number;
-  totalWallets: number;
-  totalBalance: number;
+interface RevenueStats {
   totalRevenue: number;
-  averageTransactionVolume: number;
+  quidaxFees: number;
+  netRevenue: number;
+  feeBreakdown: {
+    basic: number;
+    verified: number;
+    premium: number;
+  };
 }
 
-interface ChartData {
-  date: string;
-  users?: number;
-  transactions?: number;
-  volume?: number;
-}
-
-interface ChartResponse {
-  data: ChartData[];
-}
-
-type DashboardStats = {
+interface DashboardStats {
   totalUsers: number;
   activeUsers: number;
   totalTransactions: number;
   totalVolume: number;
   totalWallets: number;
-  lastUpdated?: string;
-};
+  revenue: RevenueStats;
+  userSegmentation: {
+    basic: number;
+    verified: number;
+    premium: number;
+  };
+  topWallets?: { currency: string; balance: number }[];
+}
 
-function ChartErrorFallback({ error }: { error: Error }) {
-  return (
-    <div className="h-[350px] flex items-center justify-center">
-      <Alert variant="destructive">
-        <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Chart Error</AlertTitle>
-        <AlertDescription>{error.message}</AlertDescription>
-      </Alert>
-    </div>
-  );
+interface ApiResponse {
+  status: 'success' | 'error';
+  message: string;
+  data: DashboardStats | null;
+  lastUpdated?: string;
 }
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,
     activeUsers: 0,
     totalTransactions: 0,
     totalVolume: 0,
     totalWallets: 0,
-    lastUpdated: ''
+    revenue: {
+      totalRevenue: 0,
+      quidaxFees: 0,
+      netRevenue: 0,
+      feeBreakdown: {
+        basic: 0,
+        verified: 0,
+        premium: 0
+      }
+    },
+    userSegmentation: {
+      basic: 0,
+      verified: 0,
+      premium: 0
+    }
   });
   
-  const [chartData, setChartData] = useState<ChartData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const { toast } = useToast();
 
   const fetchDashboardData = async () => {
     try {
-      console.log('[UI] Starting stats fetch');
       setLoading(true);
       setError(null);
       
       const response = await fetch('/api/admin/platform/stats');
-      const data = await response.json();
+      const data: ApiResponse = await response.json();
 
-      if (data.status === 'success') {
-        setStats({
-          totalUsers: data.data.totalUsers || 0,
-          activeUsers: data.data.activeUsers || 0,
-          totalTransactions: data.data.totalTransactions || 0,
-          totalVolume: data.data.totalVolume || 0,
-          totalWallets: data.data.totalWallets || 0,
-          lastUpdated: data.lastUpdated || ''
-        });
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to fetch dashboard data');
+      }
+
+      if (data.status === 'success' && data.data) {
+        setStats(data.data);
+        setLastUpdated(data.lastUpdated || null);
+      } else {
+        throw new Error(data.message || 'Invalid response format');
       }
     } catch (error) {
       console.error('[UI] Fetch error:', error);
       setError(error instanceof Error ? error.message : 'Failed to load dashboard data');
       
-      // Set fallback empty state
-      setStats({
-        totalUsers: 0,
-        activeUsers: 0,
-        totalTransactions: 0,
-        totalVolume: 0,
-        totalWallets: 0,
-        lastUpdated: ''
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : 'Failed to load dashboard data'
       });
-      setChartData([]);
     } finally {
       setLoading(false);
     }
@@ -126,15 +114,23 @@ export default function AdminDashboard() {
     fetchDashboardData();
   }, []);
 
-  // Helper function to format numbers
-  const formatNumber = (num: number) => {
-    return new Intl.NumberFormat('en-US').format(num);
-  };
+  const userSegmentationData = [
+    { name: 'Basic', value: stats.userSegmentation.basic },
+    { name: 'Verified', value: stats.userSegmentation.verified },
+    { name: 'Premium', value: stats.userSegmentation.premium }
+  ];
+
+  const revenueBreakdownData = [
+    { name: 'Basic Users', value: stats.revenue.feeBreakdown.basic },
+    { name: 'Verified Users', value: stats.revenue.feeBreakdown.verified },
+    { name: 'Premium Users', value: stats.revenue.feeBreakdown.premium },
+    { name: 'Quidax Fees', value: stats.revenue.quidaxFees }
+  ];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Platform Statistics</h1>
+        <h1 className="text-2xl font-bold">Admin Dashboard</h1>
         <Button 
           variant="outline" 
           size="sm"
@@ -147,67 +143,131 @@ export default function AdminDashboard() {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-          {error}
-        </div>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
 
-      {loading ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-[125px] w-full rounded-xl" />
-          ))}
-        </div>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {formatNumber(stats.totalUsers)}
-              </div>
-              <div className="text-xs text-muted-foreground">
-                {formatNumber(stats.activeUsers)} active users
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Transactions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {formatNumber(stats.totalTransactions)}
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Volume</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                ₦{formatNumber(stats.totalVolume)}
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Wallets</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {formatNumber(stats.totalWallets)}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-      {stats.lastUpdated && (
-        <div className="text-sm text-gray-500">
-          Last updated: {new Date(stats.lastUpdated).toLocaleString()}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {loading ? (
+          <>
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-[125px] w-full rounded-xl" />
+            ))}
+          </>
+        ) : (
+          <>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Net Revenue</CardTitle>
+                <TrendingUp className="h-4 w-4 text-green-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {formatCurrency(stats.revenue.netRevenue, 'NGN')}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  After Quidax fees
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Volume</CardTitle>
+                <Wallet className="h-4 w-4 text-green-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {formatCurrency(stats.totalVolume, 'NGN')}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {formatNumber(stats.totalTransactions)} transactions
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+                <Users className="h-4 w-4 text-green-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {formatNumber(stats.totalUsers)}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {formatNumber(stats.activeUsers)} active users
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Quidax Fees</CardTitle>
+                <TrendingDown className="h-4 w-4 text-red-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {formatCurrency(stats.revenue.quidaxFees, 'NGN')}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  1.4% of volume
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Top Wallets</CardTitle>
+                <Wallet className="h-4 w-4 text-blue-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {stats.topWallets?.map((wallet, i) => (
+                    <div key={i} className="flex justify-between items-center text-sm">
+                      <span className="font-medium">{wallet.currency.toUpperCase()}</span>
+                      <span>{formatCurrency(wallet.balance, wallet.currency)}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>User Segmentation</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <PieChart
+              data={userSegmentationData}
+              colors={['#94A3B8', '#64748B', '#475569']}
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Revenue Breakdown</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <PieChart
+              data={revenueBreakdownData}
+              colors={['#22C55E', '#16A34A', '#15803D', '#DC2626']}
+            />
+          </CardContent>
+        </Card>
+      </div>
+
+      {lastUpdated && (
+        <div className="text-sm text-muted-foreground">
+          Last updated: {new Date(lastUpdated).toLocaleString()}
         </div>
       )}
     </div>

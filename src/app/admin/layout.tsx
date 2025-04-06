@@ -7,12 +7,18 @@ import SupabaseProvider from "@/lib/providers/supabase-provider";
 import { cn } from "@/lib/utils";
 import { GlobalErrorBoundary } from '@/components/error/GlobalErrorBoundary';
 import { AdminProvider } from '@/contexts/AdminContext';
-import { AdminLayoutClient } from '@/components/admin/AdminLayoutClient';
-import { redirect } from 'next/navigation';
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { Sidebar } from '@/components/admin/Sidebar';
-import { Header } from '@/components/admin/Header';
+import { redirect } from 'next/navigation';
+
+interface AdminRole {
+  name: string;
+}
+
+interface AdminData {
+  admin_roles: AdminRole;
+}
 
 export const metadata = {
   title: 'Admin Dashboard - trustBank',
@@ -24,44 +30,58 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = createServerComponentClient({ cookies });
+  // Get the current path from headers
+  const headersList = headers();
+  const pathname = headersList.get('x-pathname') || '';
+  const isLoginPage = pathname.includes('/admin/login');
 
-  // Get session
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-  if (sessionError || !session) {
-    redirect('/auth/login');
+  // For login page, return minimal layout
+  if (isLoginPage) {
+    return (
+      <div className={cn(
+        'min-h-screen bg-background font-sans antialiased',
+        GeistSans.variable,
+        GeistMono.variable
+      )}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <GlobalErrorBoundary>
+            <SupabaseProvider>
+              {children}
+              <Toaster />
+            </SupabaseProvider>
+          </GlobalErrorBoundary>
+        </ThemeProvider>
+      </div>
+    );
   }
 
-  // Get user's role from admin_users table
-  const { data: adminData, error: adminError } = await supabase
+  // For all other admin routes, check authentication
+  const supabase = createServerComponentClient({ cookies });
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (!session) {
+    redirect('/admin/login');
+  }
+
+  // Check admin status
+  const { data: adminData } = await supabase
     .from('admin_users')
     .select(`
       admin_roles!inner (
-        name,
-        permissions
+        name
       )
     `)
     .eq('user_id', session.user.id)
-    .single() as { 
-      data: { 
-        admin_roles: { 
-          name: string; 
-          permissions: string[]; 
-        }; 
-      } | null; 
-      error: any; 
-    };
+    .single() as { data: AdminData | null, error: any };
 
-  if (adminError || !adminData?.admin_roles) {
-    redirect('/');
-  }
-
-  const role = adminData.admin_roles.name.toLowerCase();
-
-  // Check if user has admin or super_admin role
-  if (!['admin', 'super_admin'].includes(role)) {
-    redirect('/');
+  const role = adminData?.admin_roles?.name?.toLowerCase();
+  if (!role || !['admin', 'super_admin'].includes(role)) {
+    redirect('/admin/login');
   }
 
   return (
@@ -79,10 +99,13 @@ export default async function AdminLayout({
         <GlobalErrorBoundary>
           <SupabaseProvider>
             <AdminProvider>
-              <div className="flex h-screen overflow-hidden">
+              <div className="flex h-screen">
+                {/* Admin Sidebar */}
                 <Sidebar />
+                
+                {/* Main Content */}
                 <div className="flex-1 flex flex-col overflow-hidden">
-                  <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900">
+                  <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-6">
                     {children}
                   </main>
                 </div>

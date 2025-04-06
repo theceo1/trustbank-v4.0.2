@@ -154,12 +154,17 @@ export function formatRate(
   });
 }
 
-export function formatDate(date: string): string {
-  return new Date(date).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+export function formatDate(date: string | Date): string {
+  return new Intl.DateTimeFormat('en-NG', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  }).format(new Date(date));
+}
+
+export function formatPercentage(value: number): string {
+  return new Intl.NumberFormat('en-NG', {
+    style: 'percent',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(value / 100);
 }

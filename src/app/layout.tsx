@@ -15,6 +15,7 @@ import { GlobalErrorBoundary } from '@/components/error/GlobalErrorBoundary'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/next'
+import { headers } from 'next/headers';
 
 export const metadata: Metadata = {
   title: {
@@ -51,6 +52,11 @@ interface RootLayoutProps {
 }
 
 export default function RootLayout({ children }: RootLayoutProps) {
+  // Get the current pathname from headers
+  const headersList = headers();
+  const pathname = headersList.get('x-pathname') || '';
+  const isAdminRoute = pathname.startsWith('/admin');
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -72,14 +78,18 @@ export default function RootLayout({ children }: RootLayoutProps) {
               <SupabaseProvider>
                 <ProfileProvider>
                   <LanguageProvider>
-                    <div className="flex min-h-screen flex-col">
-                      <Header />
-                      <main className="flex-1">
-                        {children}
-                      </main>
-                      <Footer />
-                      <Toaster />
-                    </div>
+                    {isAdminRoute ? (
+                      children
+                    ) : (
+                      <div className="flex min-h-screen flex-col">
+                        <Header />
+                        <main className="flex-1">
+                          {children}
+                        </main>
+                        <Footer />
+                        <Toaster />
+                      </div>
+                    )}
                   </LanguageProvider>
                 </ProfileProvider>
               </SupabaseProvider>

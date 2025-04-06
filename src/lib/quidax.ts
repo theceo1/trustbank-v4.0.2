@@ -7,13 +7,13 @@ type QuidaxRequestOptions = {
   circuitBreaker?: boolean;
 };
 
-interface SwapQuotationRequest {
+export interface SwapQuotationRequest {
   from_currency: string;
   to_currency: string;
   from_amount: string;
 }
 
-interface SwapTransaction {
+export interface SwapTransaction {
   id: string;
   from_currency: string;
   to_currency: string;
@@ -24,16 +24,20 @@ interface SwapTransaction {
   updated_at: string;
 }
 
-interface QuidaxWallet {
+export interface QuidaxWallet {
   id: string;
   currency: string;
   balance: string;
   locked: string;
   address?: string;
   tag?: string;
+  status?: string;
+  created_at: string;
+  updated_at: string;
+  last_transaction_at?: string;
 }
 
-interface SubAccount {
+export interface SubAccount {
   id: string;
   email: string;
   first_name: string;
@@ -106,7 +110,7 @@ export class QuidaxService {
           new Promise((_, reject) => 
             setTimeout(() => reject(new Error('Request timeout')), timeout)
           )
-        ]) as AxiosResponse<T>;
+        ]) as AxiosResponse<{ status: string; message?: string; data: T }>;
         
         // Reset failure count on success
         if (attempt > 0) {
@@ -114,15 +118,10 @@ export class QuidaxService {
           this.lastFailureTime = null;
         }
         
-        try {
-          if (response.data.status === 'error') {
-            throw new Error(response.data.message || 'Quidax API error');
-          }
-          return response.data;
-        } catch (error) {
-          console.error('Quidax API request failed:', error);
-          throw error;
+        if (response.data.status === 'error') {
+          throw new Error(response.data.message || 'Quidax API error');
         }
+        return response.data.data;
       } catch (error) {
         lastError = error;
         if (attempt < retries) {

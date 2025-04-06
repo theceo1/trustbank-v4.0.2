@@ -12,15 +12,34 @@ export function useAdminAuth() {
   const [role, setRole] = useState<string | null>(null);
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const supabase = createClientComponentClient();
 
   useEffect(() => {
     const checkUser = async () => {
       try {
-        const { data: { user }, error } = await supabase.auth.getUser();
-        if (error || !user) {
-          throw error || new Error('No user found');
+        setIsLoading(true);
+        setError(null);
+
+        // First check if we have a session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          throw sessionError;
+        }
+
+        if (!session) {
+          setUser(null);
+          setIsAdmin(false);
+          return;
+        }
+
+        // Get the user
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        
+        if (userError || !user) {
+          throw userError || new Error('No user found');
         }
 
         // Check admin status using admin_users table
@@ -48,27 +67,62 @@ export function useAdminAuth() {
         setRole(adminData.admin_roles.name);
         setPermissions(adminData.admin_roles.permissions || []);
         setIsAdmin(true);
-        setIsLoading(false);
+        setError(null);
       } catch (error) {
         console.error('Error checking admin status:', error);
         setUser(null);
         setIsAdmin(false);
         setRole(null);
         setPermissions([]);
+        setError(error instanceof Error ? error.message : 'Authentication failed');
+        
+        // Only redirect to login if we're not already there
+        if (window.location.pathname !== '/admin/login') {
+          router.push('/admin/login');
+        }
+      } finally {
         setIsLoading(false);
-        router.push('/admin/login');
       }
     };
 
+    // Set up auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setIsAdmin(false);
+        setRole(null);
+        setPermissions([]);
+        if (window.location.pathname !== '/admin/login') {
+          router.push('/admin/login');
+        }
+      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        checkUser();
+      }
+    });
+
+    // Initial check
     checkUser();
+
+    // Cleanup subscription
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [router, supabase]);
 
   const signOut = async () => {
     try {
+      setIsLoading(true);
       await supabase.auth.signOut();
+      setUser(null);
+      setIsAdmin(false);
+      setRole(null);
+      setPermissions([]);
       router.push('/admin/login');
     } catch (error) {
       console.error('Error signing out:', error);
+      setError(error instanceof Error ? error.message : 'Failed to sign out');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -78,6 +132,7 @@ export function useAdminAuth() {
     role,
     permissions,
     isLoading,
+    error,
     signOut,
   };
 } 
