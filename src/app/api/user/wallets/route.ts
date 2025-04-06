@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
-import { QuidaxServerService } from '@/lib/quidax';
+import { QuidaxService, QuidaxWallet } from '@/lib/quidax';
+
+interface QuidaxResponse {
+  status: string;
+  message?: string;
+  data: QuidaxWallet[];
+}
 
 export async function GET() {
   try {
@@ -39,22 +45,35 @@ export async function GET() {
       throw new Error('QUIDAX_SECRET_KEY is not configured');
     }
     
-    const quidaxService = new QuidaxServerService(quidaxSecretKey);
+    const quidaxService = new QuidaxService(quidaxSecretKey);
 
-    // Fetch wallets from Quidax
-    const response = await quidaxService.getWallets(profile.quidax_id);
-    
-    // Ensure we have an array of wallets
-    const wallets = Array.isArray(response.data) ? response.data : 
-                   Array.isArray(response) ? response : 
-                   [];
+    // Fetch wallets from Quidax with error logging
+    try {
+      console.log('[UserWallets] Fetching wallets for user:', profile.quidax_id);
+      const response = await quidaxService.getWallets(profile.quidax_id);
+      console.log('[UserWallets] Raw response:', response);
 
-    return NextResponse.json({
-      status: 'success',
-      data: wallets
-    });
+      // Handle both wrapped and unwrapped responses
+      const wallets = Array.isArray(response) ? response : 
+                     Array.isArray((response as QuidaxResponse)?.data) ? (response as QuidaxResponse).data :
+                     [];
+
+      console.log('[UserWallets] Processed wallets:', wallets.length);
+
+      return NextResponse.json({
+        status: 'success',
+        data: wallets
+      });
+    } catch (error: any) {
+      console.error('[UserWallets] Error fetching wallets:', {
+        error: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      throw error;
+    }
   } catch (error) {
-    console.error('Error fetching user wallets:', error);
+    console.error('[UserWallets] Error:', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to fetch wallets' },
       { status: 500 }

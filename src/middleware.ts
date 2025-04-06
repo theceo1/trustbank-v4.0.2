@@ -169,6 +169,9 @@ export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
   const path = req.nextUrl.pathname;
 
+  // Set the x-pathname header for all requests
+  res.headers.set('x-pathname', path);
+
   // Check if the path is the admin login page FIRST
   if (path === '/admin/login') {
     console.log('[MAIN MIDDLEWARE] Admin login page detected, bypassing all checks');

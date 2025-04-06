@@ -126,34 +126,31 @@ export default function UsersPage() {
     setLoading(true);
     setError(null);
     try {
-      console.log('[Users Page] Fetching users with params:', {
-        page,
-        pageSize,
-        search,
-        status,
-        kycFilter,
-        sortField,
-        sortOrder
-      });
-
-      const queryParams = new URLSearchParams({
+      const params = {
         page: page.toString(),
         pageSize: pageSize.toString(),
+        source: 'auth.users', // Explicitly request auth.users table
         ...(search && { search }),
         ...(status && { status }),
         ...(kycFilter && { kycStatus: kycFilter }),
         sortBy: sortField,
         sortOrder
-      });
+      };
 
-      const response = await fetch(`/api/admin/users?${queryParams}`);
+      console.log('[Users Page] Requesting all users from auth.users table with params:', params);
+      
+      const apiUrl = `/api/admin/users?${new URLSearchParams(params)}`;
+      console.log('[Users Page] Full API URL:', apiUrl);
+      
+      const response = await fetch(apiUrl);
+      console.log('[Users Page] Response status:', response.status);
+      
       const data = await response.json();
-
-      console.log('[Users Page] API Response:', {
-        status: response.status,
-        users: data.users?.length,
-        stats: data.stats,
-        pagination: data.pagination
+      console.log('[Users Page] API returned:', {
+        userCount: data.users?.length,
+        totalUsers: data.pagination?.total,
+        firstUserId: data.users?.[0]?.id,
+        stats: data.stats
       });
 
       if (!response.ok) {
@@ -161,19 +158,16 @@ export default function UsersPage() {
       }
 
       setUsers(data.users || []);
-      setStats(data.stats || defaultStats);
-      setTotalPages(data.pagination.totalPages);
-      setTotalRecords(data.pagination.total);
-
-      console.log('[Users Page] Updated state:', {
-        usersCount: data.users?.length,
-        stats: data.stats,
-        currentPage: data.pagination?.page,
-        totalPages: data.pagination?.totalPages
+      setStats({
+        ...defaultStats,
+        ...data.stats,
+        totalUsers: data.pagination?.total || 0
       });
+      setTotalPages(data.pagination?.totalPages || 1);
+      setTotalRecords(data.pagination?.total || 0);
 
     } catch (error) {
-      console.error('[Users Page] Error fetching users:', error);
+      console.error('[Users Page] Error:', error);
       setError(error instanceof Error ? error.message : 'Failed to fetch users');
     } finally {
       setLoading(false);

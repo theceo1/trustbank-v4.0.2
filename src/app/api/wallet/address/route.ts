@@ -1,7 +1,21 @@
 import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
-import { QuidaxServerService } from '@/lib/quidax';
+import { createQuidaxServer } from '@/lib/quidax';
+import type { Database } from '@/lib/database.types';
+
+interface QuidaxAddressResponse {
+  address: string;
+  tag?: string;
+  network?: string;
+  currency: string;
+}
+
+interface QuidaxResponse<T> {
+  status: string;
+  message?: string;
+  data: T;
+}
 
 // Define supported networks for each currency
 const CURRENCY_NETWORKS: Record<string, string[]> = {
@@ -189,7 +203,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const quidaxService = new QuidaxServerService(process.env.QUIDAX_SECRET_KEY);
+    const quidax = createQuidaxServer(process.env.QUIDAX_SECRET_KEY);
 
     try {
       console.log('[WalletAddress] Fetching address for:', { 
@@ -200,92 +214,75 @@ export async function GET(request: Request) {
         hasSecretKey: !!process.env.QUIDAX_SECRET_KEY
       });
       
-      // First try to get existing address
-      const existingAddressResponse = await quidaxService.request(
-        `/users/${profile.quidax_id}/wallets/${currency}/address`
-      ).catch(error => {
-        console.error('[WalletAddress] Error fetching existing address:', {
-          error: error.response?.data || error.message,
-          status: error.response?.status
-        });
+      // Get existing wallet
+      const wallet = await quidax.getWallet(profile.quidax_id, currency).catch(error => {
+        console.error('[WalletAddress] Error fetching wallet:', error.response?.data || error);
         return null;
       });
-
-      console.log('[WalletAddress] Raw existing address response:', JSON.stringify(existingAddressResponse, null, 2));
-
-      let depositAddress = null;
-      let destinationTag = null;
-
-      if (existingAddressResponse?.data?.address) {
-        depositAddress = existingAddressResponse.data.address;
-        destinationTag = existingAddressResponse.data.tag;
-        console.log('[WalletAddress] Found existing address:', { depositAddress, destinationTag });
-      } else {
-        console.log('[WalletAddress] No existing address, creating new one with params:', {
-          userId: profile.quidax_id,
-          currency,
-          network: targetNetwork
+      
+      console.log('[WalletAddress] Existing wallet:', wallet);
+      
+      // If wallet has a deposit address, return it
+      if (wallet?.deposit_address) {
+        console.log('[WalletAddress] Found existing address:', {
+          address: wallet.deposit_address,
+          tag: wallet.destination_tag,
+          network: wallet.default_network
         });
         
-        // Create new address with network as query parameter
-        const newAddressResponse = await quidaxService.request(
-          `/users/${profile.quidax_id}/wallets/${currency}/addresses?network=${targetNetwork}`,
-          {
-            method: 'POST'
+        return NextResponse.json({
+          status: 'success',
+          message: 'Found existing address',
+          data: {
+            address: wallet.deposit_address,
+            tag: wallet.destination_tag,
+            network: wallet.default_network || targetNetwork,
+            currency: currency
           }
-        ).catch(error => {
-          console.error('[WalletAddress] Error creating new address:', {
-            error: error.response?.data || error.message,
-            status: error.response?.status
-          });
-          throw error;
         });
-
-        console.log('[WalletAddress] Raw new address response:', JSON.stringify(newAddressResponse, null, 2));
-
-        if (newAddressResponse?.data?.address) {
-          depositAddress = newAddressResponse.data.address;
-          destinationTag = newAddressResponse.data.tag;
-          console.log('[WalletAddress] Created new address:', { depositAddress, destinationTag });
-        } else {
-          console.error('[WalletAddress] No address in new address response:', newAddressResponse);
-        }
       }
 
-      if (!depositAddress) {
-        console.error('[WalletAddress] Failed to get or create address');
-        return NextResponse.json(
-          { 
-            status: 'error',
-            message: 'Unable to generate deposit address',
-            error: 'Failed to create deposit address. Please try again later.'
-          },
-          { status: 500 }
-        );
+      console.log('[WalletAddress] No existing address, creating new one...');
+
+      // Generate new address only if one doesn't exist
+      const newAddress = await quidax.createWalletAddress(profile.quidax_id, currency, targetNetwork).catch(error => {
+        console.error('[WalletAddress] Error creating address:', error.response?.data || error);
+        throw error;
+      });
+      
+      console.log('[WalletAddress] New address response:', newAddress);
+      
+      if (!newAddress?.address) {
+        console.error('[WalletAddress] Invalid address response:', newAddress);
+        throw new Error('Invalid address response from Quidax API');
       }
 
       return NextResponse.json({
         status: 'success',
         message: 'Address generated successfully',
         data: {
-          currency,
+          address: newAddress.address,
+          tag: newAddress.tag,
           network: targetNetwork,
-          deposit_address: depositAddress,
-          destination_tag: destinationTag,
-          is_crypto: true
+          currency: currency
         }
       });
 
     } catch (error: any) {
-      console.error('[WalletAddress] API error:', error);
+      console.error('[WalletAddress] API error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
       
       return NextResponse.json(
         { 
           status: 'error',
           message: 'Unable to process request',
-          error: 'Failed to generate deposit address. Please try again later.'
+          error: error.response?.data?.message || error.message || 'Failed to generate deposit address. Please try again later.',
+          details: error.response?.data
         },
-        { status: 500 }
+        { status: error.response?.status || 500 }
       );
     }
 

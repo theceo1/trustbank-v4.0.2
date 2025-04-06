@@ -38,25 +38,19 @@ export default async function AdminLayout({
   // For login page, return minimal layout
   if (isLoginPage) {
     return (
-      <div className={cn(
-        'min-h-screen bg-background font-sans antialiased',
-        GeistSans.variable,
-        GeistMono.variable
-      )}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <GlobalErrorBoundary>
-            <SupabaseProvider>
-              {children}
-              <Toaster />
-            </SupabaseProvider>
-          </GlobalErrorBoundary>
-        </ThemeProvider>
-      </div>
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="system"
+        enableSystem
+        disableTransitionOnChange
+      >
+        <GlobalErrorBoundary>
+          <SupabaseProvider>
+            {children}
+            <Toaster />
+          </SupabaseProvider>
+        </GlobalErrorBoundary>
+      </ThemeProvider>
     );
   }
 
@@ -85,36 +79,30 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className={cn(
-      'min-h-screen bg-background font-sans antialiased',
-      GeistSans.variable,
-      GeistMono.variable
-    )}>
-      <ThemeProvider
-        attribute="class"
-        defaultTheme="system"
-        enableSystem
-        disableTransitionOnChange
-      >
-        <GlobalErrorBoundary>
-          <SupabaseProvider>
-            <AdminProvider>
-              <div className="flex h-screen">
-                {/* Admin Sidebar */}
-                <Sidebar />
-                
-                {/* Main Content */}
-                <div className="flex-1 flex flex-col overflow-hidden">
-                  <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-6">
-                    {children}
-                  </main>
-                </div>
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      disableTransitionOnChange
+    >
+      <GlobalErrorBoundary>
+        <SupabaseProvider>
+          <AdminProvider>
+            <div className="flex h-screen">
+              {/* Admin Sidebar */}
+              <Sidebar />
+              
+              {/* Main Content */}
+              <div className="flex-1 flex flex-col overflow-hidden">
+                <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-6">
+                  {children}
+                </main>
               </div>
-              <Toaster />
-            </AdminProvider>
-          </SupabaseProvider>
-        </GlobalErrorBoundary>
-      </ThemeProvider>
-    </div>
+            </div>
+            <Toaster />
+          </AdminProvider>
+        </SupabaseProvider>
+      </GlobalErrorBoundary>
+    </ThemeProvider>
   );
 } 

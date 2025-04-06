@@ -35,6 +35,16 @@ export interface QuidaxWallet {
   created_at: string;
   updated_at: string;
   last_transaction_at?: string;
+  deposit_address?: string;
+  destination_tag?: string;
+  default_network?: string;
+  blockchain_enabled?: boolean;
+  networks?: {
+    id: string;
+    name: string;
+    deposits_enabled: boolean;
+    withdraws_enabled: boolean;
+  }[];
 }
 
 export interface SubAccount {
@@ -43,6 +53,15 @@ export interface SubAccount {
   first_name: string;
   last_name: string;
   display_name: string;
+}
+
+export interface QuidaxWalletAddress {
+  address: string;
+  tag?: string;
+  network?: string;
+  currency: string;
+  created_at: string;
+  updated_at: string;
 }
 
 const QUIDAX_API_URL = (process.env.NEXT_PUBLIC_QUIDAX_API_URL || 'https://www.quidax.com/api/v1') as string;
@@ -143,7 +162,7 @@ export class QuidaxService {
     return this.requestWithRetry(`/users/${userId}/wallets/${currency}`, { method: 'GET' });
   }
 
-  async createWalletAddress(userId: string, currency: string, network?: string): Promise<any> {
+  async createWalletAddress(userId: string, currency: string, network?: string): Promise<QuidaxWalletAddress> {
     const url = network ? 
       `/users/${userId}/wallets/${currency}/addresses?network=${network}` :
       `/users/${userId}/wallets/${currency}/addresses`;

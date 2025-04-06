@@ -2,10 +2,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
 
 const COLORS = {
-  basic: "#22C55E",     // Bright green
-  verified: "#3B82F6",  // Bright blue
-  premium: "#F59E0B",   // Bright orange
-  quidax: "#EF4444"     // Bright red
+  tier1: "#22C55E",    // Bright green
+  tier2: "#3B82F6",    // Bright blue
+  tier3: "#F59E0B",    // Bright orange
+  tier4: "#8B5CF6",    // Bright purple
+  tier5: "#EC4899",    // Bright pink
+  quidax: "#EF4444"    // Bright red
 };
 
 interface RevenueBreakdownProps {
@@ -14,9 +16,11 @@ interface RevenueBreakdownProps {
     quidaxFees: number;
     netRevenue: number;
     feeBreakdown: {
-      basic: number;
-      verified: number;
-      premium: number;
+      tier1: number;
+      tier2: number;
+      tier3: number;
+      tier4: number;
+      tier5: number;
     };
   };
 }
@@ -25,9 +29,11 @@ export function RevenueBreakdown({ data }: RevenueBreakdownProps) {
   const chartData = [
     {
       name: "Revenue",
-      Basic: data.feeBreakdown.basic,
-      Verified: data.feeBreakdown.verified,
-      Premium: data.feeBreakdown.premium,
+      Basic: data.feeBreakdown.tier1,
+      Starter: data.feeBreakdown.tier2,
+      Intermediate: data.feeBreakdown.tier3,
+      Advanced: data.feeBreakdown.tier4,
+      Premium: data.feeBreakdown.tier5,
       "Quidax Fees": data.quidaxFees
     }
   ];
@@ -48,9 +54,11 @@ export function RevenueBreakdown({ data }: RevenueBreakdownProps) {
               <YAxis />
               <Tooltip formatter={(value) => [`NGN ${value.toLocaleString()}`, "Amount"]} />
               <Legend />
-              <Bar dataKey="Basic" fill={COLORS.basic} stackId="a" />
-              <Bar dataKey="Verified" fill={COLORS.verified} stackId="a" />
-              <Bar dataKey="Premium" fill={COLORS.premium} stackId="a" />
+              <Bar dataKey="Basic" fill={COLORS.tier1} stackId="a" />
+              <Bar dataKey="Starter" fill={COLORS.tier2} stackId="a" />
+              <Bar dataKey="Intermediate" fill={COLORS.tier3} stackId="a" />
+              <Bar dataKey="Advanced" fill={COLORS.tier4} stackId="a" />
+              <Bar dataKey="Premium" fill={COLORS.tier5} stackId="a" />
               <Bar dataKey="Quidax Fees" fill={COLORS.quidax} stackId="a" />
             </BarChart>
             

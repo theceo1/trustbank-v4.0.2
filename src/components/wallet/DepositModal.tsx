@@ -271,13 +271,13 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
       }
 
       // Validate deposit address
-      if (!data.data?.deposit_address) {
+      if (!data.data?.address) {
         throw new Error('No deposit address returned from API');
       }
 
-      setAddress(data.data.deposit_address);
-      if (data.data.destination_tag) {
-        setDestinationTag(data.data.destination_tag);
+      setAddress(data.data.address);
+      if (data.data.tag) {
+        setDestinationTag(data.data.tag);
       }
 
     } catch (error) {

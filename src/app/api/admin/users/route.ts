@@ -11,15 +11,21 @@ interface AdminData {
   admin_roles: AdminRole;
 }
 
+interface AuthUser {
+  email: string;
+  created_at: string;
+  updated_at: string;
+}
+
 interface UserProfile {
   id: string;
+  user_id: string;
   first_name: string | null;
   last_name: string | null;
   phone_number: string | null;
   kyc_level: string | null;
   role: string | null;
-  created_at: string;
-  updated_at: string;
+  auth_user: AuthUser | null;
 }
 
 interface User {
@@ -27,7 +33,7 @@ interface User {
   email: string;
   created_at: string;
   updated_at: string;
-  user_profiles: UserProfile;
+  user_profiles: UserProfile | null;
 }
 
 export async function GET(req: NextRequest) {
@@ -74,147 +80,86 @@ export async function GET(req: NextRequest) {
       const page = parseInt(url.searchParams.get('page') || '1');
       const pageSize = parseInt(url.searchParams.get('pageSize') || '10');
       const search = url.searchParams.get('search') || '';
-      const status = url.searchParams.get('status') || '';
       const kycStatus = url.searchParams.get('kycStatus') || '';
       const sortBy = url.searchParams.get('sortBy') || 'created_at';
       const sortOrder = url.searchParams.get('sortOrder') || 'desc';
 
-      console.log('[USERS API] Query params:', { page, pageSize, search, status, kycStatus, sortBy, sortOrder });
+      console.log('[USERS API] Query params:', { page, pageSize, search, kycStatus, sortBy, sortOrder });
 
       // Calculate pagination
       const startIndex = (page - 1) * pageSize;
       const endIndex = startIndex + pageSize - 1;
 
-      // Build base query joining users and user_profiles
-      let query = supabase
-        .from('users')
+      // First get basic user count to verify access
+      const { data: roleCheck, error: roleError } = await supabase
+        .from('user_profiles')
+        .select('role')
+        .not('role', 'is', null);
+
+      console.log('[USERS API] Available roles:', roleCheck?.map(r => r.role));
+
+      // Get total count without role filter first
+      const { count } = await supabase
+        .from('user_profiles')
+        .select('*', { 
+          count: 'exact', 
+          head: true 
+        });
+
+      console.log('[USERS API] Total profiles in database:', count);
+
+      // Get paginated users with profiles
+      const { data: users, error } = await supabase
+        .from('user_profiles')
         .select(`
           id,
-          email,
-          created_at,
-          updated_at,
-          user_profiles!left (
-            id,
-            first_name,
-            last_name,
-            phone_number,
-            kyc_level,
-            role,
+          user_id,
+          first_name,
+          last_name,
+          phone_number,
+          kyc_level,
+          role,
+          auth_user:user_id (
+            email,
             created_at,
             updated_at
           )
-        `, { count: 'exact' });
+        `)
+        .order(sortBy, { ascending: sortOrder === 'asc' })
+        .range(startIndex, endIndex) as { data: UserProfile[] | null, error: any };
 
-      // Apply filters
-      if (search) {
-        query = query.or(`email.ilike.%${search}%,user_profiles.first_name.ilike.%${search}%,user_profiles.last_name.ilike.%${search}%`);
-      }
-
-      if (kycStatus && kycStatus !== 'all') {
-        query = query.eq('user_profiles.kyc_level', kycStatus);
-      }
-
-      // Apply sorting
-      if (sortBy.startsWith('user_profiles.')) {
-        query = query.order(sortBy, { ascending: sortOrder === 'asc' });
-      } else {
-        query = query.order(sortBy, { ascending: sortOrder === 'asc' });
-      }
-
-      // Apply pagination
-      query = query.range(startIndex, endIndex);
-
-      // Execute query
-      console.log('[USERS API] Executing query');
-      const { data: users, error: usersError, count } = await query as { 
-        data: User[] | null, 
-        error: any, 
-        count: number | null 
-      };
-
-      console.log('[USERS API] Raw query results:', {
-        usersCount: users?.length || 0,
-        totalCount: count,
-        error: usersError?.message
-      });
-
-      if (usersError) {
-        console.error('[USERS API] Error fetching users:', usersError);
+      if (error) {
+        console.error('[USERS API] Error fetching users:', error);
         throw new Error('Failed to fetch users');
       }
 
-      if (!users) {
-        console.log('[USERS API] No users found');
-        return NextResponse.json({
-          users: [],
-          stats: {
-            totalUsers: 0,
-            activeUsers: 0,
-            inactiveUsers: 0,
-            pendingUsers: 0
-          },
-          pagination: {
-            total: 0,
-            page,
-            pageSize,
-            totalPages: 0
-          }
-        });
-      }
+      console.log('[USERS API] Raw users data:', users?.slice(0, 3));
 
-      // Transform the data
-      console.log('[USERS API] Transforming user data for:', users.length, 'users');
-      const transformedUsers = users.map(user => {
-        const transformed = {
-          id: user.id,
-          email: user.email,
-          name: user.user_profiles ? `${user.user_profiles.first_name || ''} ${user.user_profiles.last_name || ''}`.trim() || 'No Name' : 'No Name',
-          status: user.user_profiles?.kyc_level || 'pending',
-          role: user.user_profiles?.role || 'user',
-          lastLogin: user.updated_at,
-          createdAt: user.created_at,
-          updatedAt: user.updated_at,
-          kycStatus: user.user_profiles?.kyc_level || 'pending',
-          stats: {
-            totalTransactions: 0,
-            totalVolume: 0,
-            successfulTransactions: 0,
-            failedTransactions: 0
-          }
-        };
-        console.log('[USERS API] Transformed user:', {
-          id: transformed.id,
-          email: transformed.email,
-          status: transformed.status,
-          kycStatus: transformed.kycStatus
-        });
-        return transformed;
-      });
+      // Transform basic user data
+      const transformedUsers = users?.map(profile => ({
+        id: profile.user_id,
+        email: profile.auth_user?.email || 'No Email',
+        name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'No Name',
+        role: profile.role || 'user',
+        lastLogin: profile.auth_user?.updated_at || profile.auth_user?.created_at || new Date().toISOString(),
+        createdAt: profile.auth_user?.created_at || new Date().toISOString(),
+        updatedAt: profile.auth_user?.updated_at || new Date().toISOString(),
+        kycStatus: profile.kyc_level || 'pending'
+      })) || [];
 
-      // Calculate stats
-      const stats = {
-        totalUsers: count || 0,
-        activeUsers: transformedUsers.filter(u => u.kycStatus !== 'pending').length,
-        inactiveUsers: transformedUsers.filter(u => u.kycStatus === 'suspended').length,
-        pendingUsers: transformedUsers.filter(u => u.kycStatus === 'pending').length
-      };
+      console.log('[USERS API] First 3 users:', transformedUsers.slice(0, 3));
 
-      console.log('[USERS API] Final stats:', stats);
-      console.log(`[USERS API] Returning ${transformedUsers.length} users with pagination:`, {
-        total: count || 0,
-        page,
-        pageSize,
-        totalPages: Math.ceil((count || 0) / pageSize)
-      });
-      
       return NextResponse.json({
         users: transformedUsers,
-        stats,
+        stats: {
+          totalUsers: count || 0,
+          pendingUsers: transformedUsers.filter(u => u.kycStatus === 'pending').length
+        },
         pagination: {
           total: count || 0,
           page,
           pageSize,
-          totalPages: Math.ceil((count || 0) / pageSize)
+          totalPages: count ? Math.ceil(count / pageSize) : 1
         }
       });
     } catch (error) {

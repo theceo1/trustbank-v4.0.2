@@ -33,24 +33,25 @@ interface TransactionsData {
   successRates: number[];
 }
 
-interface UserStats {
-  newUsers: number;
-  activeUsers: number;
-  totalTransactions: number;
+interface MonthlyStats {
+  new_users: number;
+  active_users: number;
+  total_transactions: number;
 }
 
 interface UsersData {
+  total_users: number;
+  kyc_stats: {
+    verified: number;
+    pending: number;
+    rejected: number;
+  };
+  verification_stats: {
+    email_verified: number;
+    phone_verified: number;
+  };
+  monthly_stats: MonthlyStats[];
   labels: string[];
-  monthlyStats: UserStats[];
-  totals: {
-    newUsers: number;
-    activeUsers: number;
-    totalTransactions: number;
-  };
-  averages: {
-    transactionsPerUser: string;
-    activeUserRate: string;
-  };
 }
 
 export default function AnalyticsPage() {
@@ -61,45 +62,82 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        const [overviewRes, transactionsRes, usersRes] = await Promise.all([
-          fetch('/api/admin/analytics/overview'),
-          fetch('/api/admin/analytics/transactions'),
-          fetch('/api/admin/analytics/users')
-        ]);
+  const fetchData = async () => {
+    try {
+      console.log('Fetching analytics data...');
+      const [overviewResponse, transactionsResponse, usersResponse] = await Promise.all([
+        fetch('/api/admin/analytics/overview'),
+        fetch('/api/admin/analytics/transactions'),
+        fetch('/api/admin/analytics/users')
+      ]);
 
-        if (!overviewRes.ok || !transactionsRes.ok || !usersRes.ok) {
-          throw new Error('Failed to fetch analytics data');
-        }
+      const transactionsApiData = await transactionsResponse.json();
 
-        const [overview, transactions, users] = await Promise.all([
-          overviewRes.json(),
-          transactionsRes.json(),
-          usersRes.json()
-        ]);
+      console.log('[DEBUG] Raw transactions API data:', transactionsApiData);
 
-        if (overview.error || transactions.error || users.error) {
-          throw new Error(overview.error || transactions.error || users.error);
-        }
+      const transactionsData = {
+        labels: Array(12).fill('').map((_,i) => {
+          const date = new Date();
+          date.setMonth(date.getMonth() - (11-i));
+          return date.toLocaleString('default', {month: 'short'});
+        }),
+        monthlyStats: transactionsApiData.monthlyStats || [],
+        totals: {
+          total: transactionsApiData.transactionCount || 0,
+          successful: transactionsApiData.stats?.successfulTransactions || 0,
+          failed: transactionsApiData.stats?.failedTransactions || 0,
+          pending: transactionsApiData.stats?.pendingTransactions || 0,
+          swaps: transactionsApiData.stats?.swapTransactions || 0,
+          regular: (transactionsApiData.transactionCount || 0) - (transactionsApiData.stats?.swapTransactions || 0)
+        },
+        successRates: transactionsApiData.successRates || Array(12).fill(0)
+      };
 
-        setOverviewData(overview);
-        setTransactionsData(transactions);
-        setUsersData(users);
-      } catch (error) {
-        console.error('Failed to fetch analytics data:', error);
-        setError(error instanceof Error ? error.message : 'Failed to fetch analytics data');
-      } finally {
-        setLoading(false);
+      console.log('[DEBUG] Processed transactions data:', transactionsData);
+      setTransactionsData(transactionsData);
+
+      const overviewData = await overviewResponse.json();
+      const usersData = await usersResponse.json();
+
+      console.log('Overview data:', overviewData);
+      console.log('Users data:', usersData);
+
+      // Transform monthly_stats from array of arrays to array of objects
+      if (usersData && Array.isArray(usersData.monthly_stats)) {
+        const [newUsers, activeUsers, totalTransactions] = usersData.monthly_stats;
+        usersData.monthly_stats = Array(12).fill(0).map((_, index) => ({
+          new_users: newUsers?.[index] || 0,
+          active_users: activeUsers?.[index] || 0,
+          total_transactions: totalTransactions?.[index] || 0
+        }));
       }
-    };
 
+      setOverviewData(overviewData);
+      setUsersData(usersData);
+    } catch (error) {
+      console.error('[TRANSACTIONS DEBUG] Error:', error);
+      console.error('Error fetching analytics data:', error);
+      setError('Failed to load analytics data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchData();
   }, []);
+
+  if (loading) {
+    return <Skeleton className="h-64 w-full" />;
+  }
+
+  console.log('OverviewData state:', overviewData);
+  console.log('TransactionsData state:', transactionsData);
+  console.log('UsersData state:', usersData);
+
+  if (!overviewData || !transactionsData || !usersData) {
+    return <Alert variant="destructive" className="mb-6"><AlertDescription>No data available</AlertDescription></Alert>;
+  }
 
   return (
     <div className="container mx-auto p-6">
@@ -360,7 +398,9 @@ export default function AnalyticsPage() {
                       labels: usersData?.labels || [],
                       datasets: [{
                         label: 'New Users',
-                        data: usersData?.monthlyStats.map(s => s.newUsers) || [],
+                        data: Array.isArray(usersData?.monthly_stats) 
+                          ? usersData.monthly_stats.map(s => s.new_users) 
+                          : [],
                         borderColor: '#22C55E',
                         backgroundColor: 'rgba(34, 197, 94, 0.2)',
                         tension: 0.1
@@ -385,13 +425,17 @@ export default function AnalyticsPage() {
                       datasets: [
                         {
                           label: 'Active Users',
-                          data: usersData?.monthlyStats.map(s => s.activeUsers) || [],
+                          data: Array.isArray(usersData?.monthly_stats)
+                            ? usersData.monthly_stats.map(s => s.active_users)
+                            : [],
                           backgroundColor: 'rgba(34, 197, 94, 0.5)',
                           borderColor: '#22C55E'
                         },
                         {
                           label: 'Total Transactions',
-                          data: usersData?.monthlyStats.map(s => s.totalTransactions) || [],
+                          data: Array.isArray(usersData?.monthly_stats)
+                            ? usersData.monthly_stats.map(s => s.total_transactions)
+                            : [],
                           backgroundColor: 'rgba(59, 130, 246, 0.5)',
                           borderColor: '#3B82F6'
                         }
@@ -411,25 +455,31 @@ export default function AnalyticsPage() {
                   <div className="flex justify-between">
                     <span>Total Users:</span>
                     <span className="font-bold">
-                      {loading ? '...' : usersData?.totals.newUsers}
+                      {loading ? '...' : usersData?.total_users}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Active Users:</span>
                     <span className="font-bold">
-                      {loading ? '...' : usersData?.totals.activeUsers}
+                      {loading ? '...' : Array.isArray(usersData?.monthly_stats)
+                        ? usersData.monthly_stats.reduce((acc, curr) => acc + (curr.active_users || 0), 0)
+                        : 0}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Active User Rate:</span>
                     <span className="font-bold">
-                      {loading ? '...' : `${usersData?.averages.activeUserRate}%`}
+                      {loading ? '...' : `${((Array.isArray(usersData?.monthly_stats)
+                        ? usersData.monthly_stats.reduce((acc, curr) => acc + (curr.active_users || 0), 0)
+                        : 0) / (usersData?.total_users || 1) * 100).toFixed(1)}%`}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Avg. Transactions per User:</span>
                     <span className="font-bold">
-                      {loading ? '...' : usersData?.averages.transactionsPerUser}
+                      {loading ? '...' : `${((Array.isArray(usersData?.monthly_stats)
+                        ? usersData.monthly_stats.reduce((acc, curr) => acc + (curr.total_transactions || 0), 0)
+                        : 0) / (usersData?.total_users || 1)).toFixed(1)}`}
                     </span>
                   </div>
                 </div>

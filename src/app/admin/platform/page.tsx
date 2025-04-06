@@ -11,12 +11,39 @@ import { BarChart } from '@/components/ui/charts';
 import { AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
+interface RevenueStats {
+  totalRevenue: number;
+  quidaxFees: number;
+  netRevenue: number;
+  feeBreakdown: {
+    tier1: number;
+    tier2: number;
+    tier3: number;
+    tier4: number;
+    tier5: number;
+  };
+}
+
 interface PlatformStats {
   totalUsers: number;
   activeUsers: number;
   totalTransactions: number;
   totalVolume: number;
   totalWallets: number;
+  revenue: RevenueStats;
+  userSegmentation: {
+    tier1: number;  // Basic
+    tier2: number;  // Starter
+    tier3: number;  // Intermediate
+    tier4: number;  // Advanced
+    tier5: number;  // Premium
+  };
+  topWallets: Array<{
+    currency: string;
+    balance: string;
+    converted_balance: string;
+    name: string;
+  }>;
 }
 
 interface ChartData {
@@ -156,6 +183,9 @@ export default function PlatformPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatNumber(stats.totalTransactions)}</div>
+            <p className="text-xs text-muted-foreground">
+              Last 30 days
+            </p>
           </CardContent>
         </Card>
 
@@ -165,15 +195,21 @@ export default function PlatformPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(stats.totalVolume, 'NGN')}</div>
+            <p className="text-xs text-muted-foreground">
+              Last 30 days
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Wallets</CardTitle>
+            <CardTitle className="text-sm font-medium">Net Revenue</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatNumber(stats.totalWallets)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(stats.revenue.netRevenue, 'NGN')}</div>
+            <p className="text-xs text-muted-foreground">
+              After Quidax fees
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -181,28 +217,51 @@ export default function PlatformPage() {
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Monthly Revenue</CardTitle>
+            <CardTitle>User Segmentation</CardTitle>
           </CardHeader>
           <CardContent>
             <BarChart
-              data={chartData}
-              categories={['volume']}
-              valueFormatter={(value: number) => formatCurrency(value, 'NGN')}
-              colors={['#22C55E']}
+              data={{
+                labels: ['Basic', 'Starter', 'Intermediate', 'Advanced', 'Premium'],
+                datasets: [{
+                  label: 'Users',
+                  data: [
+                    stats.userSegmentation.tier1,
+                    stats.userSegmentation.tier2,
+                    stats.userSegmentation.tier3,
+                    stats.userSegmentation.tier4,
+                    stats.userSegmentation.tier5
+                  ],
+                  backgroundColor: ['#22C55E', '#3B82F6', '#F59E0B', '#8B5CF6', '#EC4899'],
+                  borderColor: ['#16A34A', '#2563EB', '#D97706', '#7C3AED', '#DB2777']
+                }]
+              }}
             />
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Daily Transactions</CardTitle>
+            <CardTitle>Revenue Breakdown</CardTitle>
           </CardHeader>
           <CardContent>
             <BarChart
-              data={chartData}
-              categories={['transactions']}
-              valueFormatter={(value: number) => formatNumber(value)}
-              colors={['#22C55E']}
+              data={{
+                labels: ['Tier 1', 'Tier 2', 'Tier 3', 'Tier 4', 'Tier 5', 'Quidax Fees'],
+                datasets: [{
+                  label: 'Revenue',
+                  data: [
+                    stats.revenue.feeBreakdown.tier1,
+                    stats.revenue.feeBreakdown.tier2,
+                    stats.revenue.feeBreakdown.tier3,
+                    stats.revenue.feeBreakdown.tier4,
+                    stats.revenue.feeBreakdown.tier5,
+                    stats.revenue.quidaxFees
+                  ],
+                  backgroundColor: ['#22C55E', '#3B82F6', '#F59E0B', '#8B5CF6', '#EC4899', '#EF4444'],
+                  borderColor: ['#16A34A', '#2563EB', '#D97706', '#7C3AED', '#DB2777', '#DC2626']
+                }]
+              }}
             />
           </CardContent>
         </Card>
@@ -210,14 +269,48 @@ export default function PlatformPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Daily Trade Volume & Revenue</CardTitle>
+          <CardTitle>Daily Trade Volume & Transactions</CardTitle>
         </CardHeader>
         <CardContent>
           <BarChart
-            data={chartData}
-            categories={['volume', 'newUsers']}
-            valueFormatter={(value: number) => formatCurrency(value, 'NGN')}
-            colors={['#22C55E', '#16A34A']}
+            data={{
+              labels: chartData?.map(d => d.date) || [],
+              datasets: [
+                {
+                  label: 'Volume (NGN)',
+                  data: chartData?.map(d => d.volume) || [],
+                  backgroundColor: '#22C55E',
+                  borderColor: '#16A34A',
+                  yAxisID: 'y'
+                },
+                {
+                  label: 'Transactions',
+                  data: chartData?.map(d => d.transactions) || [],
+                  backgroundColor: '#3B82F6',
+                  borderColor: '#2563EB',
+                  yAxisID: 'y1'
+                }
+              ]
+            }}
+            options={{
+              scales: {
+                y: {
+                  type: 'linear',
+                  display: true,
+                  position: 'left',
+                  beginAtZero: true
+                },
+                y1: {
+                  type: 'linear',
+                  display: true,
+                  position: 'right',
+                  beginAtZero: true,
+                  grid: {
+                    drawOnChartArea: false
+                  }
+                }
+              }
+            }}
           />
         </CardContent>
       </Card>

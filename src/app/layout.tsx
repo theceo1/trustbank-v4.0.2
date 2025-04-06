@@ -55,8 +55,29 @@ export default function RootLayout({ children }: RootLayoutProps) {
   // Get the current pathname from headers
   const headersList = headers();
   const pathname = headersList.get('x-pathname') || '';
-  const isAdminRoute = pathname.startsWith('/admin');
+  const isAdminRoute = pathname.startsWith('/admin') || pathname.startsWith('/api/admin');
 
+  // For admin routes, return minimal layout without any providers
+  if (isAdminRoute) {
+    return (
+      <html lang="en" suppressHydrationWarning>
+        <head>
+          <link rel="icon" href="/favicon.ico" />
+        </head>
+        <body className={cn(
+          'min-h-screen bg-background font-sans antialiased overflow-x-hidden',
+          GeistSans.variable,
+          GeistMono.variable
+        )}>
+          {children}
+          <Analytics />
+          <SpeedInsights />
+        </body>
+      </html>
+    );
+  }
+
+  // For non-admin routes, include the full layout with all providers
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -78,18 +99,14 @@ export default function RootLayout({ children }: RootLayoutProps) {
               <SupabaseProvider>
                 <ProfileProvider>
                   <LanguageProvider>
-                    {isAdminRoute ? (
-                      children
-                    ) : (
-                      <div className="flex min-h-screen flex-col">
-                        <Header />
-                        <main className="flex-1">
-                          {children}
-                        </main>
-                        <Footer />
-                        <Toaster />
-                      </div>
-                    )}
+                    <div className="flex min-h-screen flex-col">
+                      <Header />
+                      <main className="flex-1">
+                        {children}
+                      </main>
+                      <Footer />
+                      <Toaster />
+                    </div>
                   </LanguageProvider>
                 </ProfileProvider>
               </SupabaseProvider>
@@ -100,5 +117,5 @@ export default function RootLayout({ children }: RootLayoutProps) {
         <SpeedInsights />
       </body>
     </html>
-  )
+  );
 }

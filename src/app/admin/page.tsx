@@ -21,9 +21,11 @@ interface RevenueStats {
   quidaxFees: number;
   netRevenue: number;
   feeBreakdown: {
-    basic: number;
-    verified: number;
-    premium: number;
+    tier1: number;
+    tier2: number;
+    tier3: number;
+    tier4: number;
+    tier5: number;
   };
 }
 
@@ -35,11 +37,18 @@ interface DashboardStats {
   totalWallets: number;
   revenue: RevenueStats;
   userSegmentation: {
-    basic: number;
-    verified: number;
-    premium: number;
+    tier1: number;  // Basic
+    tier2: number;  // Starter
+    tier3: number;  // Intermediate
+    tier4: number;  // Advanced
+    tier5: number;  // Premium
   };
-  topWallets?: { currency: string; balance: number }[];
+  topWallets?: Array<{
+    currency: string;
+    balance: string;
+    converted_balance: string;
+    name: string;
+  }>;
 }
 
 interface ApiResponse {
@@ -61,15 +70,19 @@ export default function AdminDashboard() {
       quidaxFees: 0,
       netRevenue: 0,
       feeBreakdown: {
-        basic: 0,
-        verified: 0,
-        premium: 0
+        tier1: 0,
+        tier2: 0,
+        tier3: 0,
+        tier4: 0,
+        tier5: 0
       }
     },
     userSegmentation: {
-      basic: 0,
-      verified: 0,
-      premium: 0
+      tier1: 0,
+      tier2: 0,
+      tier3: 0,
+      tier4: 0,
+      tier5: 0
     }
   });
   
@@ -115,15 +128,19 @@ export default function AdminDashboard() {
   }, []);
 
   const userSegmentationData = [
-    { name: 'Basic', value: stats.userSegmentation.basic },
-    { name: 'Verified', value: stats.userSegmentation.verified },
-    { name: 'Premium', value: stats.userSegmentation.premium }
+    { name: 'Basic', value: stats.userSegmentation.tier1 },
+    { name: 'Starter', value: stats.userSegmentation.tier2 },
+    { name: 'Intermediate', value: stats.userSegmentation.tier3 },
+    { name: 'Advanced', value: stats.userSegmentation.tier4 },
+    { name: 'Premium', value: stats.userSegmentation.tier5 }
   ];
 
   const revenueBreakdownData = [
-    { name: 'Basic Users', value: stats.revenue.feeBreakdown.basic },
-    { name: 'Verified Users', value: stats.revenue.feeBreakdown.verified },
-    { name: 'Premium Users', value: stats.revenue.feeBreakdown.premium },
+    { name: 'Basic', value: stats.revenue.feeBreakdown.tier1 },
+    { name: 'Starter', value: stats.revenue.feeBreakdown.tier2 },
+    { name: 'Intermediate', value: stats.revenue.feeBreakdown.tier3 },
+    { name: 'Advanced', value: stats.revenue.feeBreakdown.tier4 },
+    { name: 'Premium', value: stats.revenue.feeBreakdown.tier5 },
     { name: 'Quidax Fees', value: stats.revenue.quidaxFees }
   ];
 
@@ -251,8 +268,8 @@ export default function AdminDashboard() {
                 datasets: [{
                   label: 'Users',
                   data: userSegmentationData.map(d => d.value),
-                  backgroundColor: ['rgba(34, 197, 94, 0.5)', 'rgba(59, 130, 246, 0.5)', 'rgba(99, 102, 241, 0.5)'],
-                  borderColor: ['#22C55E', '#3B82F6', '#6366F1']
+                  backgroundColor: ['rgba(34, 197, 94, 0.5)', 'rgba(59, 130, 246, 0.5)', 'rgba(99, 102, 241, 0.5)', 'rgba(165, 180, 252, 0.5)', 'rgba(239, 68, 68, 0.5)'],
+                  borderColor: ['#22C55E', '#3B82F6', '#6366F1', '#A5B4FC', '#EF4444']
                 }]
               }}
             />
@@ -274,9 +291,10 @@ export default function AdminDashboard() {
                     'rgba(34, 197, 94, 0.5)',
                     'rgba(59, 130, 246, 0.5)',
                     'rgba(99, 102, 241, 0.5)',
+                    'rgba(165, 180, 252, 0.5)',
                     'rgba(239, 68, 68, 0.5)'
                   ],
-                  borderColor: ['#22C55E', '#3B82F6', '#6366F1', '#EF4444']
+                  borderColor: ['#22C55E', '#3B82F6', '#6366F1', '#A5B4FC', '#EF4444']
                 }]
               }}
             />

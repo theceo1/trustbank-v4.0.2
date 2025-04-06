@@ -14,12 +14,15 @@ import {
   LineChart,
   BookOpen,
   LogOut,
-  BarChart
+  BarChart,
+  Moon,
+  Sun
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useTheme } from 'next-themes';
 
 const navigation = [
   {
@@ -69,6 +72,7 @@ export function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const router = useRouter();
   const supabase = createClientComponentClient();
+  const { theme, setTheme } = useTheme();
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -125,8 +129,20 @@ export function Sidebar() {
         </nav>
       </div>
       
-      {/* Sign Out Button */}
-      <div className="p-2 border-t">
+      {/* Theme Toggle and Sign Out */}
+      <div className="p-2 border-t space-y-2">
+        <button
+          onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+          className={cn(
+            'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors w-full hover:bg-muted',
+            isCollapsed && 'justify-center'
+          )}
+        >
+          <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+          <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+          {!isCollapsed && <span>Toggle theme</span>}
+        </button>
+
         <button
           onClick={handleSignOut}
           className={cn(

@@ -30,6 +30,8 @@ interface WalletData {
   marketData: MarketData[];
   transactions: any[];
   userId: string;
+  totalValueNGN: number;
+  totalValueUSD: number;
 }
 
 export default function WalletPage() {
@@ -54,6 +56,10 @@ export default function WalletPage() {
         return;
       }
 
+      console.log('[WalletPage] Fetching wallet data with session:', {
+        userId: session.user.id
+      });
+
       const response = await fetch('/api/wallet', {
         headers: {
           'Authorization': `Bearer ${session.access_token}`
@@ -65,9 +71,24 @@ export default function WalletPage() {
       }
 
       const data = await response.json();
+      console.log('[WalletPage] Received wallet data:', {
+        walletsCount: data.wallets?.length,
+        totalValueNGN: data.totalValueNGN,
+        totalValueUSD: data.totalValueUSD,
+        marketDataCount: data.marketData?.length,
+        transactionsCount: data.transactions?.length,
+        walletsSummary: data.wallets?.map((w: any) => ({
+          currency: w.currency,
+          balance: w.balance,
+          estimated_value: w.estimated_value,
+          market_price: w.market_price
+        }))
+      });
+
       setWalletData(data);
       setError(null);
     } catch (err) {
+      console.error('[WalletPage] Error fetching wallet data:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch wallet data');
     } finally {
       setLoading(false);
@@ -76,16 +97,18 @@ export default function WalletPage() {
 
   // Initial data fetch
   useEffect(() => {
+    console.log('[WalletPage] Initial data fetch');
     fetchWalletData();
   }, []);
 
   // Set up polling for real-time updates
   useEffect(() => {
-    // Fetch updates every 10 seconds
+    console.log('[WalletPage] Setting up polling');
     const interval = setInterval(fetchWalletData, 10000);
-    
-    // Clean up interval on unmount
-    return () => clearInterval(interval);
+    return () => {
+      console.log('[WalletPage] Cleaning up polling');
+      clearInterval(interval);
+    };
   }, []);
 
   // Set up WebSocket subscription for instant updates
@@ -145,6 +168,7 @@ export default function WalletPage() {
   }, []);
 
   if (loading) {
+    console.log('[WalletPage] Rendering loading state');
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin">
@@ -158,6 +182,7 @@ export default function WalletPage() {
   }
 
   if (error) {
+    console.log('[WalletPage] Rendering error state:', error);
     return (
       <div className="container mx-auto px-4 sm:px-6 py-8">
         <div className="bg-white dark:bg-gray-900 rounded-lg p-4 sm:p-6 border border-gray-200 dark:border-gray-800">
@@ -176,6 +201,7 @@ export default function WalletPage() {
   }
 
   if (!walletData) {
+    console.log('[WalletPage] No wallet data available');
     return (
       <div className="container mx-auto px-4 sm:px-6 py-8">
         <div className="bg-white dark:bg-gray-900 rounded-lg p-4 sm:p-6 border border-gray-200 dark:border-gray-800">
@@ -198,7 +224,14 @@ export default function WalletPage() {
     );
   }
 
-  const { wallets, marketData, transactions, userId } = walletData;
+  const { wallets, marketData, transactions, userId, totalValueNGN } = walletData;
+
+  console.log('[WalletPage] Rendering with data:', {
+    walletsCount: wallets?.length,
+    totalValueNGN,
+    hasMarketData: !!marketData?.length,
+    hasTransactions: !!transactions?.length
+  });
 
   // Helper function to get market price
   const getMarketPrice = (currency: string) => {
@@ -333,7 +366,7 @@ export default function WalletPage() {
         </div>
 
         {/* Portfolio Value */}
-        <PortfolioValue value={totalValue} />
+        <PortfolioValue value={totalValueNGN} />
 
         {/* Wallets Section */}
         <div className="space-y-4">

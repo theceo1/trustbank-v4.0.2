@@ -241,22 +241,18 @@ export async function GET(): Promise<NextResponse> {
       currencies: walletData.map(w => w.currency)
     });
 
-    // Calculate user segmentation based on KYC level
+    // Calculate user segmentation based on KYC tier
     const userSegmentation = {
-      tier1: userProfiles?.filter(user => user.kyc_level === 'tier1').length || 0,
-      tier2: userProfiles?.filter(user => user.kyc_level === 'tier2').length || 0,
-      tier3: userProfiles?.filter(user => user.kyc_level === 'tier3').length || 0,
-      tier4: userProfiles?.filter(user => user.kyc_level === 'tier4').length || 0,
-      tier5: userProfiles?.filter(user => user.kyc_level === 'tier5').length || 0
+      tier1: userProfiles?.filter(user => user.kyc_level === 'TIER_1' || user.kyc_level === 'basic').length || 0,
+      tier2: userProfiles?.filter(user => user.kyc_level === 'TIER_2' || user.kyc_level === 'starter').length || 0,
+      tier3: userProfiles?.filter(user => user.kyc_level === 'TIER_3' || user.kyc_level === 'intermediate').length || 0,
+      tier4: userProfiles?.filter(user => user.kyc_level === 'TIER_4' || user.kyc_level === 'advanced').length || 0,
+      tier5: userProfiles?.filter(user => user.kyc_level === 'TIER_5' || user.kyc_level === 'premium').length || 0
     };
 
-    // Update active user definition - active if they have completed KYC and have transactions
+    // Update active user definition - active if they have transactions in last 30 days
     const activeUserIds = new Set(transactions?.map(tx => tx.user_id) || []);
-    const activeUsers = userProfiles?.filter(user => 
-      activeUserIds.has(user.user_id) && 
-      user.kyc_level && 
-      user.kyc_level !== 'pending'
-    ) || [];
+    const activeUsers = userProfiles?.filter(user => activeUserIds.has(user.user_id)) || [];
 
     // Calculate user's 30-day trading volume
     const userVolumes = new Map<string, number>();
@@ -270,20 +266,20 @@ export async function GET(): Promise<NextResponse> {
       userVolumes.set(tx.user_id, (userVolumes.get(tx.user_id) || 0) + tx.amount);
     });
 
-    // Calculate revenue and fees
+    // Calculate revenue and fees based on transaction volume tiers
     const revenueStats = recentTransactions.reduce((acc, tx) => {
       const volume = tx.amount;
       const quidaxFee = volume * QUIDAX_FEE;
       const userFeeRate = getUserFeeRate(volume);
       const txRevenue = volume * userFeeRate;
       
-      // Determine which tier this transaction falls into
+      // Determine which tier this transaction falls into based on volume
       let tierRevenue = {
-        tier1: 0,
-        tier2: 0,
-        tier3: 0,
-        tier4: 0,
-        tier5: 0
+        tier1: 0, // 0-1K USD
+        tier2: 0, // 1K-5K USD
+        tier3: 0, // 5K-20K USD
+        tier4: 0, // 20K-100K USD
+        tier5: 0  // 100K+ USD
       };
 
       if (volume < 1000) {
