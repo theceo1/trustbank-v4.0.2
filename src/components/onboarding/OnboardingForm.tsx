@@ -58,7 +58,8 @@ export function OnboardingForm({ user }: OnboardingFormProps) {
       })
 
       if (!quidaxUser?.id) {
-        throw new Error('Failed to create Quidax account')
+        console.error('Failed to create Quidax account:', quidaxUser)
+        throw new Error('Failed to complete account setup')
       }
 
       // Update user profile with Quidax ID

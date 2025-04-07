@@ -51,7 +51,7 @@ interface TradeDetails {
 interface CurrencyPair {
   value: string;
   label: string;
-  icon: JSX.Element;
+  icon?: JSX.Element;
 }
 
 interface Currency {
@@ -499,11 +499,12 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
   ));
 
   // Filter to currencies based on search and show all toggle
-  const toCurrencyOptions: CurrencyPair[] = SUPPORTED_CURRENCIES
-    .filter(pair => {
-      if (pair.value === fromCurrency) return false;
-      return true;
-    });
+  const toCurrencyOptions = SUPPORTED_CURRENCIES
+    .filter(pair => pair.value !== fromCurrency)
+    .map(currency => ({
+      ...currency,
+      icon: <Circle className="h-4 w-4" />  // Add a default icon for all currencies
+    }));
 
   // Get market rate for currency pair
   const getMarketRate = async (from: string, to: string) => {
@@ -563,20 +564,55 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      const response = await fetch('/api/markets/rates', {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
+      // Fetch rates for common pairs
+      const pairs = [
+        { from: 'USDT', to: 'NGN' },
+        { from: 'BTC', to: 'USDT' },
+        { from: 'ETH', to: 'USDT' },
+        { from: 'BNB', to: 'USDT' },
+        { from: 'SOL', to: 'USDT' }
+      ];
+
+      const rates: Record<string, number> = {};
+      
+      await Promise.all(pairs.map(async ({ from, to }) => {
+        try {
+          const response = await fetch(`/api/markets/rate?from=${from}&to=${to}`, {
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (!response.ok) {
+            throw new Error(`Failed to fetch ${from}/${to} rate`);
+          }
+
+          const data = await response.json();
+          if (data.rate) {
+            rates[`${from}/${to}`] = data.rate;
+          }
+        } catch (error) {
+          console.error(`Error fetching ${from}/${to} rate:`, error);
         }
-      });
-      const data = await response.json();
-      if (data.status === 'success') {
-        setMarketRates(data.rates);
+      }));
+
+      // If we have both USDT/NGN and crypto/USDT rates, calculate direct crypto/NGN rates
+      if (rates['USDT/NGN']) {
+        Object.entries(rates).forEach(([pair, rate]) => {
+          const [from, to] = pair.split('/');
+          if (to === 'USDT') {
+            rates[`${from}/NGN`] = rate * rates['USDT/NGN'];
+          }
+        });
       }
+
+      setMarketRates(rates);
     } catch (error) {
       console.error('Error fetching market rates:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch market rates",
+        description: "Failed to fetch some market rates",
         variant: "destructive"
       });
     }

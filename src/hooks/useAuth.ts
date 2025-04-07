@@ -21,7 +21,6 @@ export function useAuth() {
 
         if (session?.user) {
           setUser(session.user);
-          // Don't show welcome toast on initial session
         }
         setIsInitialized(true);
       } catch (error) {
@@ -44,30 +43,35 @@ export function useAuth() {
         case 'SIGNED_IN':
           if (session?.user) {
             setUser(session.user);
-            // Check if this is an admin login
-            try {
-              const response = await fetch('/api/admin/auth/check');
-              const data = await response.json();
-              
-              if (data.isAdmin) {
-                // Skip the default redirect for admin users
-                await router.refresh();
-                return;
+            
+            // Only check admin status if the URL includes /admin
+            if (window.location.pathname.includes('/admin')) {
+              try {
+                const response = await fetch('/api/admin/auth/check');
+                const data = await response.json();
+                
+                if (data.isAdmin) {
+                  // Skip the default redirect for admin users
+                  await router.refresh();
+                  return;
+                }
+              } catch (error) {
+                // If admin check fails, proceed with normal user flow
+                console.error('Admin check error:', error);
               }
-            } catch (error) {
-              // If admin check fails, proceed with normal user flow
-              console.error('Admin check error:', error);
             }
 
             // Wait for state update before navigation for regular users
             setTimeout(async () => {
               await router.refresh();
-              router.push('/dashboard');
-              toast({
-                title: "Welcome back! 👋",
-                description: "You have successfully signed in.",
-                className: "bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-800 text-green-600 dark:text-green-400"
-              });
+              if (!window.location.pathname.includes('/admin')) {
+                router.push('/dashboard');
+                toast({
+                  title: "Welcome back! 👋",
+                  description: "You have successfully signed in.",
+                  className: "bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-800 text-green-600 dark:text-green-400"
+                });
+              }
             }, 0);
           }
           break;

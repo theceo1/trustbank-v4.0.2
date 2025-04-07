@@ -130,7 +130,7 @@ export function WalletCard({
                     variant="outline"
                     size="sm"
                     onClick={onWithdraw}
-                    className="bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200 hover:border-blue-300 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800"
+                    className="bg-purple-50 hover:bg-purple-100 text-purple-600 border-purple-200 hover:border-purple-300 dark:bg-purple-900/20 dark:hover:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800"
                   >
                     <Icons.upload className="h-4 w-4" />
                     {expanded && <span className="ml-2">Withdraw</span>}
@@ -151,7 +151,7 @@ export function WalletCard({
                     variant="outline"
                     size="sm"
                     onClick={onSwap}
-                    className="bg-purple-50 hover:bg-purple-100 text-purple-600 border-purple-200 hover:border-purple-300 dark:bg-purple-900/20 dark:hover:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800"
+                    className="bg-orange-50 hover:bg-orange-100 text-orange-600 border-orange-200 hover:border-orange-300 dark:bg-orange-900/20 dark:hover:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800"
                   >
                     <Icons.refresh className="h-4 w-4" />
                     {expanded && <span className="ml-2">Swap</span>}

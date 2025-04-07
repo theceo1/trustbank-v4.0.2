@@ -65,11 +65,11 @@ export async function POST(request: Request) {
 
           if (!quidaxResponse.id) {
             console.error('[Signup] Invalid Quidax response:', quidaxResponse);
-            throw new Error('No Quidax ID returned');
+            throw new Error('Failed to complete account setup');
           }
 
           quidaxId = quidaxResponse.id;
-          console.log('[Signup] Quidax sub-account created:', quidaxId);
+          console.log('[Signup] Account created:', quidaxId);
           break; // Success, exit retry loop
           
         } catch (quidaxApiError: any) {
@@ -101,7 +101,7 @@ export async function POST(request: Request) {
 
           // If this was the last attempt, throw the error
           if (attempt === maxRetries) {
-            throw new Error(`Failed to create Quidax account after ${maxRetries} attempts: ${errorMessage}`);
+            throw new Error(`Failed to complete account setup after ${maxRetries} attempts`);
           }
 
           // Wait before retrying (exponential backoff)
@@ -123,9 +123,8 @@ export async function POST(request: Request) {
 
       return NextResponse.json(
         { 
-          error: 'Failed to create Quidax account',
-          details: quidaxError.message,
-          code: 'QUIDAX_ACCOUNT_CREATION_FAILED'
+          error: 'Failed to complete account setup',
+          code: 'ACCOUNT_SETUP_FAILED'
         },
         { status: 500 }
       );

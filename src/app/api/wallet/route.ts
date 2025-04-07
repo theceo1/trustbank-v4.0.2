@@ -355,8 +355,13 @@ export async function GET(request: Request) {
       });
 
     } catch (quidaxError: any) {
+      console.error('[Wallet] API error:', quidaxError);
       return NextResponse.json(
-        { error: quidaxError.message || 'Failed to fetch wallet data from Quidax' },
+        { 
+          status: 'error',
+          error: 'Failed to fetch wallet data. Please try again later.',
+          code: 'FETCH_ERROR'
+        },
         { status: quidaxError.status || 500 }
       );
     }

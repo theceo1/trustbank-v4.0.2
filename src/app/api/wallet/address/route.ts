@@ -232,7 +232,7 @@ export async function GET(request: Request) {
         
         return NextResponse.json({
           status: 'success',
-          message: 'Found existing address',
+          message: 'Address found',
           data: {
             address: wallet.deposit_address,
             tag: wallet.destination_tag,
@@ -254,7 +254,7 @@ export async function GET(request: Request) {
       
       if (!newAddress?.address) {
         console.error('[WalletAddress] Invalid address response:', newAddress);
-        throw new Error('Invalid address response from Quidax API');
+        throw new Error('Unable to generate deposit address');
       }
 
       return NextResponse.json({
@@ -279,7 +279,7 @@ export async function GET(request: Request) {
         { 
           status: 'error',
           message: 'Unable to process request',
-          error: error.response?.data?.message || error.message || 'Failed to generate deposit address. Please try again later.',
+          error: 'Failed to generate deposit address. Please try again later.',
           details: error.response?.data
         },
         { status: error.response?.status || 500 }

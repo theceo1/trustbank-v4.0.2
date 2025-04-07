@@ -16,6 +16,7 @@ import { DepositModal } from '@/components/wallet/DepositModal'
 import { GeneralDepositModal } from '@/components/wallet/GeneralDepositModal'
 import { GeneralWithdrawModal } from '@/components/wallet/GeneralWithdrawModal'
 import { GeneralSwapModal } from '@/components/wallet/GeneralSwapModal'
+import { Input } from '@/components/ui/input'
 
 interface MarketData {
   currency: string;
@@ -56,10 +57,6 @@ export default function WalletPage() {
         return;
       }
 
-      console.log('[WalletPage] Fetching wallet data with session:', {
-        userId: session.user.id
-      });
-
       const response = await fetch('/api/wallet', {
         headers: {
           'Authorization': `Bearer ${session.access_token}`
@@ -71,24 +68,9 @@ export default function WalletPage() {
       }
 
       const data = await response.json();
-      console.log('[WalletPage] Received wallet data:', {
-        walletsCount: data.wallets?.length,
-        totalValueNGN: data.totalValueNGN,
-        totalValueUSD: data.totalValueUSD,
-        marketDataCount: data.marketData?.length,
-        transactionsCount: data.transactions?.length,
-        walletsSummary: data.wallets?.map((w: any) => ({
-          currency: w.currency,
-          balance: w.balance,
-          estimated_value: w.estimated_value,
-          market_price: w.market_price
-        }))
-      });
-
       setWalletData(data);
       setError(null);
     } catch (err) {
-      console.error('[WalletPage] Error fetching wallet data:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch wallet data');
     } finally {
       setLoading(false);
@@ -97,18 +79,13 @@ export default function WalletPage() {
 
   // Initial data fetch
   useEffect(() => {
-    console.log('[WalletPage] Initial data fetch');
     fetchWalletData();
   }, []);
 
   // Set up polling for real-time updates
   useEffect(() => {
-    console.log('[WalletPage] Setting up polling');
     const interval = setInterval(fetchWalletData, 10000);
-    return () => {
-      console.log('[WalletPage] Cleaning up polling');
-      clearInterval(interval);
-    };
+    return () => clearInterval(interval);
   }, []);
 
   // Set up WebSocket subscription for instant updates
@@ -168,7 +145,6 @@ export default function WalletPage() {
   }, []);
 
   if (loading) {
-    console.log('[WalletPage] Rendering loading state');
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin">
@@ -182,7 +158,6 @@ export default function WalletPage() {
   }
 
   if (error) {
-    console.log('[WalletPage] Rendering error state:', error);
     return (
       <div className="container mx-auto px-4 sm:px-6 py-8">
         <div className="bg-white dark:bg-gray-900 rounded-lg p-4 sm:p-6 border border-gray-200 dark:border-gray-800">
@@ -201,7 +176,6 @@ export default function WalletPage() {
   }
 
   if (!walletData) {
-    console.log('[WalletPage] No wallet data available');
     return (
       <div className="container mx-auto px-4 sm:px-6 py-8">
         <div className="bg-white dark:bg-gray-900 rounded-lg p-4 sm:p-6 border border-gray-200 dark:border-gray-800">
@@ -225,13 +199,6 @@ export default function WalletPage() {
   }
 
   const { wallets, marketData, transactions, userId, totalValueNGN } = walletData;
-
-  console.log('[WalletPage] Rendering with data:', {
-    walletsCount: wallets?.length,
-    totalValueNGN,
-    hasMarketData: !!marketData?.length,
-    hasTransactions: !!transactions?.length
-  });
 
   // Helper function to get market price
   const getMarketPrice = (currency: string) => {
@@ -320,18 +287,20 @@ export default function WalletPage() {
     <div className="container mx-auto px-4 sm:px-6 space-y-6">
       <BalanceProvider>
         {/* Header */}
-        <div>
-          <h1 className="text-xl font-medium text-gray-900 dark:text-gray-100">Wallet</h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400">Manage your crypto assets and transactions</p>
+        <div className="py-8 border-b">
+          <h1 className="text-xl font-bold tracking-tight mb-2">Wallet</h1>
+          <p className="text-muted-foreground text-sm italic">
+            Manage your crypto assets and transactions
+          </p>
         </div>
 
         {/* Action Buttons */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Button 
             onClick={() => handleDepositClick()}
-            className="w-full h-auto py-4 bg-green-600 hover:bg-green-700 text-white flex flex-col items-center gap-2"
+            className="w-full h-auto py-6 bg-green-600 hover:bg-green-700 text-white flex flex-col items-center gap-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
           >
-            <div className="bg-green-500/20 p-2 rounded-lg">
+            <div className="bg-green-500/20 p-3 rounded-lg">
               <Icons.download className="h-5 w-5" />
             </div>
             <div className="text-center">
@@ -341,26 +310,26 @@ export default function WalletPage() {
           </Button>
           <Button 
             onClick={() => handleWithdrawClick()}
-            className="w-full h-auto py-4 bg-blue-600 hover:bg-blue-700 text-white flex flex-col items-center gap-2"
+            className="w-full h-auto py-6 bg-purple-600 hover:bg-purple-700 text-white flex flex-col items-center gap-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
           >
-            <div className="bg-blue-500/20 p-2 rounded-lg">
+            <div className="bg-purple-500/20 p-3 rounded-lg">
               <Icons.upload className="h-5 w-5" />
             </div>
             <div className="text-center">
               <div className="font-medium">Withdraw</div>
-              <div className="text-xs text-blue-100">Send funds to external wallet</div>
+              <div className="text-xs text-purple-100">Send funds to external wallet</div>
             </div>
           </Button>
           <Button 
             onClick={() => handleSwapClick()}
-            className="w-full h-auto py-4 bg-purple-800 hover:bg-purple-900 text-white flex flex-col items-center gap-2"
+            className="w-full h-auto py-6 bg-orange-600 hover:bg-orange-700 text-white flex flex-col items-center gap-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
           >
-            <div className="bg-white/10 p-2 rounded-lg">
+            <div className="bg-orange-500/20 p-3 rounded-lg">
               <Icons.refresh className="h-5 w-5" />
             </div>
             <div className="text-center">
               <div className="font-medium">Instant Swap</div>
-              <div className="text-xs text-purple-50">Exchange between currencies</div>
+              <div className="text-xs text-orange-50">Exchange between currencies</div>
             </div>
           </Button>
         </div>
@@ -371,22 +340,48 @@ export default function WalletPage() {
         {/* Wallets Section */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-600 dark:text-gray-400">{wallets?.length || 0} wallet{wallets?.length !== 1 ? 's' : ''}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-muted-foreground">{wallets?.length || 0} wallet{wallets?.length !== 1 ? 's' : ''}</p>
+              <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" onClick={() => window.location.reload()}>
+                <Icons.refresh className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setIsGeneralDepositOpen(true)}>
+                <Icons.add className="h-4 w-4 mr-2" />
+                Add New
+              </Button>
+            </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-[2fr_1fr]">
+          <div className="grid gap-6 md:grid-cols-[2fr_1fr]">
             {/* Wallet List */}
-            <WalletListWrapper
-              wallets={wallets}
-              marketData={marketData}
-              userId={userId}
-              onDeposit={handleDepositClick}
-              onWithdraw={handleWithdrawClick}
-              onSwap={handleSwapClick}
-            />
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-4">
+                <Input
+                  type="search"
+                  placeholder="Search wallets..."
+                  className="max-w-sm"
+                />
+                <Button variant="ghost" size="icon" className="shrink-0">
+                  <Icons.grid className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="shrink-0">
+                  <Icons.list className="h-4 w-4" />
+                </Button>
+              </div>
+              <WalletListWrapper
+                wallets={wallets}
+                marketData={marketData}
+                userId={userId}
+                onDeposit={handleDepositClick}
+                onWithdraw={handleWithdrawClick}
+                onSwap={handleSwapClick}
+              />
+            </div>
 
             {/* Asset Distribution */}
-            <div className="rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-4">
+            <div className="rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-6 shadow-lg">
               <h3 className="text-base font-medium text-gray-900 dark:text-gray-100 mb-4">Asset Distribution</h3>
               <AssetDistribution wallets={wallets} marketData={marketData} />
             </div>
