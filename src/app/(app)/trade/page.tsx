@@ -436,39 +436,59 @@ export default function TradePage() {
   };
 
   return (
-    <div className="min-h-screen">
-      <div className="container mx-auto px-4 py-12 sm:px-6 lg:px-8">
-        {/* Only show KYC banner if not verified */}
-        {!hasBasicKyc && (
-          <Alert className="mb-6 border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20">
-            <AlertTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5 text-yellow-500" />
-              Complete KYC to Start Trading
-            </AlertTitle>
-            <AlertDescription className="mt-2">
-              <p className="mb-2">
-                To ensure the security of our platform and comply with regulations, you need to complete basic KYC verification before trading.
-              </p>
-              <Button asChild variant="outline" size="sm">
-                <Link href="/kyc" className="inline-flex items-center">
-                  Complete Verification
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </Link>
-              </Button>
-            </AlertDescription>
-          </Alert>
-        )}
+    <div className="container mx-auto px-4 sm:px-6 space-y-8">
+      {/* Header Section */}
+      <div className="py-8 border-b">
+        <h1 className="text-2xl font-bold tracking-tight mb-2">Welcome to trustBank Trading</h1>
+        <p className="text-muted-foreground">
+          Experience seamless trading with our advanced platform. Choose from multiple trading options and enjoy competitive rates with top-notch security.
+        </p>
+      </div>
 
-        {/* Quick Trade Form */}
-        <Card className="max-w-xl mx-auto bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-xl">
+      {/* KYC Banner */}
+      {!hasBasicKyc && (
+        <Alert className="border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20">
+          <AlertTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5 text-yellow-500" />
+            Complete KYC to Start Trading
+          </AlertTitle>
+          <AlertDescription className="mt-2">
+            <p className="mb-2">
+              To ensure the security of our platform and comply with regulations, you need to complete basic KYC verification before trading.
+            </p>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/kyc" className="inline-flex items-center">
+                Complete Verification
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Link>
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Quick Trade Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
+        <Card className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-lg">
           <CardHeader>
-            <CardTitle className="text-2xl font-bold text-gray-900 dark:text-gray-50">Quick Trade</CardTitle>
+            <CardTitle className="text-xl font-bold text-gray-900 dark:text-gray-100">Quick Trade</CardTitle>
           </CardHeader>
           <CardContent>
             <Tabs value={tab} onValueChange={setTab} className="w-full">
               <TabsList className="grid w-full grid-cols-2 mb-8">
-                <TabsTrigger value="buy" className="text-lg" disabled={!hasBasicKyc}>Buy Crypto</TabsTrigger>
-                <TabsTrigger value="sell" className="text-lg" disabled={!hasBasicKyc}>Sell Crypto</TabsTrigger>
+                <TabsTrigger 
+                  value="buy" 
+                  className="data-[state=active]:bg-green-500 data-[state=active]:text-white"
+                  disabled={!hasBasicKyc}
+                >
+                  Buy Crypto
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="sell"
+                  className="data-[state=active]:bg-green-500 data-[state=active]:text-white"
+                  disabled={!hasBasicKyc}
+                >
+                  Sell Crypto
+                </TabsTrigger>
               </TabsList>
 
               <div className="space-y-6">
@@ -477,49 +497,21 @@ export default function TradePage() {
                   <label className="text-sm font-medium text-gray-900 dark:text-gray-100">
                     {tab === 'buy' ? 'Select Asset to Buy' : 'Select Asset to Sell'}
                   </label>
-                  <Select 
-                    value={selectedCrypto} 
-                    onValueChange={(value) => {
-                      setSelectedCrypto(value);
-                      setShowRate(false);
-                      setQuotation(null);
-                    }}
+                  <Select
+                    value={selectedCrypto}
+                    onValueChange={setSelectedCrypto}
                     disabled={!hasBasicKyc}
                   >
                     <SelectTrigger className="w-full bg-white dark:bg-gray-800">
-                      <SelectValue />
+                      <SelectValue placeholder="Select cryptocurrency" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-white dark:bg-gray-800">
                       {SUPPORTED_CURRENCIES.map((currency) => (
-                        <SelectItem
-                          key={currency.value}
-                          value={currency.value}
-                          className="flex items-center gap-2"
-                        >
-                          <span className="font-mono">{currency.icon}</span>
-                          {currency.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Input Currency Selection */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                    {tab === 'buy' ? 'Choose Payment Method' : 'Receive Payment in'}
-                  </label>
-                  <Select value={inputCurrency} onValueChange={setInputCurrency} disabled={!hasBasicKyc}>
-                    <SelectTrigger className="w-full bg-white dark:bg-gray-800">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {INPUT_CURRENCIES.map((currency) => (
-                        <SelectItem
-                          key={currency.value}
-                          value={currency.value}
-                        >
-                          {currency.label}
+                        <SelectItem key={currency.value} value={currency.value}>
+                          <span className="flex items-center gap-2">
+                            <span className="text-lg">{currency.icon}</span>
+                            {currency.label}
+                          </span>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -529,35 +521,51 @@ export default function TradePage() {
                 {/* Amount Input */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                    {tab === 'buy' ? 'Enter Amount to Buy (NGN)' : 'Enter Amount to Sell'}
+                    {tab === 'buy' ? 'Enter Amount to Buy' : 'Enter Amount to Sell'}
                   </label>
                   <div className="relative">
-                    <input
+                    <Input
                       type="text"
                       value={amount}
                       onChange={(e) => handleAmountChange(e.target.value)}
-                      className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary/50"
+                      className="w-full pr-24"
                       placeholder="0.00"
                       disabled={!hasBasicKyc}
                     />
+                    <Select
+                      value={inputCurrency}
+                      onValueChange={setInputCurrency}
+                      disabled={!hasBasicKyc}
+                    >
+                      <SelectTrigger className="absolute right-1 top-1 bottom-1 w-20 bg-white dark:bg-gray-800">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white dark:bg-gray-800">
+                        {INPUT_CURRENCIES.map((currency) => (
+                          <SelectItem key={currency.value} value={currency.value}>
+                            {currency.value}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex justify-between items-center text-xs text-muted-foreground">
+                    <span>Available Balance: {getDisplayBalance()}</span>
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-primary hover:text-primary/80"
                       onClick={handleMaxAmount}
                       disabled={!hasBasicKyc}
+                      className="text-primary hover:text-primary/80"
                     >
                       Max
                     </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Available Balance: {getDisplayBalance()}
-                  </p>
                 </div>
 
                 {/* Action Button */}
                 <Button
-                  className="w-full bg-primary hover:bg-primary/90"
+                  className="w-full bg-green-500 hover:bg-green-600 text-white"
                   size="lg"
                   onClick={showRate ? () => setShowConfirmation(true) : handleProceed}
                   disabled={loading || quoting || !amount || !hasBasicKyc}
@@ -578,34 +586,59 @@ export default function TradePage() {
           </CardContent>
         </Card>
 
-        {/* Fee Config Section */}
-        {feeConfig && (
-          <div className="max-w-xl mx-auto mt-6">
-            <Card className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-lg">
-              <CardContent className="p-6">
-                <h3 className="font-semibold mb-2 text-lg text-gray-900 dark:text-gray-50">Your Trading Fees</h3>
-                <div className="space-y-2 text-sm text-gray-600 dark:text-gray-300">
-                  <p>Current Tier: {feeConfig.user_tier.tier_level}</p>
-                  <p>Fee Rate: {feeConfig.user_tier.fee_percentage}%</p>
-                  <p>30-day Volume: {formatCurrency(feeConfig.user_tier.trading_volume, 'USD')}</p>
-                  {feeConfig.user_tier.next_tier && (
-                    <p className="text-green-600 dark:text-green-400">
-                      Trade {formatCurrency(feeConfig.user_tier.next_tier.min - feeConfig.user_tier.trading_volume, 'USD')} more to reach next tier ({feeConfig.user_tier.next_tier.fee}% fee)
-                    </p>
-                  )}
-                  {feeConfig.referral_discount > 0 && (
-                    <p className="text-green-600 dark:text-green-400">
-                      Referral Discount: {feeConfig.referral_discount}%
-                    </p>
-                  )}
+        {/* Market Info Card */}
+        <Card className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-lg">
+          <CardHeader>
+            <CardTitle className="text-xl font-bold text-gray-900 dark:text-gray-100">Market Info</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Current Rate</p>
+                <p className="text-lg font-semibold">{getDisplayRate()}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">24h Change</p>
+                <p className="text-lg font-semibold text-green-600">
+                  {quotation?.price_change_24h || '0.00'}%
+                </p>
+              </div>
+            </div>
+
+            {feeConfig && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <h4 className="font-medium text-sm">Your Trading Fees</h4>
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Current Tier</span>
+                      <span>{feeConfig.user_tier.tier_level}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Fee Rate</span>
+                      <span>{feeConfig.user_tier.fee_percentage}%</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Network Fee</span>
+                      <span>{NETWORK_FEE[selectedCrypto as keyof typeof NETWORK_FEE]} {selectedCrypto}</span>
+                    </div>
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+
+                {feeConfig.user_tier.next_tier && (
+                  <Alert className="bg-green-50 dark:bg-green-900/20 border-green-200">
+                    <AlertDescription className="text-sm text-green-600">
+                      Trade {formatCurrency(feeConfig.user_tier.next_tier.min - feeConfig.user_tier.trading_volume, 'USD')} more to reach next tier ({feeConfig.user_tier.next_tier.fee}% fee)
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Confirmation Modal */}
+      {/* Confirmation Dialog */}
       <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>
         <DialogContent>
           <DialogHeader>
@@ -647,33 +680,32 @@ export default function TradePage() {
               <span className="text-sm text-muted-foreground">You Receive</span>
               <span className="font-medium">
                 {tab === 'buy'
-                  ? formatCryptoAmount(quotation?.to_amount || '0')
+                  ? `${formatCryptoAmount(quotation?.to_amount || '0')} ${selectedCrypto}`
                   : formatCurrency(quotation?.to_amount || '0', 'NGN')}
               </span>
             </div>
+
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Rate</span>
               <span className="font-medium">
-                1 {selectedCrypto} = {formatRate(rate || '0', {
-                  inputCurrency: selectedCrypto,
-                  outputCurrency: 'NGN'
-                })} NGN
+                1 {selectedCrypto} = {formatCurrency(rate || 0, 'NGN')}
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
-            <Info className="h-4 w-4" />
-            <Link href="/trade/guide" className="hover:text-primary hover:underline">
-              View our trading guide for fee tiers and limits
-            </Link>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowConfirmation(false)}>
+          <DialogFooter className="flex-col sm:flex-row gap-3">
+            <Button
+              variant="outline"
+              onClick={handleCancelQuote}
+              className="sm:flex-1"
+            >
               Cancel
             </Button>
-            <Button onClick={handleTrade} disabled={loading || !quotation}>
+            <Button
+              onClick={handleTrade}
+              className="sm:flex-1"
+              disabled={loading}
+            >
               {loading ? (
                 <span className="flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
