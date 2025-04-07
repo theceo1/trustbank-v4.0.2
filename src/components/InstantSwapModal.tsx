@@ -225,7 +225,7 @@ const validateLimits = (amount: string, currency: string, amountType: AmountCurr
   return null;
 };
 
-function TradePreviewModal({ 
+export function TradePreviewModal({ 
   isOpen, 
   onClose, 
   onConfirm, 

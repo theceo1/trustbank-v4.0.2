@@ -51,7 +51,7 @@ export default async function SupportPage() {
                   <Phone className="h-5 w-5 text-green-600" />
                   <div>
                     <h3 className="font-semibold">Phone Support</h3>
-                    <p className="text-green-600">+1 (800) 123-4567</p>
+                    <p className="text-green-600">+XXX (XXX) XXXX-XXXX</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4 p-4 rounded-lg bg-white/50 dark:bg-gray-900/50 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors">

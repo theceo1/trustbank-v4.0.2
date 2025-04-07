@@ -5,6 +5,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2 } from 'lucide-react';
 import { formatCurrency, formatNumber } from '@/lib/utils';
+import { toast } from '@/components/ui/use-toast';
 
 interface Transaction {
   id: string;
@@ -24,84 +25,71 @@ export function SwapHistory() {
   const [error, setError] = useState<string | null>(null);
   const supabase = createClientComponentClient();
 
-  useEffect(() => {
-    const fetchTransactionHistory = async () => {
-      try {
-        setLoading(true);
-        
-        // Get current user's session
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          setError('No session found');
-          return;
-        }
+  const fetchTransactions = async (retryCount = 0) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
 
-        // Fetch both swap transactions and regular trades for the current user
-        const [swapResponse, tradeResponse] = await Promise.all([
-          supabase
+      const maxRetries = 3;
+      const retryDelay = 1000; // 1 second
+
+      const fetchWithRetry = async () => {
+        try {
+          const { data: swapData, error: swapError } = await supabase
             .from('swap_transactions')
             .select('*')
             .eq('user_id', session.user.id)
-            .order('created_at', { ascending: false }),
-          supabase
+            .order('created_at', { ascending: false });
+
+          if (swapError) throw swapError;
+
+          const { data: tradeData, error: tradeError } = await supabase
             .from('trades')
             .select('*')
             .eq('user_id', session.user.id)
             .eq('type', 'swap')
-            .order('created_at', { ascending: false })
-        ]);
+            .order('created_at', { ascending: false });
 
-        if (swapResponse.error) throw swapResponse.error;
-        if (tradeResponse.error) throw tradeResponse.error;
+          if (tradeError) throw tradeError;
 
-        console.log('Swap transactions:', swapResponse.data);
-        console.log('Trade swaps:', tradeResponse.data);
+          return { swapData, tradeData };
+        } catch (error) {
+          if (retryCount < maxRetries) {
+            await new Promise(resolve => setTimeout(resolve, retryDelay * (retryCount + 1)));
+            return fetchWithRetry();
+          }
+          throw error;
+        }
+      };
 
-        // Format swap transactions
-        const swapTransactions = (swapResponse.data || []).map(swap => ({
-          id: swap.id,
-          type: 'swap' as const,
-          from_currency: swap.from_currency || swap.currency,
-          to_currency: swap.to_currency || 'NGN',
-          from_amount: swap.amount?.toString() || '0',
-          to_amount: (swap.amount * (swap.rate || 0))?.toString() || '0',
-          execution_price: swap.rate?.toString() || '0',
-          status: swap.status || 'pending',
-          created_at: swap.created_at
-        }));
-
-        // Format regular trades that are swaps
-        const trades = (tradeResponse.data || []).map(trade => ({
-          id: trade.id,
-          type: 'swap' as const,
-          from_currency: trade.currency?.toUpperCase() || 'UNKNOWN',
-          to_currency: 'NGN',
-          from_amount: trade.amount?.toString() || '0',
-          to_amount: (trade.amount * (trade.rate || 0))?.toString() || '0',
-          execution_price: trade.rate?.toString() || '0',
-          status: trade.status || 'pending',
-          created_at: trade.created_at
-        }));
-
-        // Combine and sort transactions by date
-        const allTransactions = [...swapTransactions, ...trades].sort((a, b) => 
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
-
-        console.log('All transactions:', allTransactions);
-        setTransactions(allTransactions);
-      } catch (error) {
-        console.error('Failed to fetch transaction history:', error);
-        setError('Failed to load transaction history');
-      } finally {
+      const { swapData, tradeData } = await fetchWithRetry();
+      
+      // Process and combine the data
+      const combinedData = [...(swapData || []), ...(tradeData || [])]
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      
+      setTransactions(combinedData);
+      setLoading(false);
+    } catch (error) {
+      console.error('Failed to fetch transaction history:', error);
+      if (retryCount < 3) {
+        setTimeout(() => fetchTransactions(retryCount + 1), 1000 * (retryCount + 1));
+      } else {
         setLoading(false);
+        toast({
+          title: 'Error',
+          description: 'Failed to load transaction history. Please try refreshing the page.',
+          variant: 'destructive',
+        });
       }
-    };
+    }
+  };
 
-    fetchTransactionHistory();
-    const interval = setInterval(fetchTransactionHistory, 30000); // Update every 30 seconds
+  useEffect(() => {
+    fetchTransactions();
+    const interval = setInterval(fetchTransactions, 30000); // Refresh every 30 seconds
     return () => clearInterval(interval);
-  }, [supabase]);
+  }, []);
 
   if (loading) {
     return (
@@ -130,44 +118,44 @@ export function SwapHistory() {
   return (
     <div className="space-y-4">
       {transactions.map((transaction) => {
-        // Calculate the formatted amounts
-        const fromAmount = formatNumber(parseFloat(transaction.from_amount));
-        const toAmount = formatNumber(parseFloat(transaction.to_amount));
-        const rate = formatNumber(parseFloat(transaction.execution_price));
+        // Calculate the formatted amounts with null checks
+        const fromAmount = formatNumber(parseFloat(transaction?.from_amount || '0'));
+        const toAmount = formatNumber(parseFloat(transaction?.to_amount || '0'));
+        const rate = formatNumber(parseFloat(transaction?.execution_price || '0'));
         
         return (
           <div
-            key={transaction.id}
+            key={transaction?.id || Math.random()}
             className="flex justify-between items-center p-4 rounded-lg border bg-card text-card-foreground shadow-sm hover:shadow-md transition-shadow"
           >
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <p className="text-sm font-medium">
-                  {fromAmount} {transaction.from_currency.toUpperCase()} →{' '}
-                  {toAmount} {transaction.to_currency.toUpperCase()}
+                  {fromAmount} {transaction?.from_currency?.toUpperCase() || 'N/A'} →{' '}
+                  {toAmount} {transaction?.to_currency?.toUpperCase() || 'N/A'}
                 </p>
                 <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
                   swap
                 </span>
               </div>
               <p className="text-xs text-muted-foreground">
-                Rate: {rate} {transaction.to_currency}/{transaction.from_currency}
+                Rate: {rate} {transaction?.to_currency?.toUpperCase() || 'N/A'}/{transaction?.from_currency?.toUpperCase() || 'N/A'}
               </p>
               <p className="text-xs text-muted-foreground">
-                {new Date(transaction.created_at).toLocaleString()}
+                {transaction?.created_at ? new Date(transaction.created_at).toLocaleString() : 'N/A'}
               </p>
             </div>
             <div className="text-right">
               <span
                 className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                  transaction.status === 'completed'
+                  transaction?.status === 'completed'
                     ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                    : transaction.status === 'failed'
+                    : transaction?.status === 'failed'
                     ? 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400'
                     : 'bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
                 }`}
               >
-                {transaction.status}
+                {transaction?.status || 'pending'}
               </span>
             </div>
           </div>

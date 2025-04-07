@@ -71,12 +71,16 @@ export default function SpotTradingPage() {
           onValueChange={setSelectedMarket}
           disabled={!hasBasicKyc}
         >
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-[180px] bg-white dark:bg-gray-800 border-2">
             <SelectValue placeholder="Select market" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="bg-purple-100 dark:bg-blue-900/90 border-2">
             {MARKETS.map((market) => (
-              <SelectItem key={market.value} value={market.value}>
+              <SelectItem 
+                key={market.value} 
+                value={market.value}
+                className="hover:bg-purple-200 dark:hover:bg-blue-800 cursor-pointer"
+              >
                 {market.label}
               </SelectItem>
             ))}
@@ -103,9 +107,9 @@ export default function SpotTradingPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Order form */}
-        <Card>
+        <Card className="bg-orange-300/90 dark:bg-orange-900/90 border-2">
           <CardHeader>
-            <CardTitle>Place Order</CardTitle>
+            <CardTitle className="text-foreground">Place Order</CardTitle>
           </CardHeader>
           <CardContent>
             <PlaceOrder
@@ -119,7 +123,7 @@ export default function SpotTradingPage() {
         </Card>
 
         {/* Order book */}
-        <Card>
+        <Card className="border-2">
           <CardHeader>
             <CardTitle>Order Book</CardTitle>
           </CardHeader>

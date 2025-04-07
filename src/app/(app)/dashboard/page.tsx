@@ -2,8 +2,20 @@ import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import ClientDashboard from './ClientDashboard';
+import { useState } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { formatNumber } from '@/lib/utils';
+import { WithdrawalLimitCard } from '@/components/dashboard/WithdrawalLimitCard';
 
 export const dynamic = 'force-dynamic';
+
+const WITHDRAWAL_LIMITS = {
+  NONE: 0,            // No KYC
+  BASIC: 1000,        // Basic KYC - $1,000 limit
+  INTERMEDIATE: 10000, // Intermediate KYC - $10,000 limit
+  ADVANCED: 100000    // Advanced KYC - $100,000 limit
+};
 
 export default async function DashboardPage() {
   const cookieStore = cookies();
@@ -26,6 +38,8 @@ export default async function DashboardPage() {
   const hasBasicKyc = verificationHistory.email && 
                      verificationHistory.phone && 
                      verificationHistory.basic_info;
+  const hasIntermediateKyc = verificationHistory.intermediate_info;
+  const hasAdvancedKyc = verificationHistory.advanced_info;
 
   // Calculate 30-day trading volume
   const thirtyDaysAgo = new Date();
@@ -101,21 +115,49 @@ export default async function DashboardPage() {
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, 5); // Keep only the 5 most recent
 
+  const [withdrawalCurrency, setWithdrawalCurrency] = useState<'USD' | 'NGN'>('USD');
+
+  // Determine withdrawal limit based on KYC level
+  const getWithdrawalLimit = () => {
+    if (hasAdvancedKyc) return WITHDRAWAL_LIMITS.ADVANCED;
+    if (hasIntermediateKyc) return WITHDRAWAL_LIMITS.INTERMEDIATE;
+    if (hasBasicKyc) return WITHDRAWAL_LIMITS.BASIC;
+    return WITHDRAWAL_LIMITS.NONE;
+  };
+
+  // Format withdrawal limit based on selected currency
+  const formatWithdrawalLimit = () => {
+    const limit = getWithdrawalLimit();
+    if (withdrawalCurrency === 'NGN') {
+      // Use flat rate of 1600 NGN = 1 USD
+      return formatNumber(limit * 1600, { style: 'currency', currency: 'NGN' });
+    }
+    return formatNumber(limit, { style: 'currency', currency: 'USD' });
+  };
+
   return (
-    <ClientDashboard
-      user={user}
-      kycStatus={{
-        status: hasBasicKyc ? 'verified' : 'unverified',
-        tier: hasBasicKyc ? 1 : 0
-      }}
-      limits={{
-        withdrawal_limit: limits?.withdrawal_limit || 10000000,
-        trading_limit: limits?.trading_limit || 10000000,
-        withdrawal_used: limits?.withdrawal_used || 0,
-        trading_used: tradingVolume || 0
-      }}
-      volumeTrades={trades || []}
-      transactions={recentTransactions}
-    />
+    <div className="container mx-auto px-4 py-8 space-y-8">
+      <WithdrawalLimitCard 
+        hasBasicKyc={hasBasicKyc}
+        hasIntermediateKyc={verificationHistory.intermediate_info}
+        hasAdvancedKyc={verificationHistory.advanced_info}
+      />
+      
+      <ClientDashboard
+        user={user}
+        kycStatus={{
+          status: hasBasicKyc ? 'verified' : 'unverified',
+          tier: hasBasicKyc ? 1 : 0
+        }}
+        limits={{
+          withdrawal_limit: getWithdrawalLimit(),
+          trading_limit: limits?.trading_limit || 10000000,
+          withdrawal_used: limits?.withdrawal_used || 0,
+          trading_used: tradingVolume || 0
+        }}
+        volumeTrades={trades || []}
+        transactions={recentTransactions}
+      />
+    </div>
   );
 } 

@@ -52,7 +52,7 @@ export function formatCurrency(value: NumericValue, currency: string = 'NGN'): s
   if (isNaN(numValue)) return '0';
 
   // Handle crypto currencies differently since they're not valid ISO currency codes
-  if (['BTC', 'ETH', 'USDT'].includes(currency)) {
+  if (['BTC', 'ETH', 'USDT', 'CRYPTO'].includes(currency)) {
     return `${formatNumericValue(numValue, {
       minimumFractionDigits: 2,
       maximumFractionDigits: 8,

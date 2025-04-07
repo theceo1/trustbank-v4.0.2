@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/dialog';
 import { KYCBanner } from '@/components/trades/KYCBanner';
 import { Label } from '@/components/ui/label';
+import { TradePreviewModal } from '@/components/InstantSwapModal';
 
 const SUPPORTED_CURRENCIES = [
   { value: 'NGN', label: 'Nigerian Naira (NGN)' },
@@ -31,17 +32,129 @@ const SUPPORTED_CURRENCIES = [
   { value: 'BNB', label: 'Binance Coin (BNB)' },
   { value: 'SOL', label: 'Solana (SOL)' },
   { value: 'MATIC', label: 'Polygon (MATIC)' },
+  { value: 'XRP', label: 'Ripple (XRP)' },
+  { value: 'DOGE', label: 'Dogecoin (DOGE)' },
+  { value: 'ADA', label: 'Cardano (ADA)' },
+  { value: 'DOT', label: 'Polkadot (DOT)' },
+  { value: 'LTC', label: 'Litecoin (LTC)' },
+  { value: 'LINK', label: 'Chainlink (LINK)' },
+  { value: 'BCH', label: 'Bitcoin Cash (BCH)' },
+  { value: 'AAVE', label: 'Aave (AAVE)' },
+  { value: 'ALGO', label: 'Algorand (ALGO)' },
+  { value: 'NEAR', label: 'NEAR Protocol (NEAR)' },
+  { value: 'FIL', label: 'Filecoin (FIL)' },
+  { value: 'SAND', label: 'The Sandbox (SAND)' },
+  { value: 'MANA', label: 'Decentraland (MANA)' },
+  { value: 'APE', label: 'ApeCoin (APE)' },
+  { value: 'SHIB', label: 'Shiba Inu (SHIB)' },
+  { value: 'SUI', label: 'Sui (SUI)' },
+  { value: 'INJ', label: 'Injective (INJ)' },
+  { value: 'ARB', label: 'Arbitrum (ARB)' },
+  { value: 'TON', label: 'Toncoin (TON)' },
+  { value: 'RNDR', label: 'Render Token (RNDR)' },
+  { value: 'STX', label: 'Stacks (STX)' },
+  { value: 'GRT', label: 'The Graph (GRT)' },
+  { value: 'TRUMP', label: 'Trump Token (TRUMP)' },
+  { value: 'UNI', label: 'Uniswap (UNI)' },
+  { value: 'AVAX', label: 'Avalanche (AVAX)' },
+  { value: 'ATOM', label: 'Cosmos (ATOM)' },
+  { value: 'CAKE', label: 'PancakeSwap (CAKE)' },
+  { value: 'COMP', label: 'Compound (COMP)' },
+  { value: 'CRV', label: 'Curve DAO (CRV)' },
+  { value: 'DAI', label: 'Dai (DAI)' },
+  { value: 'ENJ', label: 'Enjin Coin (ENJ)' },
+  { value: 'FTM', label: 'Fantom (FTM)' },
+  { value: 'GALA', label: 'Gala (GALA)' },
+  { value: 'HBAR', label: 'Hedera (HBAR)' },
+  { value: 'ICP', label: 'Internet Computer (ICP)' },
+  { value: 'KCS', label: 'KuCoin Token (KCS)' },
+  { value: 'LDO', label: 'Lido DAO (LDO)' },
+  { value: 'MASK', label: 'Mask Network (MASK)' },
+  { value: 'MKR', label: 'Maker (MKR)' },
+  { value: 'NEO', label: 'NEO (NEO)' },
+  { value: 'ONE', label: 'Harmony (ONE)' },
+  { value: 'OP', label: 'Optimism (OP)' },
+  { value: 'PEPE', label: 'Pepe (PEPE)' },
+  { value: 'QNT', label: 'Quant (QNT)' },
+  { value: 'RUNE', label: 'THORChain (RUNE)' },
+  { value: 'SNX', label: 'Synthetix (SNX)' },
+  { value: 'THETA', label: 'Theta Network (THETA)' },
+  { value: 'VET', label: 'VeChain (VET)' },
+  { value: 'WAVES', label: 'Waves (WAVES)' },
+  { value: 'XDC', label: 'XDC Network (XDC)' },
+  { value: 'XEC', label: 'eCash (XEC)' },
+  { value: 'XEM', label: 'NEM (XEM)' },
+  { value: 'XLM', label: 'Stellar (XLM)' },
+  { value: 'XTZ', label: 'Tezos (XTZ)' },
+  { value: 'ZEC', label: 'Zcash (ZEC)' },
+  { value: 'ZIL', label: 'Zilliqa (ZIL)' }
 ];
 
 // Add min/max amount limits
 const AMOUNT_LIMITS = {
-  NGN: { min: 1000, max: 10000000 },
-  USDT: { min: 10, max: 100000 },
-  BTC: { min: 0.0001, max: 10 },
-  ETH: { min: 0.01, max: 100 },
-  BNB: { min: 0.01, max: 1000 },
-  SOL: { min: 0.1, max: 10000 },
-  MATIC: { min: 1, max: 100000 },
+  NGN: { min: 1000 },
+  USDT: { min: 0.1 },
+  BTC: { min: 0.0001 },
+  ETH: { min: 0.01 },
+  BNB: { min: 0.01 },
+  SOL: { min: 0.1 },
+  MATIC: { min: 1 },
+  XRP: { min: 1 },
+  DOGE: { min: 1 },
+  ADA: { min: 1 },
+  DOT: { min: 0.1 },
+  LTC: { min: 0.01 },
+  LINK: { min: 0.1 },
+  BCH: { min: 0.001 },
+  AAVE: { min: 0.01 },
+  ALGO: { min: 1 },
+  NEAR: { min: 0.1 },
+  FIL: { min: 0.1 },
+  SAND: { min: 1 },
+  MANA: { min: 1 },
+  APE: { min: 0.1 },
+  SHIB: { min: 1000 },
+  SUI: { min: 1 },
+  INJ: { min: 0.1 },
+  ARB: { min: 0.1 },
+  TON: { min: 0.1 },
+  RNDR: { min: 0.1 },
+  STX: { min: 1 },
+  GRT: { min: 1 },
+  TRUMP: { min: 1 },
+  UNI: { min: 0.1 },
+  AVAX: { min: 0.1 },
+  ATOM: { min: 0.1 },
+  CAKE: { min: 0.1 },
+  COMP: { min: 0.01 },
+  CRV: { min: 0.1 },
+  DAI: { min: 1 },
+  ENJ: { min: 1 },
+  FTM: { min: 1 },
+  GALA: { min: 1 },
+  HBAR: { min: 1 },
+  ICP: { min: 0.1 },
+  KCS: { min: 0.1 },
+  LDO: { min: 0.1 },
+  MASK: { min: 0.1 },
+  MKR: { min: 0.001 },
+  NEO: { min: 0.1 },
+  ONE: { min: 1 },
+  OP: { min: 0.1 },
+  PEPE: { min: 1000 },
+  QNT: { min: 0.01 },
+  RUNE: { min: 0.1 },
+  SNX: { min: 0.1 },
+  THETA: { min: 1 },
+  VET: { min: 1 },
+  WAVES: { min: 0.1 },
+  XDC: { min: 1 },
+  XEC: { min: 1000 },
+  XEM: { min: 1 },
+  XLM: { min: 1 },
+  XTZ: { min: 1 },
+  ZEC: { min: 0.01 },
+  ZIL: { min: 1 }
 };
 
 interface SwapQuotation {
@@ -52,6 +165,22 @@ interface SwapQuotation {
   from_amount: string;
   to_amount: string;
   expires_at: string;
+}
+
+interface TradeDetails {
+  type: string;
+  amount: string;
+  currency: string;
+  rate: number;
+  fees: {
+    total: number;
+    platform: number;
+    service: number;
+  };
+  total: number;
+  quote_amount: string;
+  ngn_equivalent: number;
+  quotation_id: string;
 }
 
 interface SwapFormProps {
@@ -73,8 +202,17 @@ export function SwapForm({ disabled }: SwapFormProps) {
   const [countdown, setCountdown] = useState(15);
   const [error, setError] = useState<string | null>(null);
   const [balances, setBalances] = useState<Record<string, string>>({});
+  const [trade, setTrade] = useState<TradeDetails | null>(null);
   const { toast } = useToast();
   const supabase = createClientComponentClient<Database>();
+
+  const [toSearchQuery, setToSearchQuery] = useState('');
+  const filteredToCurrencies = SUPPORTED_CURRENCIES.filter(currency =>
+    currency.label.toLowerCase().includes(toSearchQuery.toLowerCase())
+  );
+
+  const [showQuoteButton, setShowQuoteButton] = useState(true);
+  const [showProceedButton, setShowProceedButton] = useState(false);
 
   useEffect(() => {
     fetchBalances();
@@ -154,7 +292,128 @@ export function SwapForm({ disabled }: SwapFormProps) {
     }
   };
 
-  const handleSwap = async () => {
+  const handleProceed = async () => {
+    if (!amount || !fromCurrency || !toCurrency) {
+      toast({
+        title: "Error",
+        description: "Please fill in all fields",
+        variant: "destructive",
+        className: "bg-red-500/90 text-white border-red-600",
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      console.log('Requesting quote with:', {
+        from_currency: fromCurrency.toLowerCase(),
+        to_currency: toCurrency.toLowerCase(),
+        from_amount: amount
+      });
+
+      // First get the NGN/USDT rate
+      const ngnUsdtResponse = await fetch('/api/markets/rate?from=USDT&to=NGN');
+      if (!ngnUsdtResponse.ok) {
+        throw new Error('Failed to fetch NGN/USDT rate');
+      }
+      const ngnUsdtData = await ngnUsdtResponse.json();
+      const ngnUsdtRate = ngnUsdtData.rate;
+
+      // Get the quote
+      const response = await fetch('/api/swap/quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from_currency: fromCurrency.toLowerCase(),
+          to_currency: toCurrency.toLowerCase(),
+          from_amount: amount
+        })
+      });
+
+      console.log('Quote response status:', response.status);
+
+      if (!response.ok) {
+        const error = await response.json();
+        console.error('Error response:', error);
+        throw new Error(error.error || 'Failed to get quote');
+      }
+
+      const quoteData = await response.json();
+      console.log('Quote data received:', quoteData);
+      
+      // Calculate NGN equivalent
+      let ngnEquivalent = 0;
+      if (fromCurrency === 'USDT') {
+        ngnEquivalent = parseFloat(amount) * ngnUsdtRate;
+      } else {
+        // For other currencies, we need to get their USDT rate first
+        const cryptoUsdtResponse = await fetch(`/api/markets/rate?from=${fromCurrency}&to=USDT`);
+        if (!cryptoUsdtResponse.ok) {
+          throw new Error(`Failed to fetch ${fromCurrency}/USDT rate`);
+        }
+        const cryptoUsdtData = await cryptoUsdtResponse.json();
+        const cryptoUsdtRate = cryptoUsdtData.rate;
+        ngnEquivalent = parseFloat(amount) * cryptoUsdtRate * ngnUsdtRate;
+      }
+
+      // Calculate fees based on volume tiers
+      const VOLUME_TIERS = {
+        TIER_1: { min: 0, max: 1000, fee: 4.0 },        // 0-1K USD: 4.0%
+        TIER_2: { min: 1000, max: 5000, fee: 3.5 },     // 1K-5K USD: 3.5%
+        TIER_3: { min: 5000, max: 20000, fee: 3.0 },    // 5K-20K USD: 3.0%
+        TIER_4: { min: 20000, max: 100000, fee: 2.8 },  // 20K-100K USD: 2.8%
+        TIER_5: { min: 100000, max: Infinity, fee: 2.5 } // 100K+ USD: 2.5%
+      };
+
+      // Convert NGN amount to USD for fee tier calculation (using approximate rate)
+      const usdAmount = ngnEquivalent / 1585; // Approximate NGN/USD rate
+      
+      // Determine fee tier
+      let feeTier = VOLUME_TIERS.TIER_1;
+      for (const tier of Object.values(VOLUME_TIERS)) {
+        if (usdAmount >= tier.min && usdAmount < tier.max) {
+          feeTier = tier;
+          break;
+        }
+      }
+
+      // Calculate fees
+      const totalFee = (ngnEquivalent * feeTier.fee) / 100;
+      
+      // Set the trade data with the correct values from the quote
+      setTrade({
+        type: 'swap',
+        amount: amount,
+        currency: fromCurrency,
+        rate: ngnUsdtRate,
+        fees: {
+          total: totalFee,
+          platform: totalFee,
+          service: 0
+        },
+        total: ngnEquivalent + totalFee,
+        quote_amount: quoteData.to_amount,
+        ngn_equivalent: ngnEquivalent,
+        quotation_id: quoteData.id
+      });
+      
+      // Show the preview modal
+      setShowConfirmation(true);
+      setCountdown(14);
+    } catch (error) {
+      console.error('Error getting quote:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to get quote. Please try again.',
+        variant: 'destructive',
+        className: "bg-red-500 text-white",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleConfirmTrade = async () => {
     if (!quotation) return;
     
     try {
@@ -173,24 +432,32 @@ export function SwapForm({ disabled }: SwapFormProps) {
       toast({
         title: 'Success',
         description: `Successfully swapped ${amount} ${fromCurrency} to ${quotation.to_amount} ${toCurrency}`,
+        className: "bg-green-500 text-white",
       });
 
       // Reset form
-      setAmount('');
-      setNgnEquivalent('');
-      setQuotation(null);
-      setShowConfirmation(false);
-      fetchBalances();
+      resetForm();
     } catch (error: any) {
       console.error('Swap error:', error);
       toast({
         title: 'Swap Failed',
         description: error.message || 'Failed to complete swap',
         variant: 'destructive',
+        className: "bg-red-500 text-white",
       });
     } finally {
       setLoading(false);
     }
+  };
+
+  const resetForm = () => {
+    setAmount('');
+    setNgnEquivalent('');
+    setQuotation(null);
+    setShowConfirmation(false);
+    setCountdown(14);
+    setError(null);
+    setLoading(false);
   };
 
   const handleSwapCurrencies = () => {
@@ -213,9 +480,6 @@ export function SwapForm({ disabled }: SwapFormProps) {
 
     if (numValue < limits.min) {
       return `Minimum amount is ${formatNumber(limits.min)} ${fromCurrency}`;
-    }
-    if (numValue > limits.max) {
-      return `Maximum amount is ${formatNumber(limits.max)} ${fromCurrency}`;
     }
 
     const balance = parseFloat(balances[fromCurrency] || '0');
@@ -263,12 +527,6 @@ export function SwapForm({ disabled }: SwapFormProps) {
     }
   };
 
-  const handleProceed = () => {
-    if (error || !amount || !rate) return;
-    setShowConfirmation(true);
-    setCountdown(14);
-  };
-
   const handleMaxAmount = () => {
     if (!fromCurrency || !balances[fromCurrency]) return;
     
@@ -284,24 +542,23 @@ export function SwapForm({ disabled }: SwapFormProps) {
     }
   };
 
+  // Update the from currency selection to display only wallets with balances
+  const fromCurrencyOptions = Object.keys(balances).filter(currency => parseFloat(balances[currency]) > 0);
+
   return (
     <div className="space-y-6">
       {/* Currency Selection */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>From</Label>
           <Select value={fromCurrency} onValueChange={setFromCurrency}>
-            <SelectTrigger>
+            <SelectTrigger className="w-full h-12 bg-white dark:bg-gray-800">
               <SelectValue placeholder="Select currency" />
             </SelectTrigger>
-            <SelectContent>
-              {SUPPORTED_CURRENCIES.map((currency) => (
-                <SelectItem 
-                  key={currency.value} 
-                  value={currency.value}
-                  disabled={currency.value === toCurrency}
-                >
-                  {currency.label}
+            <SelectContent className="bg-white dark:bg-gray-800 max-h-60 overflow-y-auto">
+              {fromCurrencyOptions.map(currency => (
+                <SelectItem key={currency} value={currency}>
+                  {currency}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -311,16 +568,21 @@ export function SwapForm({ disabled }: SwapFormProps) {
         <div className="space-y-2">
           <Label>To</Label>
           <Select value={toCurrency} onValueChange={setToCurrency}>
-            <SelectTrigger>
+            <SelectTrigger className="w-full h-12 bg-white dark:bg-gray-800">
               <SelectValue placeholder="Select currency" />
             </SelectTrigger>
-            <SelectContent>
-              {SUPPORTED_CURRENCIES.map((currency) => (
-                <SelectItem 
-                  key={currency.value} 
-                  value={currency.value}
-                  disabled={currency.value === fromCurrency}
-                >
+            <SelectContent className="bg-white dark:bg-gray-800 max-h-60 overflow-y-auto">
+              <div className="sticky top-0 z-10 bg-white dark:bg-gray-800 p-2">
+                <Input
+                  type="text"
+                  placeholder="Search currencies..."
+                  value={toSearchQuery}
+                  onChange={(e) => setToSearchQuery(e.target.value)}
+                  className="h-9 bg-white dark:bg-gray-800"
+                />
+              </div>
+              {filteredToCurrencies.map(currency => (
+                <SelectItem key={currency.value} value={currency.value} className="hover:bg-green-600">
                   {currency.label}
                 </SelectItem>
               ))}
@@ -331,14 +593,14 @@ export function SwapForm({ disabled }: SwapFormProps) {
 
       {/* Amount Input with Currency Toggle */}
       <div className="space-y-2">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
           <Label>Amount</Label>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <Button
               variant={inputCurrency === 'CRYPTO' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setInputCurrency('CRYPTO')}
-              className="text-xs"
+              className="flex-1 sm:flex-none text-xs"
             >
               {fromCurrency}
             </Button>
@@ -346,7 +608,7 @@ export function SwapForm({ disabled }: SwapFormProps) {
               variant={inputCurrency === 'NGN' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setInputCurrency('NGN')}
-              className="text-xs"
+              className="flex-1 sm:flex-none text-xs"
             >
               NGN
             </Button>
@@ -354,33 +616,27 @@ export function SwapForm({ disabled }: SwapFormProps) {
               variant={inputCurrency === 'USD' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setInputCurrency('USD')}
-              className="text-xs"
+              className="flex-1 sm:flex-none text-xs"
             >
               USD
             </Button>
           </div>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <Input
             type="text"
             placeholder={`Enter amount in ${inputCurrency === 'CRYPTO' ? fromCurrency : inputCurrency}`}
-            value={inputCurrency === 'CRYPTO' ? 
-              amount ? formatNumber(parseFloat(amount)) : '' : 
-              inputCurrency === 'NGN' ? 
-                ngnEquivalent ? formatNumber(parseFloat(ngnEquivalent)) : '' :
-                usdEquivalent ? formatNumber(parseFloat(usdEquivalent)) : ''
-            }
-            onChange={(e) => {
-              const value = e.target.value.replace(/,/g, '');
-              handleAmountChange(value);
-            }}
+            value={amount}
+            onChange={(e) => handleAmountChange(e.target.value.replace(/,/g, ''))}
             disabled={disabled || !fromCurrency || !toCurrency}
+            className="w-full"
           />
           <Button
             variant="outline"
             onClick={handleMaxAmount}
             disabled={disabled || !fromCurrency || !toCurrency}
+            className="w-full sm:w-auto"
           >
             Max
           </Button>
@@ -393,7 +649,7 @@ export function SwapForm({ disabled }: SwapFormProps) {
               Balance: {formatNumber(parseFloat(balances[fromCurrency] || '0'))} {fromCurrency}
             </div>
             <div className="text-muted-foreground">
-              Limit: {formatNumber(AMOUNT_LIMITS[fromCurrency as keyof typeof AMOUNT_LIMITS]?.min || 0)} - {formatNumber(AMOUNT_LIMITS[fromCurrency as keyof typeof AMOUNT_LIMITS]?.max || 0)} {fromCurrency}
+              Minimum: {formatNumber(AMOUNT_LIMITS[fromCurrency as keyof typeof AMOUNT_LIMITS]?.min || 0)} {fromCurrency}
             </div>
           </div>
         )}
@@ -414,65 +670,62 @@ export function SwapForm({ disabled }: SwapFormProps) {
         )}
       </div>
 
-      {/* Proceed Button */}
+      {/* Proceed Button with Loading States */}
       <Button
-        className="w-full"
+        className="w-full relative"
         size="lg"
         onClick={handleProceed}
-        disabled={loading || quoting || !amount || !rate || !!error || disabled}
+        disabled={loading || !amount || !fromCurrency || !toCurrency}
       >
         {loading ? (
-          <span className="flex items-center gap-2">
+          <span className="flex items-center justify-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Processing Swap...
+            Getting Quote...
+          </span>
+        ) : quoting ? (
+          <span className="flex items-center justify-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Processing...
           </span>
         ) : (
-          'Proceed with Swap'
+          "Get Quote"
         )}
       </Button>
 
-      {/* Confirmation Modal */}
-      <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirm Swap</DialogTitle>
-            <DialogDescription>
-              Please review your swap details. This quote will expire in {countdown} seconds.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">You Pay</span>
-              <span className="font-medium">{amount} {fromCurrency}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">You Receive</span>
-              <span className="font-medium">{ngnEquivalent} {toCurrency}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Rate</span>
-              <span className="font-medium">1 {fromCurrency} = {rate} {toCurrency}</span>
-            </div>
+      {/* Visual Feedback for Trade Process */}
+      {loading && (
+        <div className="mt-4 space-y-2">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span>Fetching market rates...</span>
           </div>
+        </div>
+      )}
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowConfirmation(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSwap} disabled={loading || countdown === 0}>
-              {loading ? (
-                <span className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Confirming...
-                </span>
-              ) : (
-                'Confirm Swap'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {quoting && (
+        <div className="mt-4 space-y-2">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span>Calculating best rates...</span>
+          </div>
+        </div>
+      )}
+
+      {trade && (
+        <TradePreviewModal
+          isOpen={showConfirmation}
+          onClose={() => {
+            resetForm();
+          }}
+          onConfirm={handleConfirmTrade}
+          trade={trade}
+          countdown={countdown}
+          toCurrency={toCurrency}
+          setAmount={setAmount}
+          setError={setError}
+          setShowPreview={setShowConfirmation}
+        />
+      )}
     </div>
   );
 } 
