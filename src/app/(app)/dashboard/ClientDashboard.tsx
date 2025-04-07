@@ -47,6 +47,7 @@ interface ClientDashboardProps {
 interface WalletData {
   totalValue: number;
   wallets: Array<{
+    id: string;
     currency: string;
     balance: string;
     estimated_value: number;
@@ -456,6 +457,7 @@ export default function ClientDashboard({
       <InstantSwapModal
         isOpen={isSwapModalOpen}
         onClose={() => setIsSwapModalOpen(false)}
+        wallet={walletData?.wallets?.[0]}
       />
     </div>
   );

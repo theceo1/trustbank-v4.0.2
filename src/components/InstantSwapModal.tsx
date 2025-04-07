@@ -326,24 +326,6 @@ const formatAmount = (amount: string, currency: string): string => {
   return num.toFixed(decimals);
 };
 
-// Add this helper function at the top of the file
-const getCurrencyIcon = (currency: string): JSX.Element => {
-  switch (currency.toUpperCase()) {
-    case 'BTC':
-      return <Icons.bitcoin className="h-4 w-4" />;
-    case 'ETH':
-      return <Icons.ethereum className="h-4 w-4" />;
-    case 'USDT':
-      return <Icons.dollar className="h-4 w-4" />;
-    case 'NGN':
-      return <Icons.naira className="h-4 w-4" />;
-    case 'USD':
-      return <Icons.dollar className="h-4 w-4" />;
-    default:
-      return <Circle className="h-4 w-4" />;
-  }
-};
-
 // Add this helper function near the top with other utility functions
 const getCurrencyName = (currency: string): string => {
   const names: Record<string, string> = {
@@ -397,36 +379,34 @@ const getMarketRate = async (from: string, to: string): Promise<number | null> =
 };
 
 export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalProps) {
-  const [fromCurrency, setFromCurrency] = useState<string>(wallet?.currency || '');
-  const [toCurrency, setToCurrency] = useState<string>('');
-  const [amount, setAmount] = useState<string>('');
-  const [amountCurrency, setAmountCurrency] = useState<AmountCurrencyType>('CRYPTO');
-  const [fromSearchQuery, setFromSearchQuery] = useState('');
-  const [toSearchQuery, setToSearchQuery] = useState('');
-  const [availableWallets, setAvailableWallets] = useState<WalletType[]>([]);
-  const [availableCurrencies, setAvailableCurrencies] = useState<CurrencyPair[]>([]);
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const router = useRouter();
+  const supabase = createClientComponentClient();
   const [isLoading, setIsLoading] = useState(false);
-  const [quote, setQuote] = useState<QuoteState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [fromCurrency, setFromCurrency] = useState('BTC');
+  const [toCurrency, setToCurrency] = useState('USDT');
+  const [amount, setAmount] = useState('');
+  const [amountCurrency, setAmountCurrency] = useState<AmountCurrencyType>('CRYPTO');
   const [wallets, setWallets] = useState<WalletType[]>([]);
-  const [quidaxId, setQuidaxId] = useState('');
+  const [marketRates, setMarketRates] = useState<MarketRates>({});
+  const [showPreview, setShowPreview] = useState(false);
+  const [trade, setTrade] = useState<TradeDetails | null>(null);
   const [countdown, setCountdown] = useState(14);
   const [countdownInterval, setCountdownInterval] = useState<NodeJS.Timeout | null>(null);
-  const [isQuoteExpired, setIsQuoteExpired] = useState(false);
+  const [quidaxId, setQuidaxId] = useState<string | null>(null);
+  const [feeConfig, setFeeConfig] = useState<VolumeTier[]>([]);
+  const [availableCurrencies, setAvailableCurrencies] = useState<CurrencyPair[]>([]);
+  const [quote, setQuote] = useState<QuoteState | null>(null);
   const [isConfirming, setIsConfirming] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
-  const [tradeDetails, setTradeDetails] = useState<TradeDetails | null>(null);
-  const { toast } = useToast();
-  const [marketRates, setMarketRates] = useState<MarketRates>({});
-  const { session } = useAuth();
-  const router = useRouter();
-  const [feeConfig, setFeeConfig] = useState<any>(null);
+  const [isQuoteExpired, setIsQuoteExpired] = useState(false);
+  const [toSearchQuery, setToSearchQuery] = useState('');
 
   const resetForm = useCallback(() => {
     setAmount('');
     setShowPreview(false);
-    setTradeDetails(null);
-    setQuote(null);
+    setTrade(null);
     setCountdown(14);
     setError(null);
     setIsLoading(false);
@@ -442,71 +422,61 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
 
   // Filter to-currencies based on search and exclude the from-currency
   const filteredToCurrencies = useMemo(() => 
-    availableCurrencies.filter(pair => {
-      if (pair.value === fromCurrency) return false;
-      if (!toSearchQuery) return true;
-      return (
-        pair.value.toLowerCase().includes(toSearchQuery.toLowerCase()) ||
-        pair.label.toLowerCase().includes(toSearchQuery.toLowerCase())
-      );
+    SUPPORTED_CURRENCIES.filter(currency => {
+      if (currency.value === fromCurrency) return false;
+      return true;
     }),
-    [availableCurrencies, fromCurrency, toSearchQuery]
+    [fromCurrency]
   );
 
   const { createSwapQuotation, confirmSwapQuotation } = useQuidaxAPI();
-  const supabase = createClientComponentClient();
 
-  // Fetch user wallets and balances
-  useEffect(() => {
-    const fetchWallets = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) throw new Error('No session found');
+  // Add the fetchUserBalance function
+  const fetchUserBalance = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
 
-        const response = await fetch('/api/wallet', {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`
-          }
-        });
-        if (!response.ok) throw new Error('Failed to fetch wallets');
-        const data = await response.json();
-        
-        // Filter wallets to only include those with positive balances
-        const walletsWithBalance = data.wallets.filter(
-          (w: WalletType) => parseFloat(w.balance) > 0
-        );
-        
-        setWallets(walletsWithBalance);
-        setAvailableWallets(walletsWithBalance);
-        
-        // Set available currencies from wallets with balance
-        const currencies = walletsWithBalance.map((w: WalletType) => w.currency);
-        setAvailableCurrencies(currencies.map((currency: string) => ({
-          value: currency,
-          label: currency.toUpperCase(),
-          icon: getCurrencyIcon(currency)
-        })));
-      } catch (error) {
-        console.error('Error fetching wallets:', error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch wallet balances",
-          variant: "destructive",
-        });
-      }
-    };
-
-    if (isOpen) {
-      fetchWallets();
+      const response = await fetch('/api/wallet', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+      
+      if (!response.ok) throw new Error('Failed to fetch wallets');
+      const data = await response.json();
+      
+      // Filter wallets to only include those with positive balances
+      const walletsWithBalance = data.wallets.filter(
+        (w: WalletType) => parseFloat(w.balance) > 0
+      );
+      
+      setWallets(walletsWithBalance);
+      
+      // Set available currencies from wallets with balance
+      const currencies = walletsWithBalance.map((w: WalletType) => ({
+        value: w.currency,
+        label: w.currency.toUpperCase(),
+        icon: getCurrencyName(w.currency)
+      }));
+      
+      setAvailableCurrencies(currencies);
+    } catch (error) {
+      console.error('Error fetching wallets:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch wallet balances",
+        variant: "destructive"
+      });
     }
-  }, [isOpen, toast, supabase]);
+  };
 
   // Filter currencies based on search query
   const filteredCurrencies = useMemo(() => {
-    return availableCurrencies.filter(currency =>
-      currency.value.toLowerCase().includes(fromSearchQuery.toLowerCase())
+    return SUPPORTED_CURRENCIES.filter(currency =>
+      currency.value.toLowerCase().includes(fromCurrency.toLowerCase())
     );
-  }, [availableCurrencies, fromSearchQuery]);
+  }, [fromCurrency]);
 
   // Render currency option with balance
   const renderCurrencyOption = (currency: string): ReactNode => {
@@ -525,16 +495,14 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
 
   // Filter available currencies based on user balances and ensure unique keys
   const fromCurrencyOptions = Array.from(new Set(
-    availableCurrencies.map(c => c.value)
+    SUPPORTED_CURRENCIES.map(c => c.value)
   ));
 
   // Filter to currencies based on search and show all toggle
-  const toCurrencyOptions: CurrencyPair[] = availableCurrencies
+  const toCurrencyOptions: CurrencyPair[] = SUPPORTED_CURRENCIES
     .filter(pair => {
       if (pair.value === fromCurrency) return false;
-      if (!toSearchQuery) return true;
-      return pair.label.toLowerCase().includes(toSearchQuery.toLowerCase()) ||
-             pair.value.toLowerCase().includes(toSearchQuery.toLowerCase());
+      return true;
     });
 
   // Get market rate for currency pair
@@ -589,33 +557,69 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
     return parseFloat(amount) * rate;
   };
 
-  useEffect(() => {
-    checkAuth();
-  }, []);
+  // Add the fetchMarketRates function
+  const fetchMarketRates = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
 
-  const checkAuth = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-      fetchUserBalance();
+      const response = await fetch('/api/markets/rates', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+      const data = await response.json();
+      if (data.status === 'success') {
+        setMarketRates(data.rates);
+      }
+    } catch (error) {
+      console.error('Error fetching market rates:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch market rates",
+        variant: "destructive"
+      });
     }
   };
 
-  const fetchUserBalance = async () => {
+  // Add the fetchQuidaxId function
+  const fetchQuidaxId = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
 
-      const { data: balances, error } = await supabase
-        .from('wallets')
-        .select('*')
-        .eq('user_id', user.id);
+      const { data: profiles, error } = await supabase
+        .from('user_profiles')
+        .select('quidax_id')
+        .eq('user_id', session.user.id)
+        .single();
 
       if (error) throw error;
-      setWallets(balances);
+      if (profiles?.quidax_id) {
+        setQuidaxId(profiles.quidax_id);
+      }
     } catch (error) {
-      console.error('Error fetching balance:', error);
+      console.error('Error fetching Quidax ID:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch user profile",
+        variant: "destructive"
+      });
     }
   };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    // If we're in the dashboard, we know the user is authenticated
+    // so we can skip the auth check and proceed with initialization
+    if (user) {
+      fetchUserBalance();
+      fetchMarketRates();
+      fetchQuidaxId();
+      fetchFeeConfig();
+    }
+  }, [isOpen, user]);
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -669,39 +673,10 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
     return null;
   };
 
-  useEffect(() => {
-    const fetchQuidaxId = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        const { data: profiles, error } = await supabase
-          .from('user_profiles')
-          .select('quidax_id')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(1);
-
-        if (error) throw error;
-        if (!profiles || profiles.length === 0) {
-          setError('No profile found');
-          return;
-        }
-        
-        setQuidaxId(profiles[0]?.quidax_id || '');
-      } catch (err) {
-        console.error('Error fetching Quidax ID:', err);
-        setError('Failed to fetch user profile');
-      }
-    };
-
-    fetchQuidaxId();
-  }, [supabase]);
-
   const fetchFeeConfig = async () => {
     try {
       // Check authentication before fetching fees
-      if (!session) {
+      if (!user) {
         toast({
           title: "Authentication Required",
           description: "Please sign in to access instant swap.",
@@ -855,7 +830,7 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
       // Calculate fees based on tier
       const fees = (ngnAmount * feeTier.fee) / 100;
 
-      setTradeDetails({
+      setTrade({
         type: 'swap',
         amount: cryptoAmount.toString(),
         currency: fromCurrency,
@@ -917,14 +892,14 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
     setAmount('');
     setCountdown(14);
     setShowPreview(false);
-    setTradeDetails(null);
+    setTrade(null);
     setError(null);
     setIsLoading(false);
     onClose();
   };
 
   const handleConfirmSwap = async () => {
-    if (!tradeDetails?.quotation_id) return;
+    if (!trade?.quotation_id) return;
 
     try {
       setIsConfirming(true);
@@ -934,7 +909,7 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          quotation_id: tradeDetails.quotation_id
+          quotation_id: trade.quotation_id
         })
       });
 
@@ -947,7 +922,7 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
 
       toast({
         title: "✅ Swap Successful",
-        description: `Successfully swapped ${tradeDetails.amount} ${tradeDetails.currency} to ${confirmation.received_amount} ${confirmation.to_currency}`,
+        description: `Successfully swapped ${trade.amount} ${trade.currency} to ${confirmation.received_amount} ${confirmation.to_currency}`,
         variant: "default",
         className: "bg-green-500/90 text-white border-green-600",
       });
@@ -1004,44 +979,6 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
     // Reset amount when changing currency type
     setAmount('');
   };
-
-  // Add useEffect to fetch market rates
-  useEffect(() => {
-    const fetchMarketRates = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
-
-        const response = await fetch('/api/markets/rate', {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`
-          }
-        });
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch market rates');
-        }
-
-        const data = await response.json();
-        if (!data || !data.rates) {
-          throw new Error('Invalid rate data received');
-        }
-
-        setMarketRates(data.rates);
-      } catch (error) {
-        console.error('Error fetching market rates:', error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch market rates",
-          variant: "destructive"
-        });
-      }
-    };
-
-    if (isOpen) {
-      fetchMarketRates();
-    }
-  }, [isOpen, toast, supabase]);
 
   const startCountdown = () => {
     setCountdown(14);
@@ -1223,12 +1160,12 @@ export function InstantSwapModal({ isOpen, onClose, wallet }: InstantSwapModalPr
         </DialogContent>
       </Dialog>
 
-      {tradeDetails && (
+      {trade && (
         <TradePreviewModal
           isOpen={showPreview}
           onClose={() => setShowPreview(false)}
           onConfirm={handleConfirmSwap}
-          trade={tradeDetails}
+          trade={trade}
           countdown={countdown}
           toCurrency={toCurrency}
           setAmount={setAmount}
