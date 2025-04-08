@@ -432,13 +432,23 @@ export function SignUpForm() {
                 variant="outline"
                 type="button"
                 className="w-full border-input hover:bg-green-600 hover:text-white transition-colors"
-                onClick={() => {
-                  supabase.auth.signInWithOAuth({
+                onClick={async () => {
+                  console.log('[OAuth Debug] Starting Google OAuth flow');
+                  const { data, error } = await supabase.auth.signInWithOAuth({
                     provider: 'google',
                     options: {
                       redirectTo: `${window.location.origin}/auth/callback`,
+                      queryParams: {
+                        access_type: 'offline',
+                        prompt: 'consent'
+                      }
                     },
                   });
+                  if (error) {
+                    console.error('[OAuth Debug] OAuth error:', error);
+                  } else {
+                    console.log('[OAuth Debug] OAuth initiated:', data);
+                  }
                 }}
                 disabled={isLoading}
               >

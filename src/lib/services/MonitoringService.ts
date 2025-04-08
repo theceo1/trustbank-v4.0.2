@@ -24,7 +24,10 @@ export class MonitoringService {
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
-    this.quidaxService = new QuidaxService();
+    this.quidaxService = new QuidaxService(
+      process.env.QUIDAX_SECRET_KEY,
+      process.env.QUIDAX_API_URL
+    );
   }
 
   async monitorTransactions() {

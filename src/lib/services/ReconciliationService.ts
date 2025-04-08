@@ -38,8 +38,7 @@ export class ReconciliationService {
   async reconcileWallets() {
     try {
       // Fetch all wallets from Quidax
-      const response = await this.quidaxService.request('/users/me/wallets');
-      const quidaxWallets = response.data as QuidaxWallet[];
+      const quidaxWallets = await this.quidaxService.getWallets();
       
       // Fetch all wallet records from our database
       const { data: localWallets, error: dbError } = await this.supabase
@@ -101,10 +100,10 @@ export class ReconciliationService {
         .single();
 
       // Fetch transactions from Quidax since last check
-      const response = await this.quidaxService.request(
-        `/users/me/transactions?from=${lastReconciled?.last_transaction_check}`
+      const quidaxTransactions = await this.quidaxService.getSwapTransactions(
+        'me',
+        lastReconciled?.last_transaction_check
       );
-      const quidaxTransactions = response.data as SwapTransaction[];
 
       // Compare with local transactions
       const { data: localTransactions } = await this.supabase

@@ -52,7 +52,12 @@ export interface SubAccount {
   email: string;
   first_name: string;
   last_name: string;
-  display_name: string;
+  display_name?: string;
+  metadata?: {
+    source?: string;
+    provider_id?: string;
+    email_verified?: boolean;
+  };
 }
 
 export interface QuidaxWalletAddress {
@@ -183,8 +188,14 @@ export class QuidaxService {
     });
   }
 
-  async getSwapTransactions(userId: string = 'me'): Promise<SwapTransaction[]> {
-    return this.requestWithRetry(`/users/${userId}/swap_transactions`, { method: 'GET' });
+  async getSwapTransactions(userId: string = 'me', from?: string): Promise<SwapTransaction[]> {
+    return this.requestWithRetry(`/users/${userId}/swap_transactions`, { 
+      method: 'GET',
+      params: {
+        per_page: 100,
+        ...(from && { from })
+      }
+    });
   }
 
   // Sub-Account Operations
@@ -207,10 +218,19 @@ export class QuidaxService {
     email: string;
     first_name: string;
     last_name: string;
+    display_name?: string;
+    metadata?: {
+      source?: string;
+      provider_id?: string;
+      email_verified?: boolean;
+    };
   }): Promise<SubAccount> {
     return this.requestWithRetry('/users', {
       method: 'POST',
-      data: params
+      data: {
+        ...params,
+        display_name: params.display_name || `${params.first_name} ${params.last_name}`
+      }
     });
   }
 

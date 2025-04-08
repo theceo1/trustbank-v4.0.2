@@ -117,9 +117,31 @@ export async function GET(request: Request) {
       // Fetch wallets first
       const walletsResponse = await quidax.getWallets(profile.quidax_id)
         .catch(error => {
-          console.error('Error fetching wallets:', error);
+          console.error('Error fetching wallets:', {
+            error: error.message,
+            status: error.response?.status,
+            data: error.response?.data,
+            userId: profile.quidax_id
+          });
+          
+          // Check for specific error conditions
+          if (error.response?.status === 401) {
+            console.error('Authentication failed - check QUIDAX_SECRET_KEY');
+          } else if (error.response?.status === 403) {
+            console.error('Authorization failed - check user permissions');
+          } else if (error.response?.status === 429) {
+            console.error('Rate limit exceeded');
+          }
+          
           return [] as QuidaxWallet[];
         });
+
+      // Log wallet response
+      console.log('Wallet fetch response:', {
+        walletsCount: walletsResponse.length,
+        currencies: walletsResponse.map(w => w.currency),
+        userId: profile.quidax_id
+      });
 
       // Retry market data fetch up to 3 times
       let marketDataResponse;
