@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="32" height="32" rx="8" fill="#16A34A"/>
-  <text x="50%" y="50%" text-anchor="middle" dominant-baseline="central" fill="white" font-family="system-ui" font-weight="bold" font-size="16">tB</text>
+  <rect width="32" height="32" rx="4" fill="#16A34A"/>
+  <text x="50%" y="50%" text-anchor="middle" dominant-baseline="central" fill="white" font-family="system-ui" font-weight="600" font-size="16">tB</text>
 </svg> 

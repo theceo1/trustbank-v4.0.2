@@ -32,7 +32,11 @@ export const metadata: Metadata = {
     follow: true
   },
   icons: {
-    icon: '/favicon.ico'
+    icon: [
+      { url: '/favicon.png', sizes: '32x32', type: 'image/png' }
+    ],
+    shortcut: '/favicon.png',
+    apple: '/apple-touch-icon.png',
   },
   manifest: '/site.webmanifest',
   viewport: {
