@@ -32,9 +32,7 @@ export const metadata: Metadata = {
     follow: true
   },
   icons: {
-    icon: '/favicon.ico',
-    shortcut: '/favicon.ico',
-    apple: '/apple-touch-icon.png',
+    icon: '/favicon.ico'
   },
   manifest: '/site.webmanifest',
   viewport: {
@@ -61,9 +59,6 @@ export default function RootLayout({ children }: RootLayoutProps) {
   if (isAdminRoute) {
     return (
       <html lang="en" suppressHydrationWarning>
-        <head>
-          <link rel="icon" href="/favicon.ico" />
-        </head>
         <body className={cn(
           'min-h-screen bg-background font-sans antialiased overflow-x-hidden',
           GeistSans.variable,
@@ -80,9 +75,6 @@ export default function RootLayout({ children }: RootLayoutProps) {
   // For non-admin routes, include the full layout with all providers
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <link rel="icon" href="/favicon.ico" />
-      </head>
       <body className={cn(
         'min-h-screen bg-background font-sans antialiased overflow-x-hidden',
         GeistSans.variable,

@@ -1,50 +1,57 @@
 import { motion } from 'framer-motion';
-import { Avatar, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
 import { Quote, Star } from 'lucide-react';
 
 const testimonials = [
   {
-    name: "Ijeoma Ogugua",
-    role: "Crypto Trader",
-    avatar: "/images/placeholder-user.jpg",
-    content: "trustBank has made my crypto trading experience smooth and secure. I couldn't ask for a better platform.",
-    rating: 4
+    name: "Sarah Johnson",
+    role: "Crypto Enthusiast",
+    content: "trustBank has made crypto trading so much easier. Their platform is intuitive and secure.",
+    initials: "SJ",
+    rating: 5
   },
   {
     name: "Michael Massamba",
-    role: "Investment Analyst",
-    avatar: "/images/placeholder-user.jpg",
-    content: "The real-time market data and user-friendly interface have significantly improved my trading strategies.",
-    rating: 3
-  },
-  {
-    name: "Vivian Vincent",
-    role: "Business Owner",
-    avatar: "/images/placeholder-user.jpg",
-    content: "trustBank's security features give me peace of mind. I can trade confidently knowing my assets are protected.",
+    role: "Day Trader",
+    content: "Best crypto platform I've used. The instant swap feature is a game-changer!",
+    initials: "MM",
     rating: 4
   },
   {
+    name: "Aisha Patel",
+    role: "Business Owner",
+    content: "Excellent customer support and very user-friendly interface. Highly recommended!",
+    initials: "AP",
+    rating: 5
+  },
+  {
     name: "Austin Obinna",
-    role: "Day Trader",
-    avatar: "/images/placeholder-user.jpg",
-    content: "The community support is incredible. I've learned so much from other traders!",
+    role: "Tech Professional",
+    content: "The security features and ease of use make trustBank stand out from other platforms.",
+    initials: "AO",
+    rating: 4
+  },
+  {
+    name: "Emma Thompson",
+    role: "Investment Advisor",
+    content: "trustBank's commitment to security and compliance gives me confidence in their platform.",
+    initials: "ET",
     rating: 3
   },
   {
-    name: "Kate Chukwu",
-    role: "Trader",
-    avatar: "/images/placeholder-user.jpg",
-    content: "The platform is easy to use and the customer support is top-notch. I've been able to make consistent profits since joining.",
-    rating: 3
+    name: "Carlos Rodriguez",
+    role: "Blockchain Developer",
+    content: "The API integration and technical features are top-notch. Great work!",
+    initials: "CR",
+    rating: 4
   },
   {
     name: "Aminu Sanni",
     role: "Entrepreneur",
-    avatar: "/images/placeholder-user.jpg",
     content: "trustBank has been a game-changer for me. The platform's features and the community support have made a significant difference in my trading success.",
-    rating: 3
+    initials: "AS",
+    rating: 5
   }
 ];
 
@@ -80,7 +87,7 @@ export function UserFeedback() {
             }}
             className="flex gap-6 py-4"
           >
-            {[...testimonials, ...testimonials].map((testimonial, index) => (
+            {testimonials.map((testimonial, index) => (
               <Card 
                 key={index} 
                 className="w-[300px] flex-shrink-0 backdrop-blur-sm bg-white/50 dark:bg-gray-900/50 border-0 shadow-lg hover:shadow-xl transition-shadow duration-300"
@@ -92,10 +99,9 @@ export function UserFeedback() {
                   </p>
                   <div className="flex items-center gap-3">
                     <Avatar className="w-10 h-10 border-2 border-green-100 dark:border-green-900">
-                      <AvatarImage
-                        src={testimonial.avatar}
-                        alt={testimonial.name}
-                      />
+                      <AvatarFallback className="bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400">
+                        {testimonial.initials}
+                      </AvatarFallback>
                     </Avatar>
                     <div>
                       <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
