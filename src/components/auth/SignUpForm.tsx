@@ -125,6 +125,7 @@ export function SignUpForm() {
       const maxRetries = 5;
       let sessionEstablished = false;
 
+      // First, wait for the session to be available
       while (retries < maxRetries && !sessionEstablished) {
         const { data: newSession } = await supabase.auth.getSession();
         console.log('[Signup Debug Frontend] Session check attempt', retries + 1, ':', !!newSession?.session);
@@ -140,19 +141,43 @@ export function SignUpForm() {
         throw new Error('Failed to establish session. Please try logging in.');
       }
 
-      // Force a router refresh to update auth state
-      console.log('[Signup Debug Frontend] Session established, refreshing router');
-      router.refresh();
-      
+      // Now wait for auth state to be fully initialized
+      console.log('[Signup Debug Frontend] Waiting for auth state initialization');
+      retries = 0;
+      let authInitialized = false;
+
+      while (retries < maxRetries && !authInitialized) {
+        // Force a refresh of the auth state
+        await supabase.auth.refreshSession();
+        // Wait for state update
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        const { data: { user } } = await supabase.auth.getUser();
+        console.log('[Signup Debug Frontend] Auth state check attempt', retries + 1, ':', !!user);
+        
+        if (user) {
+          authInitialized = true;
+          // Force a router refresh to update auth state
+          console.log('[Signup Debug Frontend] Auth state initialized, refreshing router');
+          await router.refresh();
+        } else {
+          retries++;
+        }
+      }
+
+      if (!authInitialized) {
+        throw new Error('Failed to initialize auth state. Please try refreshing the page.');
+      }
+
       // Show welcome toast
       toast({
         title: "Welcome to trustBank!",
         description: "Your account is ready. Redirecting to dashboard...",
-        className: "bg-green-500/90 text-white border-green-600"
+        className: "bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-800 text-green-600 dark:text-green-400"
       });
 
-      // Final delay before redirect
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Final delay to ensure all state updates are complete
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       // Redirect to dashboard
       console.log('[Signup Debug Frontend] Redirecting to dashboard');

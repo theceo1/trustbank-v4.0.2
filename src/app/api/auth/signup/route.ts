@@ -167,15 +167,34 @@ export async function POST(request: Request) {
       }
     });
 
-    // Ensure auth cookie is set
+    // Ensure auth cookie is set with proper configuration
     if (signInData.session) {
       const sessionStr = JSON.stringify(signInData.session);
-      response.cookies.set('sb-auth-token', sessionStr, {
+      const cookieOptions = {
+        name: 'sb-auth-token',
+        value: sessionStr,
         path: '/',
-        sameSite: 'lax',
+        sameSite: 'lax' as const,
         secure: process.env.NODE_ENV === 'production',
-        maxAge: 60 * 60 * 24 * 7 // 1 week
-      });
+        maxAge: 60 * 60 * 24 * 7, // 1 week
+        httpOnly: true
+      };
+
+      // Set cookie using Next.js Response
+      response.cookies.set(cookieOptions);
+      
+      // Also set the refresh token if available
+      if (signInData.session.refresh_token) {
+        response.cookies.set({
+          name: 'sb-refresh-token',
+          value: signInData.session.refresh_token,
+          path: '/',
+          sameSite: 'lax',
+          secure: process.env.NODE_ENV === 'production',
+          maxAge: 60 * 60 * 24 * 7, // 1 week
+          httpOnly: true
+        });
+      }
     }
 
     return response;

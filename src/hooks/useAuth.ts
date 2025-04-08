@@ -61,18 +61,17 @@ export function useAuth() {
               }
             }
 
-            // Wait for state update before navigation for regular users
-            setTimeout(async () => {
-              await router.refresh();
-              if (!window.location.pathname.includes('/admin')) {
-                router.push('/dashboard');
-                toast({
-                  title: "Welcome back! 👋",
-                  description: "You have successfully signed in.",
-                  className: "bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-800 text-green-600 dark:text-green-400"
-                });
-              }
-            }, 0);
+            // Update router state immediately
+            await router.refresh();
+            
+            // Only show welcome toast if not coming from signup
+            if (!window.location.pathname.includes('/auth/signup')) {
+              toast({
+                title: "Welcome back! 👋",
+                description: "You have successfully signed in.",
+                className: "bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-800 text-green-600 dark:text-green-400"
+              });
+            }
           }
           break;
         case 'SIGNED_OUT':
