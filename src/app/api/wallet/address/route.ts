@@ -209,64 +209,83 @@ export async function GET(request: Request) {
       console.log('[WalletAddress] Fetching address for:', { 
         currency, 
         network: targetNetwork,
-        userId: profile.quidax_id,
-        apiUrl: process.env.NEXT_PUBLIC_QUIDAX_API_URL,
-        hasSecretKey: !!process.env.QUIDAX_SECRET_KEY
+        userId: profile.quidax_id
       });
       
       // Get existing wallet
-      const wallet = await quidax.getWallet(profile.quidax_id, currency).catch(error => {
-        console.error('[WalletAddress] Error fetching wallet:', error.response?.data || error);
-        return null;
-      });
+      const wallet = await quidax.getWallet(profile.quidax_id, currency);
       
       console.log('[WalletAddress] Existing wallet:', wallet);
       
-      // If wallet has a deposit address, return it
+      // If wallet has a deposit address, check network compatibility
       if (wallet?.deposit_address) {
-        console.log('[WalletAddress] Found existing address:', {
-          address: wallet.deposit_address,
-          tag: wallet.destination_tag,
-          network: wallet.default_network
-        });
-        
-        return NextResponse.json({
-          status: 'success',
-          message: 'Address found',
-          data: {
+        // For networks that share addresses (like BTC), or if networks match
+        if (!wallet.default_network || wallet.default_network === targetNetwork) {
+          console.log('[WalletAddress] Found compatible existing address:', {
             address: wallet.deposit_address,
             tag: wallet.destination_tag,
-            network: wallet.default_network || targetNetwork,
+            network: wallet.default_network || targetNetwork
+          });
+          
+          return NextResponse.json({
+            status: 'success',
+            message: 'Address found',
+            data: {
+              address: wallet.deposit_address,
+              tag: wallet.destination_tag,
+              network: wallet.default_network || targetNetwork,
+              currency: currency
+            }
+          });
+        }
+      }
+
+      console.log('[WalletAddress] Generating new address for network:', targetNetwork);
+
+      // Generate new address
+      try {
+        const newAddress = await quidax.createWalletAddress(profile.quidax_id, currency, targetNetwork);
+        
+        console.log('[WalletAddress] New address response:', newAddress);
+        
+        if (!newAddress?.address) {
+          console.error('[WalletAddress] Invalid address response:', newAddress);
+          throw new Error('Unable to generate deposit address');
+        }
+
+        return NextResponse.json({
+          status: 'success',
+          message: 'Address generated successfully',
+          data: {
+            address: newAddress.address,
+            tag: newAddress.tag,
+            network: targetNetwork,
             currency: currency
           }
         });
-      }
+      } catch (addressError: any) {
+        console.error('[WalletAddress] Address generation error:', {
+          message: addressError.message,
+          response: addressError.response?.data,
+          status: addressError.response?.status
+        });
 
-      console.log('[WalletAddress] No existing address, creating new one...');
-
-      // Generate new address only if one doesn't exist
-      const newAddress = await quidax.createWalletAddress(profile.quidax_id, currency, targetNetwork).catch(error => {
-        console.error('[WalletAddress] Error creating address:', error.response?.data || error);
-        throw error;
-      });
-      
-      console.log('[WalletAddress] New address response:', newAddress);
-      
-      if (!newAddress?.address) {
-        console.error('[WalletAddress] Invalid address response:', newAddress);
-        throw new Error('Unable to generate deposit address');
-      }
-
-      return NextResponse.json({
-        status: 'success',
-        message: 'Address generated successfully',
-        data: {
-          address: newAddress.address,
-          tag: newAddress.tag,
-          network: targetNetwork,
-          currency: currency
+        // If address already exists, return the existing wallet address
+        if (addressError.response?.data?.message?.includes('Address already generated') && wallet?.deposit_address) {
+          return NextResponse.json({
+            status: 'success',
+            message: 'Using existing address',
+            data: {
+              address: wallet.deposit_address,
+              tag: wallet.destination_tag,
+              network: wallet.default_network || targetNetwork,
+              currency: currency
+            }
+          });
         }
-      });
+
+        throw addressError;
+      }
 
     } catch (error: any) {
       console.error('[WalletAddress] API error:', {
@@ -274,6 +293,27 @@ export async function GET(request: Request) {
         response: error.response?.data,
         status: error.response?.status
       });
+
+      // If address already exists error, try to get the existing address
+      if (error.response?.data?.message?.includes('Address already generated')) {
+        try {
+          const existingWallet = await quidax.getWallet(profile.quidax_id, currency);
+          if (existingWallet?.deposit_address) {
+            return NextResponse.json({
+              status: 'success',
+              message: 'Using existing address',
+              data: {
+                address: existingWallet.deposit_address,
+                tag: existingWallet.destination_tag,
+                network: existingWallet.default_network || targetNetwork,
+                currency: currency
+              }
+            });
+          }
+        } catch (retryError) {
+          console.error('[WalletAddress] Error fetching existing address:', retryError);
+        }
+      }
       
       return NextResponse.json(
         { 
@@ -296,6 +336,68 @@ export async function GET(request: Request) {
       },
       { status: 500 }
     );
+  }
+}
+
+async function getDepositAddress(
+  userId: string,
+  currency: string,
+  network: string
+): Promise<string> {
+  try {
+    // Initialize Quidax service
+    const quidax = createQuidaxServer(process.env.QUIDAX_SECRET_KEY!);
+    
+    // Get existing wallet
+    const wallet = await quidax.getWallet(userId, currency).catch(error => {
+      console.error('[WalletAddress] Error fetching wallet:', error.response?.data || error);
+      return null;
+    });
+    
+    // If wallet has a deposit address, return it
+    if (wallet?.deposit_address) {
+      return wallet.deposit_address;
+    }
+
+    // Validate network for the currency
+    const supportedNetworks = CURRENCY_NETWORKS[currency.toLowerCase()];
+    if (!supportedNetworks || !supportedNetworks.includes(network.toLowerCase())) {
+      throw new Error(`Network ${network} is not supported for currency ${currency}`);
+    }
+
+    try {
+      // Try to generate new address
+      const newAddress = await quidax.createWalletAddress(userId, currency, network);
+      
+      if (!newAddress?.address) {
+        throw new Error('Unable to generate deposit address');
+      }
+
+      return newAddress.address;
+    } catch (error: any) {
+      // If the error indicates address already exists, try to get the existing address
+      if (error.response?.data?.message?.includes('Address already generated')) {
+        console.log('[WalletAddress] Address already exists, fetching existing address');
+        
+        // Get the wallet again to get the existing address
+        const existingWallet = await quidax.getWallet(userId, currency);
+        if (existingWallet?.deposit_address) {
+          return existingWallet.deposit_address;
+        }
+      }
+      
+      // If we can't get the existing address, throw the original error
+      throw error;
+    }
+  } catch (error: any) {
+    console.error('[WalletAddress] Error in getDepositAddress:', {
+      error: error.message,
+      response: error.response?.data,
+      currency,
+      network,
+      userId
+    });
+    throw error;
   }
 } 
  
