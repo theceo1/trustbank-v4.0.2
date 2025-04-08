@@ -80,6 +80,14 @@ export function MobileMenu({
               >
                 Calculator
               </Link>
+              <Link
+                href="/trade/guide"
+                className="flex items-center h-10 px-4 text-base rounded-md hover:bg-accent hover:text-green-600 dark:hover:text-green-400 data-[active=true]:bg-accent data-[active=true]:text-green-600 dark:data-[active=true]:text-green-400"
+                onClick={onClose}
+                data-active={window.location.pathname === '/trade/guide'}
+              >
+                Trade Guide
+              </Link>
             </div>
 
             {/* Authenticated User Navigation */}
