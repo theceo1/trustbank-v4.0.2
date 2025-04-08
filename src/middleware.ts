@@ -121,6 +121,7 @@ const PUBLIC_PATHS = [
   '/features',
   '/pricing',
   '/contact',
+  '/trade/guide',
   
   // Auth routes
   '/auth/login',

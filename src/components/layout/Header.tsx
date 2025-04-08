@@ -180,6 +180,12 @@ export function Header() {
               >
                 Calculator
               </Link>
+              <Link 
+                href="/trade/guide" 
+                className={`text-sm font-medium transition-colors hover:text-primary ${pathname === '/trade/guide' ? 'text-green-600' : ''}`}
+              >
+                Trade Guide
+              </Link>
 
               {/* Links only for authenticated users */}
               {!loading && user && (
@@ -195,12 +201,6 @@ export function Header() {
                     className={`text-sm font-medium transition-colors hover:text-primary ${pathname === '/trade' ? 'text-green-600' : ''}`}
                   >
                     Trade
-                  </Link>
-                  <Link 
-                    href="/trade/guide" 
-                    className={`text-sm font-medium transition-colors hover:text-primary ${pathname === '/trade/guide' ? 'text-green-600' : ''}`}
-                  >
-                    Trade Guide
                   </Link>
                 </>
               )}

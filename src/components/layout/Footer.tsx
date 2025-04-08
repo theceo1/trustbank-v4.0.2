@@ -212,6 +212,7 @@ export function Footer() {
     { name: "Blog", href: "/about/blog", icon: <Newspaper className="w-4 h-4" /> },
     { name: "Team", href: "/about/team", icon: <Users className="w-4 h-4" /> },
     { name: "Careers", href: "/about/careers", icon: <BookMarked className="w-4 h-4" /> },
+    { name: "Trade Guide", href: "/trade/guide", icon: <GraduationCap className="w-4 h-4" />, isNew: true },
   ];
 
   const supportLinks: LinkItem[] = [
