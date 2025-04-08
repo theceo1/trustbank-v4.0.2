@@ -21,6 +21,7 @@ export async function POST(request: Request) {
 
     // If referral code provided, verify it exists
     if (referralCode) {
+      console.log('[Signup] Verifying referral code:', referralCode);
       const { data: referrer, error: referrerError } = await supabase
         .from('user_profiles')
         .select('referral_code')
@@ -28,12 +29,47 @@ export async function POST(request: Request) {
         .single();
 
       if (referrerError || !referrer) {
+        console.error('[Signup] Invalid referral code:', referralCode);
         return NextResponse.json(
           { error: 'Invalid referral code' },
           { status: 400 }
         );
       }
+      console.log('[Signup] Referral code verified:', referralCode);
     }
+
+    // First, sign up the user in Supabase
+    console.log('[Signup] Creating Supabase account');
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          first_name: firstName,
+          last_name: lastName || '',
+          full_name: `${firstName} ${lastName || ''}`.trim()
+        }
+      }
+    });
+
+    if (signUpError) {
+      console.error('[Signup] Error creating Supabase account:', signUpError);
+      return NextResponse.json(
+        { error: signUpError.message },
+        { status: 400 }
+      );
+    }
+
+    if (!signUpData.user) {
+      console.error('[Signup] No user data returned from signup');
+      return NextResponse.json(
+        { error: 'Failed to create user account' },
+        { status: 500 }
+      );
+    }
+
+    console.log('[Signup] Supabase account created:', signUpData.user.id);
+    console.log('[Signup] Full signup data:', JSON.stringify(signUpData, null, 2));
 
     // Create Quidax sub-account first
     let quidaxId;
@@ -47,72 +83,21 @@ export async function POST(request: Request) {
       console.log('[Signup] Creating Quidax sub-account for:', { email, firstName, lastName });
       const quidaxService = new QuidaxService(quidaxSecretKey);
       
-      // Add retry logic for Quidax account creation
-      const maxRetries = 3;
-      let lastError;
-      
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-          console.log(`[Signup] Attempt ${attempt} to create Quidax account`);
-          
-          const quidaxResponse = await quidaxService.createSubAccount({
-            email,
-            first_name: firstName,
-            last_name: lastName || ''
-          });
+      const quidaxResponse = await quidaxService.createSubAccount({
+        email,
+        first_name: firstName,
+        last_name: lastName || ''
+      });
 
-          console.log('[Signup] Quidax response:', JSON.stringify(quidaxResponse, null, 2));
+      console.log('[Signup] Quidax response:', JSON.stringify(quidaxResponse, null, 2));
 
-          if (!quidaxResponse.id) {
-            console.error('[Signup] Invalid Quidax response:', quidaxResponse);
-            throw new Error('Failed to complete account setup');
-          }
-
-          quidaxId = quidaxResponse.id;
-          console.log('[Signup] Account created:', quidaxId);
-          break; // Success, exit retry loop
-          
-        } catch (quidaxApiError: any) {
-          lastError = quidaxApiError;
-          
-          // Check for specific API errors that shouldn't be retried
-          const errorMessage = quidaxApiError.response?.data?.message || 
-                             quidaxApiError.response?.data?.error || 
-                             quidaxApiError.message;
-          
-          // Don't retry if email is already taken
-          if (errorMessage?.toLowerCase().includes('email') && 
-              errorMessage?.toLowerCase().includes('taken')) {
-            return NextResponse.json(
-              { 
-                error: 'Email address is already registered',
-                code: 'EMAIL_TAKEN'
-              },
-              { status: 400 }
-            );
-          }
-
-          // Log the error for debugging
-          console.error(`[Signup] Quidax API error (attempt ${attempt}):`, {
-            error: quidaxApiError,
-            response: quidaxApiError.response?.data,
-            message: errorMessage
-          });
-
-          // If this was the last attempt, throw the error
-          if (attempt === maxRetries) {
-            throw new Error(`Failed to complete account setup after ${maxRetries} attempts`);
-          }
-
-          // Wait before retrying (exponential backoff)
-          await new Promise(resolve => setTimeout(resolve, attempt * 1000));
-        }
+      if (!quidaxResponse.id) {
+        console.error('[Signup] Invalid Quidax response:', quidaxResponse);
+        throw new Error('Failed to complete account setup');
       }
 
-      // If we got here without a quidaxId, throw the last error
-      if (!quidaxId && lastError) {
-        throw lastError;
-      }
+      quidaxId = quidaxResponse.id;
+      console.log('[Signup] Account created:', quidaxId);
 
     } catch (quidaxError: any) {
       console.error('[Signup] Error in Quidax account creation:', {
@@ -130,120 +115,30 @@ export async function POST(request: Request) {
       );
     }
 
-    // Sign up the user in Supabase with retry logic
-    let signUpData: { user: any } | null = null;
-    try {
-      const maxRetries = 3;
-      let lastError;
-
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-          console.log(`[Signup] Attempt ${attempt} to create Supabase account`);
-          
-          const { data, error } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              data: {
-                first_name: firstName,
-                last_name: lastName || '',
-                full_name: `${firstName} ${lastName || ''}`.trim()
-              }
-            }
-          });
-
-          if (error) throw error;
-          if (!data || !data.user) throw new Error('No user data returned from signup');
-          
-          signUpData = data;
-          break; // Success, exit retry loop
-
-        } catch (error) {
-          lastError = error;
-          console.error(`[Signup] Supabase signup error (attempt ${attempt}):`, error);
-
-          if (attempt === maxRetries) {
-            throw error;
-          }
-
-          // Wait before retrying (exponential backoff)
-          await new Promise(resolve => setTimeout(resolve, attempt * 1000));
-        }
-      }
-
-      if (!signUpData || !signUpData.user) {
-        throw lastError || new Error('Failed to create user account');
-      }
-
-    } catch (signUpError: any) {
-      return NextResponse.json(
-        { error: signUpError.message },
-        { status: 400 }
-      );
-    }
-
     // Generate a unique referral code
     const newReferralCode = nanoid(8);
 
-    // Update the user profile with all fields in a single update
+    // Update the user profile with Quidax ID and referral code
+    console.log('[Signup] Updating user profile with Quidax ID and referral code');
     const { error: profileError } = await supabase
       .from('user_profiles')
-      .upsert({
-        user_id: signUpData.user!.id,
-        first_name: firstName,
-        last_name: lastName || '',
-        full_name: `${firstName} ${lastName || ''}`.trim(),
-        email: email,
-        referral_code: newReferralCode,
-        referred_by: referralCode || null,
+      .update({
         quidax_id: quidaxId,
         quidax_sn: quidaxId,
-        role: 'user',
-        kyc_level: 'basic',
-        kyc_verified: false,
-        two_factor_enabled: false,
-        total_referrals: 0,
-        active_referrals: 0,
-        referral_earnings: 0,
-        pending_earnings: 0,
-        completed_trades: 0,
-        completion_rate: 100,
-        trading_volume_usd: 0,
-        monthly_volume_usd: 0,
-        daily_volume_usd: 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        referral_code: newReferralCode,
+        referred_by: referralCode || null,
         verification_history: {
           email: true,
           phone: false,
           basic_info: false
         }
       })
-      .eq('user_id', signUpData.user!.id);
+      .eq('user_id', signUpData.user.id);
 
     if (profileError) {
-      console.error('Error updating user profile:', profileError);
+      console.error('[Signup] Error updating user profile:', profileError);
       return NextResponse.json(
         { error: 'Failed to update user profile', details: profileError.message },
-        { status: 500 }
-      );
-    }
-
-    // Verify the profile was updated with Quidax ID
-    const { data: verifyProfile, error: verifyError } = await supabase
-      .from('user_profiles')
-      .select('quidax_id')
-      .eq('user_id', signUpData.user!.id)
-      .single();
-
-    if (verifyError || !verifyProfile?.quidax_id) {
-      console.error('Profile verification failed:', {
-        error: verifyError,
-        profile: verifyProfile,
-        userId: signUpData.user!.id
-      });
-      return NextResponse.json(
-        { error: 'Failed to verify profile update' },
         { status: 500 }
       );
     }

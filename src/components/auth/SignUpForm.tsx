@@ -68,46 +68,107 @@ export function SignUpForm() {
         title: "Terms & Conditions",
         description: "Please accept the Terms of Service and Privacy Policy to continue.",
         variant: "destructive",
+        className: "bg-red-500/90 text-white border-red-600"
       });
       return;
     }
 
     try {
       setIsLoading(true);
+      console.log('[Signup Debug Frontend] Starting signup process with data:', {
+        email: data.email,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        hasReferral: !!data.referralCode
+      });
+
+      // Check if user is already signed in
+      const { data: session } = await supabase.auth.getSession();
+      if (session?.session) {
+        console.log('[Signup Debug Frontend] User already has a session, redirecting to dashboard');
+        router.push('/dashboard');
+        return;
+      }
       
+      console.log('[Signup Debug Frontend] Making signup request to /api/auth/signup');
       const response = await fetch('/api/auth/signup', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify(data)
       });
 
+      console.log('[Signup Debug Frontend] Signup response status:', response.status);
       const result = await response.json();
+      console.log('[Signup Debug Frontend] Signup response data:', result);
 
       if (!response.ok) {
+        // Handle specific error cases
+        if (result.error === 'Email address is already registered') {
+          throw new Error('This email address is already registered. Please try logging in instead.');
+        }
         throw new Error(result.error || 'Failed to sign up');
       }
 
+      // Show success toast
       toast({
-        title: "Success",
-        description: "Your account has been created successfully.",
-        className: "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-600 dark:text-green-400"
+        title: "Account Created",
+        description: "Your account has been created successfully. Setting up your wallets...",
+        className: "bg-green-500/90 text-white border-green-600"
       });
 
+      // Wait for session to be established
+      console.log('[Signup Debug Frontend] Waiting for session to be established');
+      let retries = 0;
+      const maxRetries = 5;
+      let sessionEstablished = false;
+
+      while (retries < maxRetries && !sessionEstablished) {
+        const { data: newSession } = await supabase.auth.getSession();
+        console.log('[Signup Debug Frontend] Session check attempt', retries + 1, ':', !!newSession?.session);
+        if (newSession?.session) {
+          sessionEstablished = true;
+        } else {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          retries++;
+        }
+      }
+
+      if (!sessionEstablished) {
+        throw new Error('Failed to establish session. Please try logging in.');
+      }
+
       // Force a router refresh to update auth state
+      console.log('[Signup Debug Frontend] Session established, refreshing router');
       router.refresh();
       
-      // Small delay to ensure auth state is updated
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Show welcome toast
+      toast({
+        title: "Welcome to trustBank!",
+        description: "Your account is ready. Redirecting to dashboard...",
+        className: "bg-green-500/90 text-white border-green-600"
+      });
+
+      // Final delay before redirect
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Redirect to dashboard
+      console.log('[Signup Debug Frontend] Redirecting to dashboard');
       router.push('/dashboard');
     } catch (error) {
-      console.error('Signup error:', error);
+      console.error('[Signup Debug Frontend] Error:', error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Something went wrong",
         variant: "destructive",
+        className: "bg-red-500/90 text-white border-red-600"
       });
+
+      // If there was an error, try to clear any partial session
+      console.log('[Signup Debug Frontend] Clearing any partial session');
+      await supabase.auth.signOut();
     } finally {
       setIsLoading(false);
     }
@@ -295,16 +356,19 @@ export function SignUpForm() {
                 />
               </div>
 
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg border">
                 <input
                   type="checkbox"
                   id="terms"
                   checked={termsAccepted}
                   onChange={(e) => setTermsAccepted(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-600 focus:ring-offset-0 focus:ring-1"
+                  className="h-4 w-4 rounded border-2 border-gray-300 dark:border-gray-600 
+                    text-green-600 focus:ring-green-600 focus:ring-offset-0 focus:ring-2 
+                    checked:bg-green-600 checked:border-green-600 
+                    hover:border-green-500 transition-colors cursor-pointer"
                   required
                 />
-                <label htmlFor="terms" className="text-sm text-muted-foreground">
+                <label htmlFor="terms" className="text-sm text-muted-foreground cursor-pointer select-none">
                   I agree to trustBank's{" "}
                   <Link href="/legal/privacy" className="text-green-600 hover:text-green-700">
                     Privacy Policy

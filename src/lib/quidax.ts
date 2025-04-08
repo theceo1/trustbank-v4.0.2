@@ -214,6 +214,11 @@ export class QuidaxService {
     });
   }
 
+  async deleteSubAccount(subAccountId: string): Promise<void> {
+    const response = await this.client.delete(`/sub_accounts/${subAccountId}`);
+    return response.data;
+  }
+
   // Market Data
   async getOrderBook(market: string, askLimit = 20, bidsLimit = 20): Promise<any> {
     return this.requestWithRetry(`/markets/${market}/order_book?ask_limit=${askLimit}&bids_limit=${bidsLimit}`, {

@@ -103,7 +103,7 @@ const PUBLIC_PATHS = [
   '/api/auth/test-token',
   '/api/auth/callback',
   '/api/auth/sign-in',
-  '/api/auth/sign-up',
+  '/api/auth/signup',
   '/api/markets/overview',
   '/api/markets/tickers',
   '/api/markets/rate',

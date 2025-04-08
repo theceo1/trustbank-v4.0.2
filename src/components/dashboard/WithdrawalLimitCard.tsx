@@ -5,11 +5,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatNumber } from '@/lib/utils';
 
+// Use the same withdrawal limits as defined in KYC tiers
 const WITHDRAWAL_LIMITS = {
   NONE: 0,            // No KYC
-  BASIC: 1000,        // Basic KYC - $1,000 limit
-  INTERMEDIATE: 10000, // Intermediate KYC - $10,000 limit
-  ADVANCED: 100000    // Advanced KYC - $100,000 limit
+  BASIC: 200,         // Basic KYC - $200 limit
+  INTERMEDIATE: 5000,  // Intermediate KYC - $5,000 limit
+  ADVANCED: 20000,    // Advanced KYC - $20,000 limit
+  PREMIUM: 100000     // Premium KYC - $100,000 limit
 };
 
 interface WithdrawalLimitCardProps {
@@ -33,14 +35,14 @@ export function WithdrawalLimitCard({ hasBasicKyc, hasIntermediateKyc, hasAdvanc
   const formatWithdrawalLimit = () => {
     const limit = getWithdrawalLimit();
     if (withdrawalCurrency === 'NGN') {
-      // Use flat rate of 1600 NGN = 1 USD
+      // Use flat rate of 1600 NGN = 1 USD for display only
       return formatNumber(limit * 1600, { style: 'currency', currency: 'NGN' });
     }
     return formatNumber(limit, { style: 'currency', currency: 'USD' });
   };
 
   return (
-    <Card className="bg-[#3E2723] text-amber-100">
+    <Card className="bg-gradient-to-br from-amber-900/90 to-amber-800/90 text-amber-100">
       <CardContent className="p-6">
         <div className="flex justify-between items-start mb-4">
           <div>
@@ -51,12 +53,12 @@ export function WithdrawalLimitCard({ hasBasicKyc, hasIntermediateKyc, hasAdvanc
             value={withdrawalCurrency} 
             onValueChange={(value: 'USD' | 'NGN') => setWithdrawalCurrency(value)}
           >
-            <SelectTrigger className="w-[80px] h-8 bg-amber-900/50">
+            <SelectTrigger className="w-[80px] h-8 bg-amber-900/50 border-amber-700/50 text-amber-100">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="USD">USD</SelectItem>
-              <SelectItem value="NGN">NGN</SelectItem>
+            <SelectContent className="bg-amber-900 border-amber-700">
+              <SelectItem value="USD" className="text-amber-100 hover:bg-amber-800 focus:bg-amber-800">USD</SelectItem>
+              <SelectItem value="NGN" className="text-amber-100 hover:bg-amber-800 focus:bg-amber-800">NGN</SelectItem>
             </SelectContent>
           </Select>
         </div>
