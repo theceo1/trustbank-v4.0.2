@@ -647,7 +647,7 @@ export default function ClientKYCPage({ initialProfile }: ClientKYCPageProps) {
                           <div className="flex justify-between mb-1">
                             <span>{label}:</span>
                             <span className="font-medium group-hover:text-green-600 transition-colors">
-                              {formatCurrency(value, 'NGN')}
+                              {formatCurrency(value, 'USD')}
                             </span>
                           </div>
                           <Progress 
