@@ -17,8 +17,8 @@ import {
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 
-const MotionLink = motion.create(Link);
-const MotionDiv = motion.create('div');
+const MotionLink = motion(Link);
+const MotionDiv = motion.div;
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -40,6 +40,11 @@ export default function TradeLayout({
   children: ReactNode;
 }) {
   const pathname = usePathname();
+
+  // If we're on the guide page, return just the children without the layout
+  if (pathname === '/trade/guide') {
+    return children;
+  }
 
   const tradingOptions = [
     {
@@ -100,10 +105,10 @@ export default function TradeLayout({
           
           <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
             <div className="flex-1">
-              <h1 className="text-3xl font-bold text-white mb-3 bg-clip-text text-transparent bg-gradient-to-r from-white to-white/90">
+              <h1 className="text-lg font-bold text-green-600 mb-3 bg-clip-text text-transparent bg-gradient-to-r from-white to-white/90">
                 Welcome to trustBank Trading
               </h1>
-              <p className="text-slate-300 max-w-3xl text-base">
+              <p className="text-slate-200 max-w-3xl text-base">
                 Experience seamless trading with our advanced platform. Choose from multiple trading options
                 and enjoy competitive rates with top-notch security.
               </p>

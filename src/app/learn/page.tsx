@@ -10,6 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Badge } from '@/components/ui/badge';
 import { BarChart, BookOpen, Clock, Lock, Rocket, Target, Users } from 'lucide-react';
 import Link from 'next/link';
+import { useAuth } from '@/hooks/useAuth';
+import { useProfile } from '@/hooks/useProfile';
 
 interface CourseModule {
   title: string;
@@ -161,6 +163,31 @@ const courses = [
 export default function TradingAcademy() {
   const [showDialog, setShowDialog] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState<CourseModule | null>(null);
+  const { user } = useAuth();
+  const { profile } = useProfile();
+
+  const getCallToActionProps = () => {
+    if (!user) {
+      return {
+        href: '/auth/signup',
+        text: 'Create Free Account'
+      };
+    }
+
+    // If user hasn't completed their profile setup or Quidax ID isn't set
+    if (!profile?.quidax_id) {
+      return {
+        href: '/kyc',
+        text: 'Complete Profile'
+      };
+    }
+
+    // Direct to dashboard where they can see their learning progress
+    return {
+      href: '/dashboard',
+      text: 'Continue Learning'
+    };
+  };
 
   const handleStartCourse = (course: CourseModule) => {
     setSelectedCourse(course);
@@ -180,9 +207,13 @@ export default function TradingAcademy() {
         </motion.div>
 
         <Tabs defaultValue="beginner" className="space-y-8">
-          <TabsList className="flex justify-center">
+          <TabsList className="flex justify-center bg-background border-2 p-1">
             {courses.map((course: CourseLevel) => (
-              <TabsTrigger key={course.level.toLowerCase()} value={course.level.toLowerCase()}>
+              <TabsTrigger 
+                key={course.level.toLowerCase()} 
+                value={course.level.toLowerCase()}
+                className="data-[state=active]:bg-green-600 data-[state=active]:text-white transition-colors"
+              >
                 <div className="flex items-center gap-2">
                   {course.icon}
                   {course.level}
@@ -201,7 +232,7 @@ export default function TradingAcademy() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: moduleIndex * 0.2 }}
                   >
-                    <Card>
+                    <Card className="hover:shadow-lg transition-shadow duration-300">
                       <div className="p-6">
                         <div className="flex justify-between items-start mb-4">
                           <div className="flex items-center gap-2">
@@ -209,7 +240,7 @@ export default function TradingAcademy() {
                             <h3 className="font-semibold text-lg">{module.title}</h3>
                           </div>
                           {module.certification && (
-                            <Badge variant="outline" className="bg-green-500/10">
+                            <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-200">
                               Certificate
                             </Badge>
                           )}
@@ -246,6 +277,9 @@ export default function TradingAcademy() {
                             {module.duration}
                           </span>
                           <Button 
+                            className={module.progress === 0 
+                              ? "hover:bg-green-600 hover:text-white transition-colors" 
+                              : "bg-green-600 hover:bg-green-700 text-white"}
                             variant={module.progress === 0 ? "outline" : "default"}
                             onClick={() => handleStartCourse(module)}
                           >
@@ -262,31 +296,31 @@ export default function TradingAcademy() {
         </Tabs>
 
         <Dialog open={showDialog} onOpenChange={setShowDialog}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-md bg-orange-50 dark:bg-orange-950 border-2 border-orange-200 dark:border-orange-800">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Rocket className="w-5 h-5 text-green-600" />
+              <DialogTitle className="flex items-center gap-2 text-orange-800 dark:text-orange-200">
+                <Rocket className="w-5 h-5 text-orange-600" />
                 Coming Soon!
               </DialogTitle>
               <DialogDescription asChild>
                 <div className="space-y-4 pt-4">
-                  <div className="text-sm text-muted-foreground">
+                  <div className="text-sm text-orange-800/80 dark:text-orange-200/80">
                     We&apos;re currently crafting an exceptional learning experience for {selectedCourse?.title}. Our team of experts is developing comprehensive, easy-to-follow content that will help you master cryptocurrency trading.
                   </div>
                   
-                  <div className="bg-green-500/10 p-4 rounded-lg">
-                    <h4 className="font-semibold mb-2">While you wait:</h4>
+                  <div className="bg-orange-100 dark:bg-orange-900/50 p-4 rounded-lg border border-orange-200 dark:border-orange-800">
+                    <h4 className="font-semibold mb-2 text-orange-800 dark:text-orange-200">While you wait:</h4>
                     <ul className="space-y-2">
-                      <li className="flex items-center gap-2">
-                        <Users className="w-4 h-4 text-green-600" />
+                      <li className="flex items-center gap-2 text-orange-700 dark:text-orange-300">
+                        <Users className="w-4 h-4 text-orange-600" />
                         Join our trading community
                       </li>
-                      <li className="flex items-center gap-2">
-                        <Target className="w-4 h-4 text-green-600" />
+                      <li className="flex items-center gap-2 text-orange-700 dark:text-orange-300">
+                        <Target className="w-4 h-4 text-orange-600" />
                         Practice with our demo account
                       </li>
-                      <li className="flex items-center gap-2">
-                        <BookOpen className="w-4 h-4 text-green-600" />
+                      <li className="flex items-center gap-2 text-orange-700 dark:text-orange-300">
+                        <BookOpen className="w-4 h-4 text-orange-600" />
                         Browse our knowledge base
                       </li>
                     </ul>
@@ -296,11 +330,20 @@ export default function TradingAcademy() {
             </DialogHeader>
 
             <DialogFooter className="flex-col sm:flex-row gap-3">
-              <Button variant="outline" onClick={() => setShowDialog(false)}>
+              <Button 
+                variant="outline" 
+                onClick={() => setShowDialog(false)}
+                className="border-orange-300 dark:border-orange-700 hover:bg-orange-100 dark:hover:bg-orange-900"
+              >
                 Close
               </Button>
-              <Button asChild>
-                <Link href="/auth/signup">Create Free Account</Link>
+              <Button 
+                asChild
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                <Link href={getCallToActionProps().href}>
+                  {getCallToActionProps().text}
+                </Link>
               </Button>
             </DialogFooter>
           </DialogContent>

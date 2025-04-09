@@ -15,22 +15,22 @@ const stats = [
   { 
     value: '1.4B', 
     label: 'Unbanked Adults Globally',
-    description: 'People without access to basic financial services'
+    description: 'People without access to basic financial services.'
   },
   { 
     value: '57%', 
     label: 'Mobile Internet Users',
-    description: 'In emerging markets with potential crypto access'
+    description: 'In emerging markets with potential crypto access.'
   },
   { 
     value: '$500B+', 
     label: 'Remittance Market',
-    description: 'Annual cross-border payments in emerging markets'
+    description: 'Annual cross-border payments in emerging markets.'
   },
   { 
     value: '95%', 
     label: 'Transaction Cost Reduction',
-    description: 'Potential savings using crypto vs traditional methods'
+    description: 'Potential savings using crypto vs traditional methods.'
   },
 ];
 
@@ -60,17 +60,17 @@ const impactAreas = [
 const challenges = [
   {
     title: "Limited Banking Access",
-    description: "2.5 billion people in emerging markets lack access to traditional banking",
+    description: "2.5 billion people in emerging markets lack access to traditional banking.",
     solution: "Mobile-first crypto solutions"
   },
   {
     title: "High Transaction Costs",
-    description: "Average remittance fees of 6.5% eat into crucial family support",
+    description: "Average remittance fees of 6.5% eat into crucial family support.",
     solution: "Near-zero crypto transfer fees"
   },
   {
     title: "Financial Education",
-    description: "65% of adults in developing economies are financially illiterate",
+    description: "65% of adults in developing economies are financially illiterate.",
     solution: "Built-in learning resources"
   }
 ];
@@ -128,7 +128,7 @@ export default function MissionPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50/50 to-blue-50/50 dark:from-green-950/50 dark:to-blue-950/50">
-      <div className="container mx-auto py-16 px-4 sm:px-6 lg:px-8">
+      <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -136,7 +136,7 @@ export default function MissionPage() {
           className="text-center mb-10"
         >
           <Badge variant="outline" className="mb-4">Our Mission</Badge>
-          <h1 className="text-lg md:text-2xl font-bold mb-6 bg-gradient-to-r from-green-600 to-green-400 bg-clip-text text-transparent">
+          <h1 className="text-lg md:text-2xl font-bold mb-4 bg-gradient-to-r from-green-600 to-green-400 bg-clip-text text-transparent">
             Simplifying Crypto Adoption
           </h1>
           <p className="text-sm text-muted-foreground max-w-2xl mx-auto">

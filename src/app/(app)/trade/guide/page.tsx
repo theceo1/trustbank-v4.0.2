@@ -110,7 +110,7 @@ const VOLUME_TIERS = {
 export default function TradingGuidePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50/50 via-white to-green-50/50 dark:from-green-950/50 dark:via-background dark:to-green-950/50">
-      <div className="container mx-auto py-12 px-4 sm:px-6 lg:px-8 space-y-8">
+      <div className="container mx-auto py-4 px-4 sm:px-6 lg:px-8 space-y-8">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -118,7 +118,7 @@ export default function TradingGuidePage() {
           className="text-center space-y-4"
         >
           <h1 className="text-lg font-bold sm:text-2xl md:text-3xl">
-            <span className="bg-gradient-to-r from-green-600 to-green-500 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-green-600 to-green-400 bg-clip-text text-transparent">
               Trading Tiers
             </span>
           </h1>

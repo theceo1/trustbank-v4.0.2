@@ -1,65 +1,85 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useToast } from "@/components/ui/use-toast";
-import { Loader2 } from "lucide-react";
-import type { Database } from '@/types/database';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Loader2 } from "lucide-react";
 
 export default function PhoneVerificationPage() {
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
   const [phone, setPhone] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
-  const supabase = createClientComponentClient<Database>();
   const router = useRouter();
   const { toast } = useToast();
+  const supabase = createClientComponentClient();
 
-  useEffect(() => {
-    const getUser = async () => {
-      try {
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
-        setUser(currentUser);
-        if (currentUser?.phone) {
-          setPhone(currentUser.phone);
-        }
-      } catch (error) {
-        console.error('Error getting user:', error);
-        toast({
-          title: "Error",
-          description: "Failed to get user information. Please try again.",
-          variant: "destructive"
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    getUser();
-  }, [supabase.auth, toast]);
-
-  const handleUpdatePhone = async () => {
-    if (!user || !phone) return;
-
+  const updatePhone = async (phoneNumber: string) => {
     try {
       setIsUpdating(true);
-      const { error } = await supabase.auth.updateUser({ phone });
+      console.log('[Phone Verification] Starting phone update...');
       
-      if (error) throw error;
+      // Format phone number to standard format
+      let formattedPhone = phoneNumber;
+      if (!phoneNumber.startsWith('+')) {
+        // If number starts with 0, replace with +234
+        if (phoneNumber.startsWith('0')) {
+          formattedPhone = '+234' + phoneNumber.slice(1);
+        } else {
+          // If number doesn't start with 0, just add +234
+          formattedPhone = '+234' + phoneNumber;
+        }
+      }
+      console.log('[Phone Verification] Formatted phone number:', formattedPhone);
+
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No user found');
+
+      // Get current verification history
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('verification_history')
+        .eq('user_id', user.id)
+        .single();
+
+      console.log('[Phone Verification] Current verification history:', profile?.verification_history);
+
+      // Update verification history with phone status
+      const verificationHistory = {
+        ...(profile?.verification_history || {}),
+        phone: true
+      };
+
+      console.log('[Phone Verification] Updated verification history:', verificationHistory);
+
+      // Update phone number and verification history
+      const { error: updateError } = await supabase
+        .from('user_profiles')
+        .update({ 
+          phone_number: formattedPhone,
+          verification_history: verificationHistory,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id);
+
+      if (updateError) throw updateError;
+
+      console.log('[Phone Verification] Successfully updated profile');
 
       toast({
-        title: "Verification Code Sent",
-        description: "Please check your phone for the verification code.",
+        title: "Success",
+        description: "Phone number updated successfully!",
+        className: "bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-800 text-green-600 dark:text-green-400"
       });
 
-      router.push('/profile/security');
+      // Redirect to KYC page
+      router.push('/kyc');
     } catch (error) {
-      console.error('Error updating phone:', error);
+      console.error('[Phone Verification] Error:', error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to update phone number",
@@ -70,26 +90,13 @@ export default function PhoneVerificationPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-[200px]">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    router.push('/auth/login');
-    return null;
-  }
-
   return (
     <div className="container mx-auto px-4 py-8 max-w-lg">
       <Card>
         <CardHeader>
-          <CardTitle>Update Phone Number</CardTitle>
+          <CardTitle>Phone Number Update</CardTitle>
           <CardDescription>
-            Enter your phone number. You'll need to verify it with a code sent via SMS.
+            Enter your phone number to continue with verification.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -100,17 +107,21 @@ export default function PhoneVerificationPage() {
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="Enter your phone number"
+              placeholder="Enter your phone number (e.g., 08012345678)"
+              disabled={isUpdating}
             />
+            <p className="text-sm text-muted-foreground">
+              Format: 08012345678 or 8012345678
+            </p>
           </div>
 
           <Button
-            className="w-full"
-            onClick={handleUpdatePhone}
-            disabled={isUpdating || !phone || phone === user.phone}
+            className="w-full bg-green-600 hover:bg-green-700"
+            onClick={() => updatePhone(phone)}
+            disabled={isUpdating || !phone}
           >
             {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Update Phone
+            Update Phone Number
           </Button>
         </CardContent>
       </Card>

@@ -426,7 +426,7 @@ export default function FAQPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50/50 to-blue-50/50 dark:from-green-950/50 dark:to-blue-950/50">
-      <div className="container mx-auto py-16 px-4 sm:px-6 lg:px-8">
+      <div className="container mx-auto py-4 px-4 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

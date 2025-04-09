@@ -61,35 +61,35 @@ export default function FeaturesPage() {
           name: 'Instant Trades',
           description: 'Execute trades instantly with competitive rates and minimal slippage. Access deep liquidity pools and get the best prices.',
           enabled: true,
-          icon: <Zap className="h-5 w-5" />
+          icon: <Zap className="h-3 w-3" />
         },
         {
           id: 'limit-orders',
           name: 'Advanced Trading',
           description: 'Place limit, stop-loss, and take-profit orders. Use advanced charting tools and technical indicators.',
           enabled: true,
-          icon: <BarChart3 className="h-5 w-5" />
+          icon: <BarChart3 className="h-3 w-3" />
         },
         {
           id: 'p2p-trading',
           name: 'P2P Trading',
           description: 'Trade directly with other users using your preferred payment methods. Enjoy secure escrow service and dispute resolution.',
           enabled: true,
-          icon: <Users className="h-5 w-5" />
+          icon: <Users className="h-3 w-3" />
         },
         {
           id: 'fiat-gateway',
           name: 'Fiat Gateway',
           description: 'Deposit and withdraw using local currency. Support for bank transfers, cards, and mobile money.',
           enabled: true,
-          icon: <Landmark className="h-5 w-5" />
+          icon: <Landmark className="h-3 w-3" />
         },
         {
           id: 'referral-program',
           name: 'Referral Program',
           description: 'Earn up to 40% commission on trading fees. Track referrals and earnings in real-time.',
           enabled: true,
-          icon: <Gift className="h-5 w-5" />
+          icon: <Gift className="h-3 w-3" />
         },
         // Coming Soon Features
         {
@@ -97,7 +97,7 @@ export default function FeaturesPage() {
           name: 'Mobile Trading',
           description: 'Trade on the go with our mobile apps. Get real-time price alerts and portfolio updates.',
           enabled: false,
-          icon: <Smartphone className="h-5 w-5" />,
+          icon: <Smartphone className="h-3 w-3" />,
           comingSoon: {
             date: '2025 Q2',
             progress: 45
@@ -108,7 +108,7 @@ export default function FeaturesPage() {
           name: 'trustCard',
           description: 'Your crypto-backed debit card with up to 5% cashback. Spend crypto anywhere Visa is accepted.',
           enabled: false,
-          icon: <CreditCard className="h-5 w-5" />,
+          icon: <CreditCard className="h-3 w-3" />,
           comingSoon: {
             date: '2025 Q3',
             progress: 35
@@ -119,7 +119,7 @@ export default function FeaturesPage() {
           name: 'OTC Trading',
           description: 'Dedicated desk for trades above $100,000. Personalized service and competitive rates.',
           enabled: false,
-          icon: <Gem className="h-5 w-5" />,
+          icon: <Gem className="h-3 w-3" />,
           comingSoon: {
             date: '2025 Q3',
             progress: 30
@@ -130,7 +130,7 @@ export default function FeaturesPage() {
           name: 'Margin Trading',
           description: 'Trade with up to 10x leverage. Access cross-margin and isolated margin accounts.',
           enabled: false,
-          icon: <Percent className="h-5 w-5" />,
+          icon: <Percent className="h-3 w-3" />,
           comingSoon: {
             date: '2025 Q4',
             progress: 25
@@ -141,7 +141,7 @@ export default function FeaturesPage() {
           name: 'Crypto Savings',
           description: 'Earn up to 12% APY on your crypto. Choose between flexible and fixed-term deposits.',
           enabled: false,
-          icon: <PiggyBank className="h-5 w-5" />,
+          icon: <PiggyBank className="h-3 w-3" />,
           comingSoon: {
             date: '2025 Q4',
             progress: 20
@@ -152,7 +152,7 @@ export default function FeaturesPage() {
           name: 'Staking',
           description: 'Earn passive income by staking PoS tokens. Automated rewards distribution.',
           enabled: false,
-          icon: <CoinsIcon className="h-5 w-5" />,
+          icon: <CoinsIcon className="h-3 w-3" />,
           comingSoon: {
             date: '2025 Q4',
             progress: 15
@@ -163,7 +163,7 @@ export default function FeaturesPage() {
           name: 'Global Remittance',
           description: 'Send money globally with near-zero fees using stablecoins. Instant settlement.',
           enabled: false,
-          icon: <Globe className="h-5 w-5" />,
+          icon: <Globe className="h-3 w-3" />,
           comingSoon: {
             date: '2025 Q4',
             progress: 10
@@ -229,19 +229,19 @@ export default function FeaturesPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50/50 to-blue-50/50 dark:from-green-950/50 dark:to-blue-950/50">
-      <main className="container mx-auto px-4 py-16">
+      <main className="container mx-auto px-4 py-4">
         {/* Header with Animation */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="text-center mb-16"
+          className="text-center mb-8"
         >
-          <h1 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-green-600 to-green-400 bg-clip-text text-transparent">
+          <h1 className="text-lg md:text-2xl font-bold mb-6 bg-gradient-to-r from-green-600 to-green-400 bg-clip-text text-transparent">
             Platform Features
           </h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Discover the powerful features that make trustBank your trusted crypto trading platform
+          <p className="text-sm text-muted-foreground max-w-2xl mx-auto">
+            Discover the powerful features that make trustBank your trusted crypto ecosystem.
           </p>
         </motion.div>
 
@@ -250,7 +250,7 @@ export default function FeaturesPage() {
           <section className="mb-16">
             <div className="flex items-center gap-2 mb-8">
               <Sparkles className="h-6 w-6 text-green-600" />
-              <h2 className="text-3xl font-semibold">Available Features</h2>
+              <h2 className="text-lg font-semibold">Available Features</h2>
             </div>
             <motion.div
               variants={container}
@@ -296,7 +296,7 @@ export default function FeaturesPage() {
           <section>
             <div className="flex items-center gap-2 mb-8">
               <Clock className="h-6 w-6 text-blue-600" />
-              <h2 className="text-3xl font-semibold">Coming Soon</h2>
+              <h2 className="text-lg font-semibold">Coming Soon</h2>
             </div>
             <motion.div
               variants={container}

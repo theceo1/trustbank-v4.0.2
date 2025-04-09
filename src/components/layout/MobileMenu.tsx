@@ -123,7 +123,7 @@ export function MobileMenu({
             {/* User Account Section */}
             {!loading && user && (
               <div className="space-y-3 pt-3 border-t border-border">
-                <div className="px-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <div className="px-4 text-xs text-orange-300 font-medium text-muted-foreground uppercase tracking-wider">
                   Account
                 </div>
                 <div className="space-y-1">
@@ -141,7 +141,7 @@ export function MobileMenu({
                     onClick={onClose}
                     data-active={window.location.pathname === '/kyc'}
                   >
-                    KYC Verification
+                    KYC
                   </Link>
                   <Link
                     href="/profile/wallet"
@@ -173,7 +173,7 @@ export function MobileMenu({
 
             {/* About Section */}
             <div className="space-y-3 pt-3 border-t border-border">
-              <div className="px-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              <div className="px-4 text-xs text-orange-300 font-medium text-muted-foreground uppercase tracking-wider">
                 About
               </div>
               <div className="space-y-1">

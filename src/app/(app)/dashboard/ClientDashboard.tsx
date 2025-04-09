@@ -99,7 +99,7 @@ export default function ClientDashboard({
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
         <svg
-          className="animate-spin h-8 w-8 text-green-500"
+          className="animate-spin h-8 w-8 text-green-600"
           xmlns="http://www.w3.org/2000/svg"
           fill="none"
           viewBox="0 0 24 24"
@@ -127,7 +127,7 @@ export default function ClientDashboard({
     <div className="space-y-6">
       <div className="space-y-8">
         {/* Dashboard Header */}
-        <div className="py-8 border-b">
+        <div className="border-b">
           <h1 className="text-xl font-bold tracking-tight mb-2">Dashboard</h1>
           <p className="text-muted-foreground text-sm italic">
             Welcome back! Here's an overview of your account and quick actions.

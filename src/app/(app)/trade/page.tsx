@@ -762,14 +762,6 @@ export default function TradePage() {
 
   return (
     <div className="container mx-auto px-4 sm:px-6 space-y-8">
-      {/* Header Section */}
-      <div className="py-8 border-b">
-        <h1 className="text-2xl font-bold tracking-tight mb-2">Welcome to trustBank Trading</h1>
-        <p className="text-muted-foreground">
-          Experience seamless trading with our advanced platform. Choose from multiple trading options and enjoy competitive rates with top-notch security.
-        </p>
-      </div>
-
       {/* KYC Banner */}
       {!hasBasicKyc && (
         <Alert className="border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20">

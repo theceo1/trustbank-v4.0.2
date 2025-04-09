@@ -276,7 +276,7 @@ export function Header() {
                         href="/kyc" 
                         className={pathname === '/kyc' ? 'text-green-600' : ''}
                       >
-                        KYC Verification
+                        KYC
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>

@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, ChevronDown } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import { useProfile } from '@/hooks/useProfile';
 
 interface BackgroundElement {
   width: number;
@@ -16,6 +18,8 @@ interface BackgroundElement {
 
 export function HeroSection() {
   const [backgroundElements, setBackgroundElements] = useState<BackgroundElement[]>([]);
+  const { user } = useAuth();
+  const { profile } = useProfile();
 
   useEffect(() => {
     const elements: BackgroundElement[] = Array.from({ length: 20 }, () => ({
@@ -28,12 +32,37 @@ export function HeroSection() {
     setBackgroundElements(elements);
   }, []);
 
+  const getCallToActionProps = () => {
+    if (!user) {
+      return {
+        href: '/auth/signup',
+        text: 'Start Your Journey'
+      };
+    }
+
+    // If user hasn't completed their profile setup
+    if (!profile?.quidax_id) {
+      return {
+        href: '/kyc',
+        text: 'Complete Your Profile'
+      };
+    }
+
+    // If user hasn't started any courses, direct them to academy
+    return {
+      href: '/trade',
+      text: 'Start Trading'
+    };
+  };
+
   const scrollToNextSection = () => {
     window.scrollTo({
       top: window.innerHeight,
       behavior: 'smooth'
     });
   };
+
+  const { href, text } = getCallToActionProps();
 
   return (
     <div className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-gradient-to-b from-background to-green-50/20 dark:to-green-950/20">
@@ -109,8 +138,8 @@ export function HeroSection() {
             transition={{ delay: 1.5 }}
           >
             <Button asChild size="lg" className="bg-green-600 hover:bg-green-300 text-white hover:text-black mt-16">
-              <Link href="/auth/signup" className="flex items-center gap-2">
-                Start Your Journey <ArrowRight className="w-4 h-4" />
+              <Link href={href} className="flex items-center gap-2">
+                {text} <ArrowRight className="w-4 h-4" />
               </Link>
             </Button>
           </motion.div>

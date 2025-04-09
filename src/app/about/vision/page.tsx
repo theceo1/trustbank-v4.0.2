@@ -151,7 +151,7 @@ export default function VisionPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50/50 to-blue-50/50 dark:from-green-950/50 dark:to-blue-950/50">
-      <div className="container mx-auto py-16 px-4 sm:px-6 lg:px-8">
+      <div className="container mx-auto py-6 px-4 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -159,7 +159,7 @@ export default function VisionPage() {
           className="text-center mb-16"
         >
           <Badge variant="outline" className="mb-4">Our Vision</Badge>
-          <h1 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-green-600 to-green-400 bg-clip-text text-transparent">
+          <h1 className="text-lg md:text-2xl font-bold mb-2 bg-gradient-to-r from-green-600 to-green-400 bg-clip-text text-transparent">
             The Future of Finance
           </h1>
           <p className="text-sm text-muted-foreground max-w-2xl mx-auto">
