@@ -360,7 +360,7 @@ export function Footer() {
           </div>
 
           <div className="flex items-center gap-6 text-sm text-muted-foreground order-3">
-            <Link href="/profile/security" className="hover:text-green-600">Security</Link>
+            <Link href="/profile/security/2fa" className="hover:text-green-600">Security</Link>
           </div>
         </div>
       </div>

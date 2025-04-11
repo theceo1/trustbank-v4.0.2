@@ -289,8 +289,8 @@ export function Header() {
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
                       <Link 
-                        href="/profile/security" 
-                        className={pathname === '/profile/security' ? 'text-green-600' : ''}
+                        href="/profile/security/2fa" 
+                        className={pathname === '/profile/security/2fa' ? 'text-green-600' : ''}
                       >
                         Security
                       </Link>

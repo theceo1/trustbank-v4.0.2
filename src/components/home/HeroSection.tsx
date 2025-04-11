@@ -129,7 +129,7 @@ export function HeroSection() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.8 }}
           >
-            ❝Innovative solutions at the intersection of tech and finance by simplifying crypto and amplifying possibilities.❞
+            ❝simplifying crypto, amplifying possibilities.❞
           </motion.p>
           
           <motion.div
