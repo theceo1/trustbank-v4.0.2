@@ -35,17 +35,17 @@ const contactInfo = [
 const socialLinks = [
   { 
     icon: <Twitter className="h-5 w-5" />, 
-    href: "https://twitter.com/trustBanktech",
+    href: "https://twitter.com/trustbanktech",
     color: "hover:text-blue-400"
   },
   { 
     icon: <Instagram className="h-5 w-5" />, 
-    href: "https://instagram.com/trustBanktech",
+    href: "https://instagram.com/trustbank.tech",
     color: "hover:text-pink-500"
   },
   { 
     icon: <Facebook className="h-5 w-5" />, 
-    href: "https://facebook.com/trustBanktech",
+    href: "https://facebook.com/trustbanktech",
     color: "hover:text-blue-600"
   }
 ];
