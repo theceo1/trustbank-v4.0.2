@@ -86,8 +86,8 @@ const products = [
 const benefits = [
   {
     icon: <Globe className="h-6 w-6" />,
-    title: "Global Access",
-    description: "Available in 150+ countries"
+    title: "Multi-Currency Support",
+    description: "80+ cryptocurrencies available"
   },
   {
     icon: <Shield className="h-6 w-6" />,
