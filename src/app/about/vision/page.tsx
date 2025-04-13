@@ -200,7 +200,11 @@ export default function VisionPage() {
           <Tabs value={activeProduct} onValueChange={setActiveProduct}>
             <TabsList className="grid grid-cols-2 md:grid-cols-4 mb-8">
               {products.map((product) => (
-                <TabsTrigger key={product.id} value={product.id} className="gap-2">
+                <TabsTrigger 
+                  key={product.id} 
+                  value={product.id} 
+                  className="gap-2 data-[state=active]:bg-green-600 data-[state=active]:text-white transition-colors"
+                >
                   {product.icon}
                   <span className="hidden md:inline">{product.title}</span>
                 </TabsTrigger>
@@ -307,4 +311,4 @@ export default function VisionPage() {
       </div>
     </div>
   );
-} 
+}
