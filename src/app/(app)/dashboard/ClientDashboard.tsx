@@ -128,7 +128,7 @@ export default function ClientDashboard({
       <div className="space-y-8">
         {/* Dashboard Header */}
         <div className="border-b">
-          <h1 className="text-xl font-bold tracking-tight mb-2">Dashboard</h1>
+          <h1 className="text-lg font-bold tracking-tight mb-2">Dashboard</h1>
           <p className="text-muted-foreground text-sm italic">
             Welcome back! Here's an overview of your account and quick actions.
           </p>
