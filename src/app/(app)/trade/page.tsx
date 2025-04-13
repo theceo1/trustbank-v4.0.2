@@ -795,17 +795,17 @@ export default function TradePage() {
               className="w-full"
               onValueChange={(value) => setTab(value as 'buy' | 'sell')}
             >
-              <TabsList className="grid w-full grid-cols-2 mb-8">
+              <TabsList className="grid w-full grid-cols-2 mb-8 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-1 rounded-xl shadow-lg">
                 <TabsTrigger 
                   value="buy" 
-                  className="data-[state=active]:bg-green-500 data-[state=active]:text-white"
+                  className="relative bg-gradient-to-br from-green-50 to-emerald-100 dark:from-green-900/20 dark:to-emerald-800/20 data-[state=active]:from-green-500 data-[state=active]:to-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:scale-[1.02] transition-all duration-200 rounded-lg"
                   disabled={!hasBasicKyc}
                 >
                   Buy Crypto
                 </TabsTrigger>
                 <TabsTrigger 
                   value="sell"
-                  className="data-[state=active]:bg-green-500 data-[state=active]:text-white"
+                  className="relative bg-gradient-to-br from-red-50 to-rose-100 dark:from-red-900/20 dark:to-rose-800/20 data-[state=active]:from-red-500 data-[state=active]:to-rose-600 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:scale-[1.02] transition-all duration-200 rounded-lg"
                   disabled={!hasBasicKyc}
                 >
                   Sell Crypto
@@ -1151,4 +1151,4 @@ export default function TradePage() {
       </Dialog>
     </div>
   );
-} 
+}
