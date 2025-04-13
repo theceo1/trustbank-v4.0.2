@@ -78,7 +78,7 @@ export function ReferralProgram({ stats }: ReferralProgramProps) {
     <div className="space-y-6">
       <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/50 dark:to-emerald-950/50 border-green-100 dark:border-green-900">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-2">
             <div className="space-y-1">
               <CardTitle className="flex items-center gap-2 text-xl">
                 <Users className="h-5 w-5 text-green-600" />
@@ -88,7 +88,7 @@ export function ReferralProgram({ stats }: ReferralProgramProps) {
                 Invite friends and earn rewards together
               </CardDescription>
             </div>
-            <Badge variant="outline" className="bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">
+            <Badge variant="outline" className="self-start sm:self-center bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 whitespace-nowrap">
               Tier {stats.totalReferrals >= 25 ? '3' : stats.totalReferrals >= 10 ? '2' : '1'}
             </Badge>
           </div>
@@ -248,4 +248,4 @@ export function ReferralProgram({ stats }: ReferralProgramProps) {
       </Card>
     </div>
   );
-} 
+}

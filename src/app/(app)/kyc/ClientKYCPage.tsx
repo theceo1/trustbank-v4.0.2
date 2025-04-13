@@ -432,14 +432,53 @@ export default function ClientKYCPage({ initialProfile }: ClientKYCPageProps) {
   const startVerification = async (type: string) => {
     if (!isValidVerificationType(type)) return;
 
-    if (type === 'phone') {
-      router.push('/profile/security/phone');
-      return;
-    }
+    try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: "Error",
+          description: "Please log in to continue with verification.",
+          variant: "destructive"
+        });
+        return;
+      }
 
-    // Handle other verification types...
-    setVerificationType(type);
-    setShowVerificationModal(true);
+      // Get current verification history
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('verification_history')
+        .eq('user_id', user.id)
+        .single();
+
+      // Check if previous tier requirements are met
+      const currentTierProgress = tierProgress[currentTier];
+      if (!isPreviousTierCompleted(currentTier) || !currentTierProgress) {
+        toast({
+          title: "Verification Required",
+          description: "Please complete previous tier requirements first.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (type === 'phone') {
+        // Always navigate to phone verification page when clicked
+        router.push('/profile/security/phone');
+        return;
+      }
+
+      // Handle other verification types
+      setVerificationType(type);
+      setShowVerificationModal(true);
+    } catch (error) {
+      console.error('Error starting verification:', error);
+      toast({
+        title: "Error",
+        description: "Failed to start verification process. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   // Add function to check if requirement is available
@@ -692,4 +731,4 @@ export default function ClientKYCPage({ initialProfile }: ClientKYCPageProps) {
       )}
     </div>
   );
-} 
+}

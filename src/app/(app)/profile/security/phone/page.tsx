@@ -40,31 +40,44 @@ export default function PhoneVerificationPage() {
       if (!user) throw new Error('No user found');
 
       // Get current verification history
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('user_profiles')
         .select('verification_history')
         .eq('user_id', user.id)
         .single();
+
+      if (profileError) throw profileError;
 
       console.log('[Phone Verification] Current verification history:', profile?.verification_history);
 
       // Update verification history with phone status
       const verificationHistory = {
         ...(profile?.verification_history || {}),
-        phone: true
+        phone: true,
+        basic_info: true // Ensure basic info is marked as verified
       };
 
       console.log('[Phone Verification] Updated verification history:', verificationHistory);
 
-      // Update phone number and verification history
+      // Update phone number and verification history in a single transaction
       const { error: updateError } = await supabase
         .from('user_profiles')
         .update({ 
           phone_number: formattedPhone,
           verification_history: verificationHistory,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          phone_verified: true,
+          kyc_basic_verified: true, // Mark basic KYC as verified
+          kyc_level: 'basic' // Update KYC level to basic
         })
         .eq('user_id', user.id);
+
+      // Update user metadata to include phone verification
+      const { error: metadataError } = await supabase.auth.updateUser({
+        data: { phone_verified: true }
+      });
+
+      if (metadataError) throw metadataError;
 
       if (updateError) throw updateError;
 
@@ -127,4 +140,4 @@ export default function PhoneVerificationPage() {
       </Card>
     </div>
   );
-} 
+}

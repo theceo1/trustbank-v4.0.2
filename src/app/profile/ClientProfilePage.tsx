@@ -58,27 +58,33 @@ export default function ClientProfilePage({
         <Card className="border-2">
           <CardContent className="p-6">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
-              <TabsList className="grid w-full grid-cols-3 gap-4 bg-muted p-1 rounded-lg">
+              <TabsList className="flex flex-col w-full sm:grid sm:grid-cols-3 gap-2 sm:gap-4 bg-muted p-1 rounded-lg">
                 <TabsTrigger 
                   value="personal"
-                  className="data-[state=active]:bg-green-600 data-[state=active]:text-white transition-all"
+                  className="flex items-center justify-between w-full sm:justify-center data-[state=active]:bg-green-600 data-[state=active]:text-white transition-all px-4 py-2"
                 >
-                  <User className="w-4 h-4 mr-2" />
-                  Personal Information
+                  <span className="flex items-center">
+                    <User className="w-4 h-4 mr-2" />
+                    <span className="text-sm sm:text-base">Personal Information</span>
+                  </span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="security"
-                  className="data-[state=active]:bg-green-600 data-[state=active]:text-white transition-all"
+                  className="flex items-center justify-between w-full sm:justify-center data-[state=active]:bg-green-600 data-[state=active]:text-white transition-all px-4 py-2"
                 >
-                  <Shield className="w-4 h-4 mr-2" />
-                  Security
+                  <span className="flex items-center">
+                    <Shield className="w-4 h-4 mr-2" />
+                    <span className="text-sm sm:text-base">Security</span>
+                  </span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="referral"
-                  className="data-[state=active]:bg-green-600 data-[state=active]:text-white transition-all"
+                  className="flex items-center justify-between w-full sm:justify-center data-[state=active]:bg-green-600 data-[state=active]:text-white transition-all px-4 py-2"
                 >
-                  <Users className="w-4 h-4 mr-2" />
-                  Referral Program
+                  <span className="flex items-center">
+                    <Users className="w-4 h-4 mr-2" />
+                    <span className="text-sm sm:text-base">Referral Program</span>
+                  </span>
                 </TabsTrigger>
               </TabsList>
 
@@ -119,4 +125,4 @@ export default function ClientProfilePage({
       </div>
     </div>
   );
-} 
+}

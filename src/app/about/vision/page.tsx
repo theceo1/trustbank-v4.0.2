@@ -198,15 +198,14 @@ export default function VisionPage() {
         {/* Products Section */}
         <div className="mb-16">
           <Tabs value={activeProduct} onValueChange={setActiveProduct}>
-            <TabsList className="grid grid-cols-2 md:grid-cols-4 mb-8">
+            <TabsList className="flex flex-wrap gap-2 h-auto items-center justify-start rounded-lg bg-muted p-2 text-muted-foreground mb-6">
               {products.map((product) => (
-                <TabsTrigger 
-                  key={product.id} 
-                  value={product.id} 
-                  className="gap-2 data-[state=active]:bg-green-600 data-[state=active]:text-white transition-colors"
+                <TabsTrigger
+                  key={product.id}
+                  value={product.id}
+                  className="flex-1 min-w-[120px] inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-green-600 data-[state=active]:text-white data-[state=active]:shadow dark:text-gray-200 dark:data-[state=active]:text-white"
                 >
-                  {product.icon}
-                  <span className="hidden md:inline">{product.title}</span>
+                  {product.title.split(' ')[0]}
                 </TabsTrigger>
               ))}
             </TabsList>
