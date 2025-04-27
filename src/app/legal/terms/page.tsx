@@ -33,14 +33,14 @@ const sections = [
     content: `You agree to comply with all applicable laws, regulations, and rules related to cryptocurrency trading and financial services in your jurisdiction.`
   },
   {
-    id: 'fees',
-    title: '6. Fees and Charges',
-    content: `You agree to pay all applicable fees for using our services. Fee schedules are subject to change, and we will provide notice of any changes through our platform.`
+    id: 'risks',
+    title: '6. Risks and Disclaimers',
+    content: `Cryptocurrency trading involves significant risks. You acknowledge that you understand these risks and are solely responsible for your trading decisions.`
   },
   {
-    id: 'risks',
-    title: '7. Risks and Disclaimers',
-    content: `Cryptocurrency trading involves significant risks. You acknowledge that you understand these risks and are solely responsible for your trading decisions.`
+    id: 'fees',
+    title: '7. Fees and Charges',
+    content: `You agree to pay all applicable fees for using our services. Fee schedules are subject to change, and we will provide notice of any changes through our platform.`
   },
   {
     id: 'intellectual',
@@ -56,6 +56,26 @@ const sections = [
     id: 'liability',
     title: '10. Limitation of Liability',
     content: `To the maximum extent permitted by law, trustBank shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising from your use of our services.`
+  },
+  {
+    id: 'dispute',
+    title: '11. Dispute Resolution',
+    content: `If you have a complaint or dispute with trustBank, please contact our support team at support@trustbank.tech. We are committed to resolving complaints fairly and promptly. Most issues can be resolved informally by contacting us. If a dispute cannot be resolved informally, it will be handled in accordance with the laws and procedures of the jurisdiction specified below.`
+  },
+  {
+    id: 'jurisdiction',
+    title: '12. Jurisdiction and Governing Law',
+    content: `These Terms of Service are governed by and construed in accordance with the laws of the jurisdiction in which trustBank operates, without regard to its conflict of law provisions. By using our services, you consent to the exclusive jurisdiction of the courts located in this jurisdiction for any disputes arising out of or relating to these terms or your use of the services.`
+  },
+  {
+    id: 'changes',
+    title: '13. Changes to Terms',
+    content: `trustBank may update these Terms of Service from time to time. We will notify users of any material changes through our platform or by email. Continued use of our services after such changes constitutes acceptance of the updated terms. We encourage you to review these terms regularly.`
+  },
+  {
+    id: 'disclaimer',
+    title: '11. Regulatory Disclaimer',
+    content: `trustBank is a financial technology platform, not a bank. All banking, cryptocurrency, and AML/KYC services are provided by our fully licensed and regulated partners. These partners are authorized to operate under the appropriate financial regulations and hold all necessary licenses for their jurisdictions. trustBank does not directly provide banking services. For more information, please contact our legal team.`
   }
 ];
 

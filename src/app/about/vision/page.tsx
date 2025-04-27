@@ -1,3 +1,4 @@
+//src/app/about/vision/page.tsx
 'use client';
 
 import { useState } from "react";

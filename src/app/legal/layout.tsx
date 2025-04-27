@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Printer, Languages } from 'lucide-react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 const legalPages = [
   { title: 'Terms of Service', href: '/legal/terms' },
@@ -29,6 +30,7 @@ export default function LegalLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
   const [language, setLanguage] = useState('en');
 
   const handlePrint = () => {
@@ -44,18 +46,18 @@ export default function LegalLayout({
             <div className="sticky top-24">
               <nav className="space-y-2">
                 <div className="mb-6">
-                  <h2 className="text-lg font-semibold mb-4">Legal Documents</h2>
-                  <div className="space-y-1">
-                    {legalPages.map((page) => (
+                  {legalPages.map((page) => {
+                    const isActive = pathname === page.href;
+                    return (
                       <Link
                         key={page.href}
                         href={page.href}
-                        className="flex items-center px-3 py-2 text-sm rounded-lg hover:bg-accent hover:text-accent-foreground"
+                        className={`block px-4 py-2 rounded transition-colors duration-150 ${isActive ? 'text-green-600 font-semibold bg-green-50 dark:bg-green-950/30' : 'text-muted-foreground hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-950/30'}`}
                       >
                         {page.title}
                       </Link>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
                 <div className="space-y-4">
                   <div className="flex items-center space-x-2">

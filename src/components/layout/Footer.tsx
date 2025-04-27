@@ -337,9 +337,12 @@ export function Footer() {
         <Separator className="my-4" />
 
         <div className="flex flex-col sm:flex-row items-center justify-between py-4 gap-6">
-          <p className="text-sm text-muted-foreground order-2 sm:order-1">
-            © {new Date().getFullYear()} trustBank. All rights reserved.
-          </p>
+          <div className="text-xs text-muted-foreground max-w-3xl mb-2 text-center sm:text-left">
+  trustBank is a financial technology platform, not a bank. Regulated services are provided by licensed partners.
+</div>
+<p className="text-sm text-muted-foreground order-2 sm:order-1">
+  © {new Date().getFullYear()} trustBank. All rights reserved.
+</p>
 
           <div className="flex items-center gap-6 order-1 sm:order-2">
             {socialLinks.map((link) => {
