@@ -1,18 +1,28 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { validationSchemas } from '@/lib/validation';
 
+vi.mock('@supabase/auth-helpers-nextjs', () => ({
+  createClientComponentClient: vi.fn(),
+}));
+
 describe('Transaction Tests', () => {
   // Mock Supabase client with proper method chaining
-  const mockInsert = jest.fn();
-  const mockSelect = jest.fn();
-  const mockUpdate = jest.fn();
-  
+  const mockInsert = vi.fn();
+  const mockSelect = vi.fn();
+  const mockUpdate = vi.fn();
+  const mockDelete = vi.fn();
+
   const mockSupabase = {
-    from: jest.fn().mockReturnValue({
-      insert: mockInsert.mockReturnValue({ select: mockSelect, execute: jest.fn() }),
-      select: mockSelect.mockReturnValue({ execute: jest.fn() }),
-      update: mockUpdate.mockReturnValue({ execute: jest.fn() })
-    })
+    from: vi.fn().mockReturnValue({
+      select: mockSelect.mockReturnThis(),
+      insert: mockInsert.mockReturnThis(),
+      update: mockUpdate.mockReturnThis(),
+      delete: mockDelete.mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      range: vi.fn().mockReturnThis(),
+    }),
   };
 
   const mockTransaction = {
@@ -38,10 +48,118 @@ describe('Transaction Tests', () => {
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
-    mockInsert.mockImplementation(() => ({
-      execute: jest.fn().mockResolvedValue({ data: null, error: null })
-    }));
+    vi.clearAllMocks();
+    (createClientComponentClient as any).mockReturnValue(mockSupabase);
+  });
+
+  it('should create a new transaction', async () => {
+    const mockTransaction = {
+      id: 1,
+      user_id: 'user123',
+      amount: 100,
+      type: 'deposit',
+      status: 'completed',
+      created_at: new Date().toISOString(),
+    };
+
+    mockInsert.mockResolvedValueOnce({
+      data: mockTransaction,
+      error: null,
+    });
+
+    const result = await mockSupabase
+      .from('transactions')
+      .insert(mockTransaction);
+
+    expect(result.error).toBeNull();
+    expect(result.data).toEqual(mockTransaction);
+    expect(mockInsert).toHaveBeenCalledWith(mockTransaction);
+  });
+
+  it('should fetch user transactions', async () => {
+    const mockTransactions = [
+      {
+        id: 1,
+        user_id: 'user123',
+        amount: 100,
+        type: 'deposit',
+        status: 'completed',
+      },
+      {
+        id: 2,
+        user_id: 'user123',
+        amount: 50,
+        type: 'withdrawal',
+        status: 'pending',
+      },
+    ];
+
+    mockSelect.mockResolvedValueOnce({
+      data: mockTransactions,
+      error: null,
+    });
+
+    const result = await mockSupabase
+      .from('transactions')
+      .select('*')
+      .eq('user_id', 'user123');
+
+    expect(result.error).toBeNull();
+    expect(result.data).toEqual(mockTransactions);
+  });
+
+  it('should update transaction status', async () => {
+    const transactionId = 1;
+    const newStatus = 'completed';
+
+    mockUpdate.mockResolvedValueOnce({
+      data: { id: transactionId, status: newStatus },
+      error: null,
+    });
+
+    const result = await mockSupabase
+      .from('transactions')
+      .update({ status: newStatus })
+      .eq('id', transactionId);
+
+    expect(result.error).toBeNull();
+    expect(result.data.status).toBe(newStatus);
+  });
+
+  it('should handle transaction errors', async () => {
+    const mockError = {
+      message: 'Database error',
+      details: 'Connection failed',
+    };
+
+    mockInsert.mockResolvedValueOnce({
+      data: null,
+      error: mockError,
+    });
+
+    const result = await mockSupabase
+      .from('transactions')
+      .insert({ amount: 100, type: 'deposit' });
+
+    expect(result.data).toBeNull();
+    expect(result.error).toEqual(mockError);
+  });
+
+  it('should delete a transaction', async () => {
+    const transactionId = 1;
+
+    mockDelete.mockResolvedValueOnce({
+      data: { id: transactionId },
+      error: null,
+    });
+
+    const result = await mockSupabase
+      .from('transactions')
+      .delete()
+      .eq('id', transactionId);
+
+    expect(result.error).toBeNull();
+    expect(result.data.id).toBe(transactionId);
   });
 
   describe('Transaction Creation', () => {

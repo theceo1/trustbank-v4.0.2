@@ -1,22 +1,25 @@
 import { NextResponse } from 'next/server';
-import { korapayService } from '@/lib/services/korapay';
+import { SUPPORTED_BANKS } from '@/lib/constants/banks';
 
 export async function GET() {
   try {
-    const response = await korapayService.getBanks();
+    console.log('Returning local bank list...');
+    
+    if (!SUPPORTED_BANKS || SUPPORTED_BANKS.length === 0) {
+      return NextResponse.json(
+        { error: 'No banks available' },
+        { status: 404 }
+      );
+    }
 
     return NextResponse.json({
-      status: 'success',
-      data: response.data.map((bank: any) => ({
-        code: bank.code,
-        name: bank.name,
-        slug: bank.slug,
-      })),
+      status: true,
+      data: SUPPORTED_BANKS
     });
   } catch (error) {
-    console.error('Error fetching banks:', error);
+    console.error('Error in banks API route:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to fetch banks' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

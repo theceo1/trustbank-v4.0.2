@@ -1,3 +1,4 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { handleAuthError } from '@/lib/auth';
 
@@ -7,38 +8,45 @@ interface DatabaseError {
   status?: number;
 }
 
+vi.mock('@supabase/auth-helpers-nextjs', () => ({
+  createClientComponentClient: vi.fn(),
+}));
+
 describe('Error Handling Tests', () => {
   const mockSupabase = {
-    from: jest.fn().mockReturnValue({
-      select: jest.fn().mockReturnThis(),
-      insert: jest.fn().mockReturnThis(),
-      execute: jest.fn()
+    from: vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnThis(),
+      insert: vi.fn().mockReturnThis(),
+      update: vi.fn().mockReturnThis(),
+      delete: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
     }),
     auth: {
-      signInWithPassword: jest.fn(),
-      refreshSession: jest.fn(),
-      getSession: jest.fn()
+      signInWithPassword: vi.fn(),
+      refreshSession: vi.fn(),
+      getSession: vi.fn()
     }
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
-    jest.spyOn(console, 'error').mockImplementation(() => {});
+    vi.clearAllMocks();
+    (createClientComponentClient as any).mockReturnValue(mockSupabase);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
   });
 
   describe('Database Error Handling', () => {
     it('should handle connection timeouts', async () => {
       const timeoutError = new Error('Connection timeout');
-      mockSupabase.from().execute.mockRejectedValue(timeoutError);
+      mockSupabase.from().select.mockRejectedValueOnce(timeoutError);
 
       try {
         await mockSupabase.from('users').select().execute();
-        fail('Should have thrown an error');
-      } catch (error: unknown) {
+        expect(true).toBe(false);
+      } catch (error: any) {
         const dbError = error as DatabaseError;
         expect(dbError.message).toBe('Connection timeout');
         expect(console.error).toHaveBeenCalled();
@@ -50,12 +58,12 @@ describe('Error Handling Tests', () => {
         code: '23505', // Unique violation
         message: 'duplicate key value violates unique constraint'
       };
-      mockSupabase.from().execute.mockRejectedValue(constraintError);
+      mockSupabase.from().insert.mockRejectedValueOnce(constraintError);
 
       try {
         await mockSupabase.from('users').insert({ email: 'test@example.com' }).execute();
-        fail('Should have thrown an error');
-      } catch (error: unknown) {
+        expect(true).toBe(false);
+      } catch (error: any) {
         const dbError = error as DatabaseError;
         expect(dbError.code).toBe('23505');
         expect(console.error).toHaveBeenCalled();
@@ -67,15 +75,52 @@ describe('Error Handling Tests', () => {
         code: '429',
         message: 'Too many requests'
       };
-      mockSupabase.from().execute.mockRejectedValue(rateLimitError);
+      mockSupabase.from().select.mockRejectedValueOnce({ ...rateLimitError, status: 429 });
 
       try {
         await mockSupabase.from('users').select().execute();
-        fail('Should have thrown an error');
-      } catch (error: unknown) {
+        expect(true).toBe(false);
+      } catch (error: any) {
         const dbError = error as DatabaseError;
         expect(dbError.code).toBe('429');
+        expect(dbError.status).toBe(429);
         expect(console.error).toHaveBeenCalled();
+      }
+    });
+
+    it('should handle database connection errors', async () => {
+      const mockError = new Error('Database connection failed');
+      mockSupabase.from().select.mockRejectedValueOnce(mockError);
+
+      try {
+        await mockSupabase.from('test_table').select('*');
+        expect(true).toBe(false);
+      } catch (error: any) {
+        expect(error.message).toBe('Database connection failed');
+      }
+    });
+
+    it('should handle invalid query errors', async () => {
+      const mockError = { message: 'Invalid query syntax' };
+      mockSupabase.from().select.mockRejectedValueOnce(mockError);
+
+      try {
+        await mockSupabase.from('test_table').select('invalid_column');
+        expect(true).toBe(false);
+      } catch (error: any) {
+        expect(error.message).toBe('Invalid query syntax');
+      }
+    });
+
+    it('should handle permission errors', async () => {
+      const mockError = { message: 'Insufficient permissions' };
+      mockSupabase.from().insert.mockRejectedValueOnce(mockError);
+
+      try {
+        await mockSupabase.from('restricted_table').insert({ data: 'test' });
+        expect(true).toBe(false);
+      } catch (error: any) {
+        expect(error.message).toBe('Insufficient permissions');
       }
     });
   });
@@ -142,7 +187,7 @@ describe('Error Handling Tests', () => {
       let attempts = 0;
       const maxAttempts = 3;
 
-      mockSupabase.from().execute.mockImplementation(() => {
+      mockSupabase.from().select.mockImplementation(() => {
         attempts++;
         if (attempts < maxAttempts) {
           return Promise.reject(networkError);
@@ -173,7 +218,7 @@ describe('Error Handling Tests', () => {
 
     it('should handle permanent failures gracefully', async () => {
       const permanentError = new Error('Service unavailable');
-      mockSupabase.from().execute.mockRejectedValue(permanentError);
+      mockSupabase.from().select.mockRejectedValueOnce(permanentError);
 
       const fallbackData = { status: 'degraded', data: [] };
       

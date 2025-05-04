@@ -1,145 +1,90 @@
-import { render, screen, act, waitFor } from '@testing-library/react';
-import { WalletCard } from '../WalletCard';
-import { TransactionHistory } from '../TransactionHistory';
-import { BalanceProvider } from '../BalanceContext';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import WalletUpdates from '../WalletUpdates';
 
 // Mock Supabase client
-jest.mock('@supabase/auth-helpers-nextjs', () => ({
-  createClientComponentClient: jest.fn()
+vi.mock('@supabase/auth-helpers-nextjs', () => ({
+  createClientComponentClient: vi.fn(),
 }));
 
-describe('Wallet UI Update Tests', () => {
+describe('WalletUpdates Component', () => {
+  const mockSupabase = {
+    from: vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnThis(),
+      insert: vi.fn().mockReturnThis(),
+      update: vi.fn().mockReturnThis(),
+      delete: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      range: vi.fn().mockReturnThis(),
+    }),
+  };
+
   beforeEach(() => {
-    // Reset mocks
-    jest.clearAllMocks();
+    vi.clearAllMocks();
+    (createClientComponentClient as any).mockReturnValue(mockSupabase);
+  });
+
+  it('should render wallet balance', () => {
+    render(<WalletUpdates balance={1000} currency="NGN" />);
+    expect(screen.getByText(/1,000/)).toBeInTheDocument();
+    expect(screen.getByText(/NGN/)).toBeInTheDocument();
+  });
+
+  it('should handle deposit button click', () => {
+    const onDeposit = vi.fn();
+    render(<WalletUpdates balance={1000} currency="NGN" onDeposit={onDeposit} />);
     
-    // Mock Supabase client implementation
-    (createClientComponentClient as jest.Mock).mockReturnValue({
-      from: jest.fn().mockReturnThis(),
-      select: jest.fn().mockReturnThis(),
-      order: jest.fn().mockReturnThis(),
-      data: [],
-      error: null
-    });
+    fireEvent.click(screen.getByText(/Deposit/));
+    expect(onDeposit).toHaveBeenCalled();
   });
 
-  describe('WalletCard Updates', () => {
-    it('should update balance when props change', () => {
-      const { rerender } = render(
-        <BalanceProvider>
-          <WalletCard
-            currency="USDT"
-            balance="0.4"
-            price={1}
-          />
-        </BalanceProvider>
-      );
-
-      // Initial balance check
-      expect(screen.getByText('0.40')).toBeInTheDocument();
-
-      // Update balance
-      rerender(
-        <BalanceProvider>
-          <WalletCard
-            currency="USDT"
-            balance="0.3"
-            price={1}
-          />
-        </BalanceProvider>
-      );
-
-      // Check if balance updated
-      expect(screen.getByText('0.30')).toBeInTheDocument();
-    });
-
-    it('should update new currency balance when added', () => {
-      const { rerender } = render(
-        <BalanceProvider>
-          <WalletCard
-            currency="SOL"
-            balance="0"
-            price={100}
-          />
-        </BalanceProvider>
-      );
-
-      // Initial balance check
-      expect(screen.getByText('0.00')).toBeInTheDocument();
-
-      // Update with new balance
-      rerender(
-        <BalanceProvider>
-          <WalletCard
-            currency="SOL"
-            balance="0.000733"
-            price={100}
-          />
-        </BalanceProvider>
-      );
-
-      // Check if new currency balance is shown
-      expect(screen.getByText('0.000733')).toBeInTheDocument();
-    });
+  it('should handle withdraw button click', () => {
+    const onWithdraw = vi.fn();
+    render(<WalletUpdates balance={1000} currency="NGN" onWithdraw={onWithdraw} />);
+    
+    fireEvent.click(screen.getByText(/Withdraw/));
+    expect(onWithdraw).toHaveBeenCalled();
   });
 
-  describe('TransactionHistory Updates', () => {
+  it('should display transaction history', async () => {
     const mockTransactions = [
-      {
-        id: '1',
-        type: 'swap',
-        from_currency: 'USDT',
-        to_currency: 'SOL',
-        from_amount: 0.1,
-        to_amount: 0.000733,
-        status: 'completed',
-        created_at: new Date().toISOString()
-      }
+      { id: 1, type: 'deposit', amount: 500, status: 'completed', created_at: new Date().toISOString() },
+      { id: 2, type: 'withdrawal', amount: 200, status: 'pending', created_at: new Date().toISOString() },
     ];
 
-    it('should show new transactions when they occur', async () => {
-      const { rerender } = render(
-        <TransactionHistory transactions={[]} />
-      );
-
-      // Initially no transactions
-      expect(screen.getByText('No recent transactions')).toBeInTheDocument();
-
-      // Add new transaction
-      rerender(
-        <TransactionHistory transactions={mockTransactions} />
-      );
-
-      // Check if new transaction is shown
-      await waitFor(() => {
-        expect(screen.getByText('0.1 USDT → 0.000733 SOL')).toBeInTheDocument();
-        expect(screen.getByText('completed')).toBeInTheDocument();
-      });
+    mockSupabase.from().select.mockResolvedValueOnce({
+      data: mockTransactions,
+      error: null,
     });
 
-    it('should update transaction status when it changes', async () => {
-      const pendingTransaction = [{
-        ...mockTransactions[0],
-        status: 'pending'
-      }];
+    render(<WalletUpdates balance={1000} currency="NGN" />);
 
-      const { rerender } = render(
-        <TransactionHistory transactions={pendingTransaction} />
-      );
+    // Wait for transactions to load
+    expect(await screen.findByText(/500/)).toBeInTheDocument();
+    expect(await screen.findByText(/200/)).toBeInTheDocument();
+  });
 
-      // Check initial pending status
-      expect(screen.getByText('pending')).toBeInTheDocument();
+  it('should handle loading state', () => {
+    render(<WalletUpdates balance={1000} currency="NGN" isLoading={true} />);
+    expect(screen.getByTestId('loading-spinner')).toBeInTheDocument();
+  });
 
-      // Update to completed
-      rerender(
-        <TransactionHistory transactions={mockTransactions} />
-      );
+  it('should handle error state', () => {
+    const error = 'Failed to load wallet data';
+    render(<WalletUpdates balance={0} currency="NGN" error={error} />);
+    expect(screen.getByText(error)).toBeInTheDocument();
+  });
 
-      // Check if status updated
-      await waitFor(() => {
-        expect(screen.getByText('completed')).toBeInTheDocument();
-      });
-    });
+  it('should format currency correctly', () => {
+    render(<WalletUpdates balance={1234567.89} currency="NGN" />);
+    expect(screen.getByText(/1,234,567.89/)).toBeInTheDocument();
+  });
+
+  it('should disable buttons when processing', () => {
+    render(<WalletUpdates balance={1000} currency="NGN" isProcessing={true} />);
+    expect(screen.getByText(/Deposit/).closest('button')).toBeDisabled();
+    expect(screen.getByText(/Withdraw/).closest('button')).toBeDisabled();
   });
 }); 

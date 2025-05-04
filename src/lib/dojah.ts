@@ -134,4 +134,27 @@ export const dojahService = {
       };
     }
   },
+
+  async resolveBankAccount(bankCode: string, accountNumber: string): Promise<VerificationResponse> {
+    try {
+      console.log('[Dojah] resolveBankAccount called with:', { bankCode, accountNumber });
+      console.log('[Dojah] Using AppId:', process.env.DOJAH_APP_ID);
+      console.log('[Dojah] Using API Key:', process.env.DOJAH_API_KEY);
+      const response = await dojahApi.get('/api/v1/general/account', {
+        params: { bank_code: bankCode, account_number: accountNumber },
+      });
+      console.log('[Dojah] Raw response:', response.data);
+      const { entity } = response.data;
+      return {
+        success: !!entity?.account_name,
+        data: entity,
+      };
+    } catch (error: any) {
+      console.error('[Dojah] Error in resolveBankAccount:', error?.response?.data || error);
+      return {
+        success: false,
+        error: error.response?.data?.message || 'Bank account lookup failed',
+      };
+    }
+  },
 }; 

@@ -168,9 +168,17 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables');
 }
 
-export const supabase = createClientComponentClient<Database>({
-  supabaseUrl,
-  supabaseKey: supabaseAnonKey
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true
+  },
+  global: {
+    headers: {
+      'x-application-name': 'trustbank'
+    }
+  }
 });
 
 // Remove server-side initialization as it should be in a separate file

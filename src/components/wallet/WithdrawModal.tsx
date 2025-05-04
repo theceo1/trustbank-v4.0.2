@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -98,6 +98,38 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
   const [isVerifying, setIsVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const [withdrawTab, setWithdrawTab] = useState<'crypto' | 'ngn'>('ngn');
+  const [dojahBanks, setDojahBanks] = useState<{ name: string; code: string }[]>([]);
+  const [selectedBankCode, setSelectedBankCode] = useState("");
+  const [selectedBankName, setSelectedBankName] = useState("");
+  const [bankSearch, setBankSearch] = useState("");
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Filtered banks for search
+  const filteredBanks = dojahBanks.filter(bank =>
+    bank.name.toLowerCase().includes(bankSearch.toLowerCase())
+  );
+
+  // Handle keyboard navigation
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  useEffect(() => {
+    if (!dropdownOpen) setHighlightedIndex(0);
+  }, [dropdownOpen, bankSearch]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    if (dropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    } else {
+      document.removeEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [dropdownOpen]);
 
   // Ensure we have valid currency codes
   const balance = parseFloat(wallet?.balance || '0');
@@ -190,51 +222,28 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
     fetchData();
   }, [isOpen, currency, supabase, toast]);
 
-  // Auto-verify account when both bank and 10-digit account number are filled
+  // Fetch Dojah banks on modal open
   useEffect(() => {
-    const verify = async () => {
-      if (selectedBank && accountNumber.length === 10) {
-        setIsVerifying(true);
-        setVerifyError(null);
-        setAccountName('');
-        try {
-          const res = await fetch('/api/payments/korapay/verify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              bankCode: selectedBank,
-              accountNumber: accountNumber.replace(/\D/g, '') // Ensure only digits
-            }),
-          });
-          const data = await res.json();
-          
-          if (!res.ok) {
-            console.error('Account verification failed:', data);
-            setVerifyError(data.error || 'Could not verify account');
-            setAccountName('');
-            return;
+    if (isOpen) {
+      fetch('/api/payments/dojah/banks')
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data.entity)) {
+            setDojahBanks(data.entity);
           }
+        })
+        .catch(() => setDojahBanks([]));
+    }
+  }, [isOpen]);
 
-          if (data.status === 'success' && data.data.account_name) {
-            setAccountName(data.data.account_name);
-            setVerifyError(null);
-          } else {
-            setVerifyError('Could not verify account');
-            setAccountName('');
-          }
-        } catch (e) {
-          console.error('Account verification error:', e);
-          setVerifyError('Could not verify account');
-          setAccountName('');
-        } finally {
-          setIsVerifying(false);
-        }
-      } else {
-        setAccountName('');
-        setVerifyError(null);
-      }
-    };
-    verify();
+  // Remove the account verification useEffect
+  // Replace with a simple validation check
+  useEffect(() => {
+    if (selectedBank && accountNumber.length === 10) {
+      setAccountValidated(true);
+    } else {
+      setAccountValidated(false);
+    }
   }, [selectedBank, accountNumber]);
 
   // Early return if modal is not open
@@ -292,20 +301,24 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
   };
 
   const validateAccountNumber = async (accNumber: string) => {
-    if (accNumber.length === 10 && selectedBank) {
+    if (accNumber.length === 10 && selectedBankCode) {
       setIsValidatingAccount(true);
       try {
-        const response = await fetch(`/api/bank/validate-account?bank=${selectedBank}&account=${accNumber}`);
+        const response = await fetch(`/api/payments/dojah/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ bankCode: selectedBankCode, accountNumber: accNumber }),
+        });
         const data = await response.json();
-        
-        if (data.status === 'success' && data.data?.account_name) {
+        if (data.status && data.data?.account_name) {
           setAccountName(data.data.account_name);
         } else {
           setAccountName('');
           toast({
             title: "Error",
-            description: "Could not verify account number",
-            variant: "destructive"
+            description: data.error || "Could not verify account number",
+            variant: "destructive",
+            className: "bg-red-600 text-white border-none"
           });
         }
       } catch (error) {
@@ -313,7 +326,8 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
         toast({
           title: "Error",
           description: "Failed to validate account number",
-          variant: "destructive"
+          variant: "destructive",
+          className: "bg-red-600 text-white border-none"
         });
       } finally {
         setIsValidatingAccount(false);
@@ -332,133 +346,82 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
       });
       return;
     }
-
+    // Show confirmation preview instead of closing modal
     setShowPreview(true);
   };
 
   const handleConfirmWithdraw = async () => {
-    setIsLoading(true);
     try {
-      if (currency.toLowerCase() === 'ngn') {
-        // Handle NGN withdrawal using Korapay
-        const response = await fetch('/api/payments/korapay/transfer', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            amount: amountInCrypto.toString(),
-            currency: 'NGN',
-            bankCode: selectedBank,
-            accountNumber,
-            accountName,
-            narration: `Withdrawal to ${accountName}`
-          }),
-        });
+      setIsLoading(true);
+      setError(null);
 
-        if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.message || 'NGN withdrawal failed');
-        }
+      // Generate a unique reference
+      const reference = `WITHDRAW-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-        const data = await response.json();
-        if (data.status === 'success') {
-          toast({
-            title: "Success",
-            description: "Withdrawal initiated successfully. Please wait for confirmation.",
-          });
-          onClose();
-        } else {
-          throw new Error(data.message || 'Withdrawal failed');
-        }
-      } else {
-        // Handle crypto withdrawal
-        const response = await fetch('/api/wallet/withdraw', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            currency: currency.toLowerCase(),
-            amount: amountInCrypto.toString(),
-            address,
-          }),
-        });
-
-        if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.error || 'Withdrawal failed');
-        }
-
-        toast({
-          title: "Success",
-          description: "Withdrawal initiated successfully",
-        });
-
-        onClose();
-      }
-    } catch (error) {
-      console.error('Withdrawal error:', error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to process withdrawal",
-        variant: "destructive"
+      // Make the payout request to KoraPay
+      const response = await fetch('/api/payments/korapay/transfer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          bankCode: selectedBank,
+          accountNumber: accountNumber,
+          amount: parseFloat(amount),
+          reference: reference,
+          currency: 'NGN'
+        })
       });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to process withdrawal');
+      }
+
+      // Show success message
+      toast({
+        title: "Success",
+        description: "Withdrawal request submitted successfully",
+        className: "bg-green-600 text-white border-none"
+      });
+
+      // Close modal
+      onClose();
+      
+      // Refresh wallet balance
+      router.refresh();
+    } catch (error) {
+      console.error('Error processing withdrawal:', error);
+      setError(error instanceof Error ? error.message : 'Failed to process withdrawal');
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleSubmit = async () => {
-    if (withdrawTab === 'ngn') {
-      if (!amount || Number(amount) < 1000 || Number(amount) > 10000000) {
-        toast({
-          title: 'Error',
-          description: 'You can only transfer an amount between NGN 1000 and NGN 10000000',
-          variant: 'destructive',
-        });
-        return;
-      }
-      if (!selectedBank || !accountNumber || !accountName) {
-        toast({
-          title: 'Error',
-          description: 'Please fill in all bank details',
-          variant: 'destructive',
-        });
-        return;
-      }
+    try {
       setIsLoading(true);
-      try {
-        const response = await fetch('/api/payments/korapay/transfer', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            amount: Number(amount),
-            currency: 'NGN',
-            bankCode: selectedBank,
-            accountNumber,
-            accountName,
-            narration: reference || `Withdrawal from TrustBank`,
-          }),
-        });
-        const data = await response.json();
-        if (!response.ok || data.status !== 'success') {
-          throw new Error(data.error || data.message || 'Failed to process transfer');
-        }
-        toast({
-          title: 'Success',
-          description: 'Transfer initiated successfully',
-          variant: 'default',
-        });
-        setTimeout(onClose, 1200);
-      } catch (err) {
-        toast({
-          title: 'Error',
-          description: err instanceof Error ? err.message : 'An error occurred',
-          variant: 'destructive',
-        });
-      } finally {
-        setIsLoading(false);
+      setError(null);
+
+      // Basic validation
+      if (!selectedBank || !accountNumber || !amount) {
+        setError('Please fill in all required fields');
+        return;
       }
-    } else {
-      // Crypto withdrawal logic (existing)
-      // ...
+
+      if (accountNumber.length !== 10) {
+        setError('Account number must be 10 digits');
+        return;
+      }
+
+      // Show preview
+      setShowPreview(true);
+    } catch (error) {
+      console.error('Error preparing withdrawal:', error);
+      setError('Failed to prepare withdrawal. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -590,35 +553,88 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
       </div>
       <div className="space-y-1">
         <label className="text-xs font-medium text-white">Bank Name</label>
-        <BankSelector
-          value={selectedBank}
-          onSelect={setSelectedBank}
-        />
+        <div className="relative" ref={dropdownRef}>
+          <button
+            type="button"
+            className={`w-full h-8 text-xs bg-black text-white border-green-800/50 rounded px-2 flex items-center justify-between focus:outline-none ${dropdownOpen ? 'ring-2 ring-green-600' : ''}`}
+            onClick={() => setDropdownOpen((open) => !open)}
+          >
+            {selectedBankName || "Select a bank"}
+            <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+          </button>
+          {dropdownOpen && (
+            <div className="absolute z-50 mt-1 w-full max-h-64 overflow-y-auto bg-black border border-green-800/50 rounded shadow-lg">
+              <input
+                type="text"
+                autoFocus
+                value={bankSearch}
+                onChange={e => setBankSearch(e.target.value)}
+                placeholder="Search bank..."
+                className="w-full px-2 py-1 text-xs bg-black text-white border-b border-green-800/30 focus:outline-none"
+                onKeyDown={e => {
+                  if (e.key === 'ArrowDown') setHighlightedIndex(i => Math.min(i + 1, filteredBanks.length - 1));
+                  if (e.key === 'ArrowUp') setHighlightedIndex(i => Math.max(i - 1, 0));
+                  if (e.key === 'Enter' && filteredBanks[highlightedIndex]) {
+                    const bank = filteredBanks[highlightedIndex];
+                    setSelectedBankCode(bank.code);
+                    setSelectedBankName(bank.name);
+                    setDropdownOpen(false);
+                    setAccountName("");
+                    setAccountNumber("");
+                  }
+                }}
+              />
+              <ul className="max-h-56 overflow-y-auto">
+                {filteredBanks.length === 0 && (
+                  <li className="px-2 py-2 text-xs text-gray-400">No banks found</li>
+                )}
+                {filteredBanks.map((bank, idx) => (
+                  <li
+                    key={bank.code}
+                    className={`px-2 py-2 text-xs cursor-pointer ${
+                      idx === highlightedIndex ? 'bg-green-600 text-white' : 'text-white'
+                    } hover:bg-green-600 hover:text-white transition-colors`}
+                    onMouseEnter={() => setHighlightedIndex(idx)}
+                    onMouseDown={() => {
+                      setSelectedBankCode(bank.code);
+                      setSelectedBankName(bank.name);
+                      setDropdownOpen(false);
+                      setAccountName("");
+                      setAccountNumber("");
+                    }}
+                  >
+                    {bank.name}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
       </div>
       <div className="space-y-1">
         <label className="text-xs font-medium text-white">Account Number</label>
         <Input
           value={accountNumber}
-          onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
+          onChange={(e) => {
+            const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+            setAccountNumber(value);
+            if (value.length === 10 && selectedBankCode) {
+              validateAccountNumber(value);
+            } else {
+              setAccountName('');
+            }
+          }}
           placeholder="Enter 10-digit account number"
           maxLength={10}
           className="bg-black text-white border-green-800/50 h-8 text-xs"
         />
+        {isValidatingAccount && (
+          <div className="text-xs text-blue-400 mt-1">Verifying account...</div>
+        )}
+        {accountName && !isValidatingAccount && (
+          <div className="text-xs text-green-400 mt-1">Account Name: {accountName}</div>
+        )}
       </div>
-      {isVerifying && (
-        <div className="text-xs text-blue-400">Verifying account...</div>
-      )}
-      {accountName && !isVerifying && !verifyError && (
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-white">Account Name</label>
-          <div className="rounded-md border border-green-800/50 bg-black/50 px-3 py-1.5">
-            <p className="text-xs text-green-600 font-bold">{accountName}</p>
-          </div>
-        </div>
-      )}
-      {verifyError && (
-        <div className="text-xs text-red-500">{verifyError}</div>
-      )}
       <div className="space-y-1">
         <label className="text-xs font-medium text-white">Reference (Optional)</label>
         <Input

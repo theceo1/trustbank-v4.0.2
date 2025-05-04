@@ -4,6 +4,8 @@ import type { NextRequest } from 'next/server'
 import { authenticator } from 'otplib'
 import { adminMiddleware } from './middleware/admin'
 import { Redis } from '@upstash/redis'
+import { Ratelimit } from '@upstash/ratelimit'
+import { getToken } from 'next-auth/jwt'
 
 const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL!,
@@ -15,6 +17,22 @@ const RATE_LIMIT_WINDOW = 60; // 1 minute
 const API_RATE_LIMIT = 1000; // Increased to 1000 requests per minute
 const AUTH_RATE_LIMIT = 5; // 5 login attempts per minute
 const MARKET_RATE_LIMIT = 1500; // Higher limit for market endpoints
+
+// Create rate limiters
+const paymentRateLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(10, '1 m'), // 10 requests per minute
+  analytics: true,
+});
+
+const sensitiveRateLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(5, '1 m'), // 5 requests per minute
+  analytics: true,
+});
+
+// IP whitelist for KoraPay API
+const KORAPAY_WHITELISTED_IPS = process.env.KORAPAY_WHITELISTED_IPS?.split(',') || [];
 
 async function checkRateLimit(ip: string, path: string): Promise<boolean> {
   // Skip rate limiting for health checks
@@ -248,6 +266,74 @@ export async function middleware(req: NextRequest) {
         maxAge,
         path: '/'
       });
+    }
+
+    // Rate limiting for payment endpoints
+    if (path.startsWith('/api/payments/')) {
+      const ip = req.ip ?? '127.0.0.1';
+      const { success, limit, reset, remaining } = await paymentRateLimiter.limit(ip);
+      
+      if (!success) {
+        return new NextResponse(
+          JSON.stringify({
+            error: 'Too many requests',
+            limit,
+            reset,
+            remaining,
+          }),
+          {
+            status: 429,
+            headers: {
+              'Content-Type': 'application/json',
+              'X-RateLimit-Limit': limit.toString(),
+              'X-RateLimit-Remaining': remaining.toString(),
+              'X-RateLimit-Reset': reset.toString(),
+            },
+          }
+        );
+      }
+    }
+
+    // Rate limiting for sensitive operations
+    if (path.startsWith('/api/payments/korapay/transfer') || 
+        path.startsWith('/api/payments/korapay/verify')) {
+      const ip = req.ip ?? '127.0.0.1';
+      const { success, limit, reset, remaining } = await sensitiveRateLimiter.limit(ip);
+      
+      if (!success) {
+        return new NextResponse(
+          JSON.stringify({
+            error: 'Too many sensitive operations',
+            limit,
+            reset,
+            remaining,
+          }),
+          {
+            status: 429,
+            headers: {
+              'Content-Type': 'application/json',
+              'X-RateLimit-Limit': limit.toString(),
+              'X-RateLimit-Remaining': remaining.toString(),
+              'X-RateLimit-Reset': reset.toString(),
+            },
+          }
+        );
+      }
+
+      // IP whitelisting for KoraPay endpoints
+      if (!KORAPAY_WHITELISTED_IPS.includes(ip)) {
+        return new NextResponse(
+          JSON.stringify({
+            error: 'Unauthorized IP address',
+          }),
+          {
+            status: 403,
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+      }
     }
 
     return res;

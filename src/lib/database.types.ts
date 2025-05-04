@@ -1936,48 +1936,54 @@ export type Database = {
           currency: string;
           bank_code: string;
           account_number: string;
-          account_name: string | null;
+          account_name: string;
           status: string;
-          response_data: Json;
+          response_data: Record<string, any>;
           created_at: string;
           updated_at: string;
         };
+        Insert: Omit<Database['public']['Tables']['korapay_transfers']['Row'], 'id'>;
+        Update: Partial<Database['public']['Tables']['korapay_transfers']['Row']>;
+      }
+      audit_logs: {
+        Row: {
+          id: string
+          user_id: string
+          action: string
+          status: string
+          details: Json
+          ip_address: string | null
+          user_agent: string | null
+          created_at: string
+        }
         Insert: {
-          id?: string;
-          user_id: string;
-          reference: string;
-          amount: number;
-          currency: string;
-          bank_code: string;
-          account_number: string;
-          account_name?: string | null;
-          status: string;
-          response_data: Json;
-          created_at?: string;
-          updated_at?: string;
-        };
+          id?: string
+          user_id: string
+          action: string
+          status: string
+          details: Json
+          ip_address?: string | null
+          user_agent?: string | null
+          created_at?: string
+        }
         Update: {
-          id?: string;
-          user_id?: string;
-          reference?: string;
-          amount?: number;
-          currency?: string;
-          bank_code?: string;
-          account_number?: string;
-          account_name?: string | null;
-          status?: string;
-          response_data?: Json;
-          created_at?: string;
-          updated_at?: string;
-        };
+          id?: string
+          user_id?: string
+          action?: string
+          status?: string
+          details?: Json
+          ip_address?: string | null
+          user_agent?: string | null
+          created_at?: string
+        }
         Relationships: [
           {
-            foreignKeyName: "korapay_transfers_user_id_fkey";
-            columns: ["user_id"];
-            referencedRelation: "users";
-            referencedColumns: ["id"];
+            foreignKeyName: "audit_logs_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
           }
-        ];
+        ]
       }
     }
     Views: {

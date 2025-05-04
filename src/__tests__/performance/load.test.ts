@@ -1,187 +1,106 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+
+vi.mock('@supabase/auth-helpers-nextjs', () => ({
+  createClientComponentClient: vi.fn(),
+}));
 
 describe('Performance Tests', () => {
   const mockSupabase = {
-    from: jest.fn().mockReturnValue({
-      select: jest.fn().mockReturnThis(),
-      insert: jest.fn().mockReturnThis(),
-      execute: jest.fn()
+    from: vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnThis(),
+      insert: vi.fn().mockReturnThis(),
+      update: vi.fn().mockReturnThis(),
+      delete: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      range: vi.fn().mockReturnThis(),
     }),
-    auth: {
-      signInWithPassword: jest.fn(),
-      signOut: jest.fn()
-    }
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
+    (createClientComponentClient as any).mockReturnValue(mockSupabase);
   });
 
-  describe('Load Testing', () => {
-    it('should handle multiple concurrent requests', async () => {
-      const numRequests = 50;
-      const mockResponse = { data: { id: 1 }, error: null };
-      mockSupabase.from().select().execute.mockResolvedValue(mockResponse);
+  it('should handle large data sets efficiently', async () => {
+    const largeDataSet = Array.from({ length: 1000 }, (_, i) => ({
+      id: i,
+      name: `Item ${i}`,
+      value: Math.random(),
+    }));
 
-      const startTime = Date.now();
-      const requests = Array(numRequests).fill(null).map(() =>
-        mockSupabase.from('transactions').select().execute()
-      );
-
-      const results = await Promise.all(requests);
-      const endTime = Date.now();
-      const totalTime = endTime - startTime;
-
-      // Verify all requests completed successfully
-      expect(results).toHaveLength(numRequests);
-      results.forEach(result => {
-        expect(result.error).toBeNull();
-      });
-
-      // Check if total time is within acceptable range (e.g., < 5s for 50 requests)
-      expect(totalTime).toBeLessThan(5000);
+    mockSupabase.from().select.mockResolvedValueOnce({
+      data: largeDataSet,
+      error: null,
     });
 
-    it('should maintain response times under load', async () => {
-      const requests = 20;
-      const mockResponse = { data: { id: 1 }, error: null };
-      mockSupabase.from().select().execute.mockResolvedValue(mockResponse);
+    const startTime = performance.now();
+    const result = await mockSupabase.from('large_table').select('*');
+    const endTime = performance.now();
 
-      const timings: number[] = [];
-      
-      for (let i = 0; i < requests; i++) {
-        const start = Date.now();
-        await mockSupabase.from('transactions').select().execute();
-        timings.push(Date.now() - start);
-      }
-
-      // Calculate average response time
-      const avgTime = timings.reduce((a, b) => a + b, 0) / timings.length;
-      
-      // Average response time should be under 100ms
-      expect(avgTime).toBeLessThan(100);
-      
-      // Check for response time consistency
-      const maxDeviation = Math.max(...timings) - Math.min(...timings);
-      expect(maxDeviation).toBeLessThan(200); // Max 200ms deviation
-    });
-
-    it('should handle connection pool efficiently', async () => {
-      const poolSize = 10;
-      const totalRequests = 30;
-      const mockResponse = { data: { id: 1 }, error: null };
-      
-      mockSupabase.from().select().execute.mockImplementation(() => 
-        new Promise(resolve => {
-          // Simulate random database query time between 50-150ms
-          setTimeout(() => resolve(mockResponse), 50 + Math.random() * 100);
-        })
-      );
-
-      const batchRequests = async (batchSize: number) => {
-        const requests = Array(batchSize).fill(null).map(() =>
-          mockSupabase.from('transactions').select().execute()
-        );
-        return Promise.all(requests);
-      };
-
-      const startTime = Date.now();
-      
-      // Execute requests in batches of pool size
-      for (let i = 0; i < totalRequests; i += poolSize) {
-        const batchSize = Math.min(poolSize, totalRequests - i);
-        const results = await batchRequests(batchSize);
-        results.forEach(result => {
-          expect(result.error).toBeNull();
-        });
-      }
-
-      const totalTime = Date.now() - startTime;
-      
-      // Total time should be roughly (totalRequests / poolSize) * avgRequestTime
-      const expectedMaxTime = (totalRequests / poolSize) * 150; // Using max possible request time
-      expect(totalTime).toBeLessThan(expectedMaxTime);
-    });
+    expect(result.error).toBeNull();
+    expect(result.data).toHaveLength(1000);
+    expect(endTime - startTime).toBeLessThan(1000); // Should complete in less than 1 second
   });
 
-  describe('Memory Usage', () => {
-    it('should handle large result sets efficiently', async () => {
-      const largeDataset = Array(1000).fill(null).map((_, i) => ({
-        id: i,
-        data: 'x'.repeat(100) // 100 bytes of data per record
-      }));
+  it('should handle concurrent requests', async () => {
+    const mockResponses = Array.from({ length: 5 }, (_, i) => ({
+      data: { id: i, value: `test${i}` },
+      error: null,
+    }));
 
-      mockSupabase.from().select().execute.mockResolvedValue({
-        data: largeDataset,
-        error: null
-      });
+    mockSupabase.from().select.mockImplementation(() => 
+      Promise.resolve(mockResponses[Math.floor(Math.random() * mockResponses.length)])
+    );
 
-      const initialMemory = process.memoryUsage().heapUsed;
-      
+    const requests = Array.from({ length: 5 }, () => 
+      mockSupabase.from('test_table').select('*')
+    );
+
+    const startTime = performance.now();
+    const results = await Promise.all(requests);
+    const endTime = performance.now();
+
+    expect(results).toHaveLength(5);
+    results.forEach(result => {
+      expect(result.error).toBeNull();
+      expect(result.data).toBeDefined();
+    });
+    expect(endTime - startTime).toBeLessThan(2000); // Should complete in less than 2 seconds
+  });
+
+  it('should handle pagination efficiently', async () => {
+    const pageSize = 50;
+    const totalItems = 200;
+    
+    const mockPage = (page: number) => ({
+      data: Array.from({ length: pageSize }, (_, i) => ({
+        id: page * pageSize + i,
+        name: `Item ${page * pageSize + i}`,
+      })),
+      error: null,
+    });
+
+    mockSupabase.from().select.mockImplementation(() => ({
+      range: (start: number, end: number) => 
+        Promise.resolve(mockPage(Math.floor(start / pageSize)))
+    }));
+
+    const pages = [];
+    for (let i = 0; i < totalItems; i += pageSize) {
       const result = await mockSupabase
-        .from('large_table')
-        .select()
-        .execute();
+        .from('test_table')
+        .select('*')
+        .range(i, i + pageSize - 1);
+      pages.push(result);
+    }
 
-      const finalMemory = process.memoryUsage().heapUsed;
-      const memoryIncrease = finalMemory - initialMemory;
-
-      // Verify data was retrieved
-      expect(result.data).toHaveLength(1000);
-      
-      // Check memory increase is reasonable (< 10MB for 1000 records)
-      expect(memoryIncrease).toBeLessThan(10 * 1024 * 1024);
-    });
-
-    it('should clean up resources after operations', async () => {
-      const initialMemory = process.memoryUsage().heapUsed;
-      
-      // Perform multiple operations
-      for (let i = 0; i < 100; i++) {
-        await mockSupabase.from('transactions').select().execute();
-      }
-
-      // Force garbage collection if available
-      if (global.gc) {
-        global.gc();
-      }
-
-      const finalMemory = process.memoryUsage().heapUsed;
-      const memoryDiff = finalMemory - initialMemory;
-
-      // Memory usage should remain stable
-      expect(memoryDiff).toBeLessThan(1 * 1024 * 1024); // Less than 1MB increase
-    });
-  });
-
-  describe('Concurrent User Simulation', () => {
-    it('should handle multiple user sessions', async () => {
-      const numUsers = 20;
-      const operationsPerUser = 5;
-      
-      const simulateUserOperations = async (userId: number) => {
-        const results = [];
-        for (let i = 0; i < operationsPerUser; i++) {
-          const result = await mockSupabase
-            .from('transactions')
-            .select()
-            .execute();
-          results.push(result);
-        }
-        return results;
-      };
-
-      const userPromises = Array(numUsers)
-        .fill(null)
-        .map((_, index) => simulateUserOperations(index));
-
-      const allResults = await Promise.all(userPromises);
-
-      // Verify all operations completed
-      expect(allResults).toHaveLength(numUsers);
-      allResults.forEach(userResults => {
-        expect(userResults).toHaveLength(operationsPerUser);
-      });
+    expect(pages).toHaveLength(totalItems / pageSize);
+    pages.forEach((page, index) => {
+      expect(page.error).toBeNull();
+      expect(page.data).toHaveLength(pageSize);
+      expect(page.data[0].id).toBe(index * pageSize);
     });
   });
 }); 

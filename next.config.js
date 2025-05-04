@@ -137,6 +137,22 @@ const nextConfig = {
               block-all-mixed-content;
               upgrade-insecure-requests;
             `.replace(/\s{2,}/g, ' ').trim()
+          },
+          {
+            key: 'Content-Security-Policy',
+            value: "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.vercel-scripts.com; worker-src 'self' blob:"
+          },
+          {
+            key: 'Access-Control-Allow-Origin',
+            value: '*'
+          },
+          {
+            key: 'Access-Control-Allow-Methods',
+            value: 'GET, POST, PUT, DELETE, OPTIONS'
+          },
+          {
+            key: 'Access-Control-Allow-Headers',
+            value: 'Content-Type, Authorization'
           }
         ]
       }

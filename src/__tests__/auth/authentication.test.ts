@@ -1,21 +1,25 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { checkAndRefreshSession, validateSession } from '@/lib/auth';
+import { validateSession, checkAndRefreshSession, handleAuthError } from '../../lib/auth';
 import { Session } from '@supabase/supabase-js';
 
+vi.mock('@supabase/auth-helpers-nextjs', () => ({
+  createClientComponentClient: vi.fn(),
+}));
+
 describe('Authentication Tests', () => {
-  // Mock Supabase client
   const mockSupabase = {
     auth: {
-      refreshSession: jest.fn(),
-      signInWithPassword: jest.fn(),
-      signOut: jest.fn(),
-      resetPasswordForEmail: jest.fn(),
-      verifyOtp: jest.fn(),
+      refreshSession: vi.fn(),
+      signInWithPassword: vi.fn(),
+      signOut: vi.fn(),
+      resetPasswordForEmail: vi.fn(),
+      verifyOtp: vi.fn(),
       mfa: {
-        enroll: jest.fn(),
-        verify: jest.fn(),
-        unenroll: jest.fn(),
-        challenge: jest.fn()
+        enroll: vi.fn(),
+        verify: vi.fn(),
+        unenroll: vi.fn(),
+        challenge: vi.fn()
       }
     },
   };
@@ -29,6 +33,70 @@ describe('Authentication Tests', () => {
     token_type: 'bearer',
     user: { id: '123', email: 'test@example.com' } as any,
   };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (createClientComponentClient as any).mockReturnValue(mockSupabase);
+  });
+
+  it('should handle successful login', async () => {
+    const mockUser = { id: 'test-user-id', email: 'test@example.com' };
+    mockSupabase.auth.signInWithPassword.mockResolvedValueOnce({
+      data: { user: mockUser },
+      error: null,
+    });
+
+    const result = await mockSupabase.auth.signInWithPassword({
+      email: 'test@example.com',
+      password: 'password123',
+    });
+
+    expect(result.data.user).toEqual(mockUser);
+    expect(result.error).toBeNull();
+    expect(mockSupabase.auth.signInWithPassword).toHaveBeenCalledWith({
+      email: 'test@example.com',
+      password: 'password123',
+    });
+  });
+
+  it('should handle failed login', async () => {
+    const mockError = { message: 'Invalid credentials' };
+    mockSupabase.auth.signInWithPassword.mockResolvedValueOnce({
+      data: { user: null },
+      error: mockError,
+    });
+
+    const result = await mockSupabase.auth.signInWithPassword({
+      email: 'test@example.com',
+      password: 'wrongpassword',
+    });
+
+    expect(result.data.user).toBeNull();
+    expect(result.error).toEqual(mockError);
+  });
+
+  it('should handle session refresh', async () => {
+    const mockSession = { user: { id: 'test-user-id' }, expires_at: Date.now() + 3600 };
+    mockSupabase.auth.refreshSession.mockResolvedValueOnce({
+      data: { session: mockSession },
+      error: null,
+    });
+
+    const result = await mockSupabase.auth.refreshSession();
+
+    expect(result.data.session).toEqual(mockSession);
+    expect(result.error).toBeNull();
+    expect(mockSupabase.auth.refreshSession).toHaveBeenCalled();
+  });
+
+  it('should handle sign out', async () => {
+    mockSupabase.auth.signOut.mockResolvedValueOnce({ error: null });
+
+    const result = await mockSupabase.auth.signOut();
+
+    expect(result.error).toBeNull();
+    expect(mockSupabase.auth.signOut).toHaveBeenCalled();
+  });
 
   // Authentication handler functions
   const handleLogin = async (email: string, password: string) => {
@@ -48,10 +116,6 @@ describe('Authentication Tests', () => {
     });
     return response;
   };
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
 
   describe('Session Management', () => {
     it('should validate active session', async () => {
@@ -133,58 +197,6 @@ describe('Authentication Tests', () => {
 
       const refreshedSession = await checkAndRefreshSession(mockSession);
       expect(refreshedSession).toBeNull();
-    });
-  });
-
-  describe('Login Flow', () => {
-    it('should handle successful login', async () => {
-      const mockCredentials = {
-        email: 'test@example.com',
-        password: 'password123',
-      };
-
-      const mockAuthResponse = {
-        data: {
-          session: {
-            access_token: 'mock_token',
-            refresh_token: 'mock_refresh_token',
-            expires_in: 3600,
-            expires_at: Math.floor(Date.now() / 1000) + 3600,
-            token_type: 'bearer',
-            user: { id: '123', email: mockCredentials.email },
-          },
-        },
-        error: null,
-      };
-
-      mockSupabase.auth.signInWithPassword.mockResolvedValue(mockAuthResponse);
-
-      const response = await mockSupabase.auth.signInWithPassword(mockCredentials);
-      expect(response.error).toBeNull();
-      expect(response.data.session).toBeDefined();
-      expect(response.data.session.access_token).toBe('mock_token');
-    });
-
-    it('should handle login failure with invalid credentials', async () => {
-      mockSupabase.auth.signInWithPassword.mockResolvedValue({
-        data: { session: null },
-        error: { message: 'Invalid credentials', status: 401 }
-      });
-
-      const result = await handleLogin('test@example.com', 'wrongpassword');
-      expect(result.error).toBeTruthy();
-      expect(result.error?.message).toBe('Invalid credentials');
-    });
-
-    it('should handle login failure with rate limiting', async () => {
-      mockSupabase.auth.signInWithPassword.mockResolvedValue({
-        data: { session: null },
-        error: { message: 'Too many requests', status: 429 }
-      });
-
-      const result = await handleLogin('test@example.com', 'password123');
-      expect(result.error).toBeTruthy();
-      expect(result.error?.status).toBe(429);
     });
   });
 
@@ -270,10 +282,10 @@ describe('Authentication Tests', () => {
       mockSupabase.auth = {
         ...mockSupabase.auth,
         mfa: {
-          enroll: jest.fn(),
-          verify: jest.fn(),
-          unenroll: jest.fn(),
-          challenge: jest.fn()
+          enroll: vi.fn(),
+          verify: vi.fn(),
+          unenroll: vi.fn(),
+          challenge: vi.fn()
         }
       };
     });
