@@ -221,7 +221,6 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
 
   const fetchAddress = async (currency?: string, network?: string) => {
     if (!currency || !network) {
-      console.log('[DepositModal] Missing required parameters:', { currency, network });
       setError('Please select a currency and network');
       return;
     }
@@ -290,7 +289,6 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
 
   useEffect(() => {
     if (!isOpen) {
-      console.log('[DepositModal] Modal closed, resetting state');
       setAddress('');
       setDestinationTag('');
       setError('');
@@ -301,35 +299,28 @@ export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
     }
 
     if (!wallet?.currency) {
-      console.error('[DepositModal] No wallet currency available');
       return;
     }
 
     const currency = wallet.currency.toLowerCase();
     setSelectedCurrency(currency);
-    console.log('[DepositModal] Modal opened/currency changed:', { currency });
 
     if (FIAT_CURRENCIES.includes(currency)) {
-      console.log('[DepositModal] Fiat currency detected:', currency);
       setError('Please use bank transfer for fiat deposits');
       return;
     }
 
     const networks = NETWORKS_BY_CURRENCY[currency];
     if (!networks?.length) {
-      console.error('[DepositModal] No networks available for currency:', currency);
       setError(`${currency.toUpperCase()} deposits are not supported`);
       return;
     }
 
-    console.log('[DepositModal] Available networks:', networks);
     const recommendedNetwork = networks.find(n => n.isRecommended);
     const defaultNetwork = recommendedNetwork || networks[0];
     
     if (defaultNetwork) {
-      console.log('[DepositModal] Setting default network:', defaultNetwork.id);
       setSelectedNetwork(defaultNetwork.id);
-      // Add a small delay to ensure state is updated
       setTimeout(() => {
         fetchAddress(currency, defaultNetwork.id);
       }, 100);

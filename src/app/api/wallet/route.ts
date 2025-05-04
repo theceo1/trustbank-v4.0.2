@@ -1,3 +1,4 @@
+//src/app/api/wallet/route.ts
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
@@ -81,10 +82,6 @@ export async function GET(request: Request) {
 
     const profile = profileData as UserProfile;
     if (!profile?.quidax_id) {
-      console.log('No Quidax ID found for user:', {
-        profile,
-        userId: session.user.id
-      });
       return NextResponse.json({
         wallets: [],
         marketData: [],
@@ -95,11 +92,6 @@ export async function GET(request: Request) {
         message: 'Your account is being set up. Please check back in a few minutes.'
       });
     }
-
-    console.log('Found user profile:', {
-      userId: session.user.id,
-      quidaxId: profile.quidax_id
-    });
 
     // Initialize Quidax service
     const quidaxSecretKey = process.env.QUIDAX_SECRET_KEY;
@@ -136,13 +128,6 @@ export async function GET(request: Request) {
           return [] as QuidaxWallet[];
         });
 
-      // Log wallet response
-      console.log('Wallet fetch response:', {
-        walletsCount: walletsResponse.length,
-        currencies: walletsResponse.map(w => w.currency),
-        userId: profile.quidax_id
-      });
-
       // Retry market data fetch up to 3 times
       let marketDataResponse;
       let retryCount = 0;
@@ -165,17 +150,14 @@ export async function GET(request: Request) {
 
       while (retryCount < maxRetries) {
         try {
-          console.log(`Attempting to fetch market data (attempt ${retryCount + 1}/${maxRetries})`);
           marketDataResponse = await quidax.getMarketTickers();
           
           if (marketDataResponse?.data && Object.keys(marketDataResponse.data).length > 0) {
-            console.log('Successfully fetched market data');
             break;
           } else {
             throw new Error('Empty market data response');
           }
         } catch (error) {
-          console.error(`Market data fetch attempt ${retryCount + 1} failed:`, error);
           retryCount++;
           
           if (retryCount === maxRetries) {
@@ -199,13 +181,10 @@ export async function GET(request: Request) {
       const transformedMarketData: MarketData[] = [];
       
       if (marketDataResponse?.data && typeof marketDataResponse.data === 'object') {
-        console.log('Raw market data:', marketDataResponse.data);
-        
         // Process each market pair from the response
         for (const [market, data] of Object.entries<any>(marketDataResponse.data)) {
           // Skip if data is not in expected format
           if (!data?.ticker) {
-            console.log(`Skipping market ${market} - no ticker data`);
             continue;
           }
 
@@ -223,12 +202,10 @@ export async function GET(request: Request) {
             baseCurrency = market.slice(0, -3);
             quoteCurrency = 'BTC';
           } else {
-            console.log(`Skipping market ${market} - unknown quote currency`);
             continue;
           }
           
           if (!baseCurrency || !quoteCurrency) {
-            console.log(`Skipping market ${market} - cannot parse pair`);
             continue;
           }
 
@@ -236,15 +213,6 @@ export async function GET(request: Request) {
           const lastPrice = parseFloat(ticker.last) || 0;
           const openPrice = parseFloat(ticker.open) || lastPrice;
           const change24h = openPrice ? ((lastPrice - openPrice) / openPrice) * 100 : 0;
-
-          console.log(`Processing market ${market}:`, {
-            baseCurrency: baseCurrency.toUpperCase(),
-            quoteCurrency: quoteCurrency.toUpperCase(),
-            lastPrice,
-            openPrice,
-            change24h,
-            rawTicker: ticker
-          });
 
           transformedMarketData.push({
             currency: baseCurrency.toUpperCase(),
@@ -254,12 +222,6 @@ export async function GET(request: Request) {
             change_24h: change24h
           });
         }
-
-        // Log all transformed market data for debugging
-        console.log('Transformed market data:', transformedMarketData.map(m => ({
-          pair: `${m.currency}/${m.quote_currency}`,
-          price: m.price
-        })));
       } else {
         console.error('Invalid market data response:', marketDataResponse);
       }
@@ -269,16 +231,9 @@ export async function GET(request: Request) {
         m.currency === 'USDT' && m.quote_currency === 'NGN'
       );
       const usdtNgnRate = usdtNgnMarket?.price || FALLBACK_USDT_NGN_RATE;
-      console.log('USDT/NGN Rate:', usdtNgnRate, usdtNgnMarket ? '(from market)' : '(using fallback)');
 
       // Calculate wallet values
       const walletsWithValues = (walletsResponse || []).map((wallet: QuidaxWallet) => {
-        console.log('[WALLET API] Processing wallet:', {
-          currency: wallet.currency,
-          balance: wallet.balance,
-          raw: wallet
-        });
-
         const balance = parseFloat(wallet.balance || '0');
         const currency = wallet.currency?.toUpperCase();
         let valueInNGN = 0;
@@ -314,24 +269,10 @@ export async function GET(request: Request) {
               if (fallbackUsdtPrice) {
                 valueInNGN = balance * fallbackUsdtPrice * usdtNgnRate;
                 marketPrice = fallbackUsdtPrice * usdtNgnRate;
-                console.log(`[WALLET API] Using fallback price for ${currency}:`, {
-                  fallbackUsdtPrice,
-                  usdtNgnRate,
-                  valueInNGN
-                });
-              } else {
-                console.log(`[WALLET API] No price available for ${currency}`);
               }
             }
           }
         }
-
-        console.log('[WALLET API] Final wallet values:', {
-          currency,
-          balance,
-          valueInNGN,
-          marketPrice
-        });
 
         return {
           ...wallet,
@@ -344,28 +285,11 @@ export async function GET(request: Request) {
       // Calculate total portfolio value
       const totalValueNGN = walletsWithValues.reduce((sum, wallet) => {
         const value = wallet.estimated_value || 0;
-        console.log('[WALLET API] Adding to total:', {
-          currency: wallet.currency,
-          value,
-          runningTotal: sum + value
-        });
         return sum + value;
       }, 0);
 
       // Calculate total USD value
       const totalValueUSD = usdtNgnRate > 0 ? totalValueNGN / usdtNgnRate : 0;
-
-      console.log('[WALLET API] Final portfolio values:', {
-        totalValueNGN,
-        totalValueUSD,
-        usdtNgnRate,
-        walletCount: walletsWithValues.length,
-        walletsBreakdown: walletsWithValues.map(w => ({
-          currency: w.currency,
-          balance: w.balance,
-          estimated_value: w.estimated_value
-        }))
-      });
 
       return NextResponse.json({
         wallets: walletsWithValues,

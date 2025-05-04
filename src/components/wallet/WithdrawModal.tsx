@@ -16,6 +16,9 @@ import type { Database } from "@/types/database.types";
 import { WithdrawPreview } from './WithdrawPreview';
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import { BankSelector } from '@/components/payments/BankSelector';
+import { BankAccountVerifier } from '@/components/payments/BankAccountVerifier';
+import { useTheme } from 'next-themes';
 
 interface WithdrawModalProps {
   isOpen: boolean;
@@ -63,6 +66,7 @@ type InputCurrency = 'CRYPTO' | 'NGN' | 'USD';
 
 export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModalProps) {
   const { toast } = useToast();
+  const { theme } = useTheme();
   const supabase = createClientComponentClient<Database>();
   const router = useRouter();
   
@@ -90,6 +94,10 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
   const [currentRate, setCurrentRate] = useState(0);
   const [bankCode, setBankCode] = useState('');
   const [bankName, setBankName] = useState('');
+  const [withdrawalType, setWithdrawalType] = useState<'crypto' | 'fiat'>('crypto');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [withdrawTab, setWithdrawTab] = useState<'crypto' | 'ngn'>('ngn');
 
   // Ensure we have valid currency codes
   const balance = parseFloat(wallet?.balance || '0');
@@ -182,6 +190,53 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
     fetchData();
   }, [isOpen, currency, supabase, toast]);
 
+  // Auto-verify account when both bank and 10-digit account number are filled
+  useEffect(() => {
+    const verify = async () => {
+      if (selectedBank && accountNumber.length === 10) {
+        setIsVerifying(true);
+        setVerifyError(null);
+        setAccountName('');
+        try {
+          const res = await fetch('/api/payments/korapay/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              bankCode: selectedBank,
+              accountNumber: accountNumber.replace(/\D/g, '') // Ensure only digits
+            }),
+          });
+          const data = await res.json();
+          
+          if (!res.ok) {
+            console.error('Account verification failed:', data);
+            setVerifyError(data.error || 'Could not verify account');
+            setAccountName('');
+            return;
+          }
+
+          if (data.status === 'success' && data.data.account_name) {
+            setAccountName(data.data.account_name);
+            setVerifyError(null);
+          } else {
+            setVerifyError('Could not verify account');
+            setAccountName('');
+          }
+        } catch (e) {
+          console.error('Account verification error:', e);
+          setVerifyError('Could not verify account');
+          setAccountName('');
+        } finally {
+          setIsVerifying(false);
+        }
+      } else {
+        setAccountName('');
+        setVerifyError(null);
+      }
+    };
+    verify();
+  }, [selectedBank, accountNumber]);
+
   // Early return if modal is not open
   if (!isOpen) {
     return null;
@@ -229,15 +284,10 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
   };
 
   const handleAmountChange = (value: string) => {
-    setAmount(value);
-    const numValue = parseFloat(value || '0');
-    
-    if (inputCurrency === 'CRYPTO') {
-      setAmountInCrypto(numValue);
-    } else if (inputCurrency === 'NGN') {
-      setAmountInCrypto(numValue / (rate || 1));
-    } else {
-      setAmountInCrypto((numValue * 1585.23) / (rate || 1)); // Convert USD to NGN then to crypto
+    const numericValue = value.replace(/[^0-9.]/g, '');
+    setAmount(numericValue);
+    if (rate > 0) {
+      setAmountInCrypto(Number(numericValue) / rate);
     }
   };
 
@@ -290,26 +340,34 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
     setIsLoading(true);
     try {
       if (currency.toLowerCase() === 'ngn') {
-        // Handle NGN withdrawal
-        const response = await fetch('/api/wallet/withdraw', {
+        // Handle NGN withdrawal using Korapay
+        const response = await fetch('/api/payments/korapay/transfer', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            currency,
             amount: amountInCrypto.toString(),
-            withdrawType: 'ngn',
-            bankDetails: { 
-              bankName: selectedBank, 
-              accountNumber, 
-              accountName,
-              reference: reference
-            }
+            currency: 'NGN',
+            bankCode: selectedBank,
+            accountNumber,
+            accountName,
+            narration: `Withdrawal to ${accountName}`
           }),
         });
 
         if (!response.ok) {
           const data = await response.json();
           throw new Error(data.message || 'NGN withdrawal failed');
+        }
+
+        const data = await response.json();
+        if (data.status === 'success') {
+          toast({
+            title: "Success",
+            description: "Withdrawal initiated successfully. Please wait for confirmation.",
+          });
+          onClose();
+        } else {
+          throw new Error(data.message || 'Withdrawal failed');
         }
       } else {
         // Handle crypto withdrawal
@@ -327,14 +385,14 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
           const data = await response.json();
           throw new Error(data.error || 'Withdrawal failed');
         }
+
+        toast({
+          title: "Success",
+          description: "Withdrawal initiated successfully",
+        });
+
+        onClose();
       }
-
-      toast({
-        title: "Success",
-        description: "Withdrawal initiated successfully",
-      });
-
-      onClose();
     } catch (error) {
       console.error('Withdrawal error:', error);
       toast({
@@ -344,6 +402,63 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (withdrawTab === 'ngn') {
+      if (!amount || Number(amount) < 1000 || Number(amount) > 10000000) {
+        toast({
+          title: 'Error',
+          description: 'You can only transfer an amount between NGN 1000 and NGN 10000000',
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (!selectedBank || !accountNumber || !accountName) {
+        toast({
+          title: 'Error',
+          description: 'Please fill in all bank details',
+          variant: 'destructive',
+        });
+        return;
+      }
+      setIsLoading(true);
+      try {
+        const response = await fetch('/api/payments/korapay/transfer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: Number(amount),
+            currency: 'NGN',
+            bankCode: selectedBank,
+            accountNumber,
+            accountName,
+            narration: reference || `Withdrawal from TrustBank`,
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok || data.status !== 'success') {
+          throw new Error(data.error || data.message || 'Failed to process transfer');
+        }
+        toast({
+          title: 'Success',
+          description: 'Transfer initiated successfully',
+          variant: 'default',
+        });
+        setTimeout(onClose, 1200);
+      } catch (err) {
+        toast({
+          title: 'Error',
+          description: err instanceof Error ? err.message : 'An error occurred',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      // Crypto withdrawal logic (existing)
+      // ...
     }
   };
 
@@ -452,22 +567,6 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
   const renderNGNWithdraw = () => (
     <div className="space-y-4">
       <div className="space-y-1">
-        <label className="text-xs font-medium text-white">Select Cryptocurrency</label>
-        <Select value={selectedNetwork} onValueChange={(value) => setSelectedNetwork(value as NetworkType)}>
-          <SelectTrigger className="bg-black text-white border-green-800/50 h-8 text-xs">
-            <SelectValue placeholder="Select cryptocurrency" />
-          </SelectTrigger>
-          <SelectContent className="bg-black border-green-800/50">
-            {networkConfig[currency as keyof NetworkConfig]?.map((net) => (
-              <SelectItem key={net} value={net} className="text-white text-xs">
-                {net}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-1">
         <label className="text-xs font-medium text-white">Amount (NGN)</label>
         <div className="relative">
           <Input
@@ -488,60 +587,38 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
             MAX
           </Button>
         </div>
-        {rate > 0 && (
-          <p className="text-[10px] text-green-400">
-            ≈ {amountInCrypto.toFixed(8)} {selectedNetwork}
-          </p>
-        )}
       </div>
-
       <div className="space-y-1">
         <label className="text-xs font-medium text-white">Bank Name</label>
-        <Select value={selectedBank} onValueChange={(value) => setSelectedBank(value)}>
-          <SelectTrigger className="bg-black text-white border-green-800/50 h-8 text-xs">
-            <SelectValue placeholder="Select your bank" />
-          </SelectTrigger>
-          <SelectContent className="bg-black border-green-800/50">
-            {SUPPORTED_BANKS.map((bank) => (
-              <SelectItem key={bank.id} value={bank.id} className="text-white text-xs">
-                {bank.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <BankSelector
+          value={selectedBank}
+          onSelect={setSelectedBank}
+        />
       </div>
-
       <div className="space-y-1">
         <label className="text-xs font-medium text-white">Account Number</label>
         <Input
           value={accountNumber}
-          onChange={(e) => {
-            const value = e.target.value.replace(/\D/g, '').slice(0, 10);
-            setAccountNumber(value);
-            validateAccountNumber(value);
-          }}
+          onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
           placeholder="Enter 10-digit account number"
           maxLength={10}
           className="bg-black text-white border-green-800/50 h-8 text-xs"
         />
       </div>
-
-      {isValidatingAccount && (
-        <div className="flex items-center justify-center py-1">
-          <Icons.spinner className="h-3 w-3 animate-spin text-green-400" />
-          <span className="ml-2 text-[10px] text-white/70">Validating account...</span>
-        </div>
+      {isVerifying && (
+        <div className="text-xs text-blue-400">Verifying account...</div>
       )}
-
-      {accountName && (
+      {accountName && !isVerifying && !verifyError && (
         <div className="space-y-1">
           <label className="text-xs font-medium text-white">Account Name</label>
           <div className="rounded-md border border-green-800/50 bg-black/50 px-3 py-1.5">
-            <p className="text-xs text-white">{accountName}</p>
+            <p className="text-xs text-green-600 font-bold">{accountName}</p>
           </div>
         </div>
       )}
-
+      {verifyError && (
+        <div className="text-xs text-red-500">{verifyError}</div>
+      )}
       <div className="space-y-1">
         <label className="text-xs font-medium text-white">Reference (Optional)</label>
         <Input
@@ -551,7 +628,6 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
           className="bg-black text-white border-green-800/50 h-8 text-xs"
         />
       </div>
-
       <Alert className="bg-blue-900/20 border-blue-800/50 py-2">
         <Icons.info className="h-3 w-3 text-blue-400" />
         <AlertDescription className="text-[10px] text-blue-100">
@@ -588,38 +664,29 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
         >
           <DialogHeader className="space-y-0.5">
             <DialogTitle className="text-base font-semibold text-white">
-              Withdraw {currency?.toUpperCase()}
+              Withdraw {wallet?.currency?.toUpperCase()}
             </DialogTitle>
             <DialogDescription className="text-xs text-white/70">
-              {currency.toLowerCase() === 'ngn' 
-                ? "Enter your bank details to withdraw"
-                : "Select a network and enter withdrawal details"
-              }
+              {withdrawTab === 'ngn' ? 'Enter your bank details to withdraw' : 'Select a network and enter withdrawal details'}
             </DialogDescription>
           </DialogHeader>
-
           <div className="space-y-3 mt-2">
-            {currency.toLowerCase() === 'ngn' ? (
-              renderNGNWithdraw()
-            ) : (
-              <Tabs defaultValue="crypto" className="w-full" onValueChange={(value) => setSelectedNetwork(value as NetworkType)}>
-                <TabsList className="grid w-full grid-cols-2 bg-black/20 h-8">
-                  <TabsTrigger value="crypto" className="text-xs text-white data-[state=active]:bg-green-600">Crypto Withdrawal</TabsTrigger>
-                  <TabsTrigger value="ngn" className="text-xs text-white data-[state=active]:bg-green-600">NGN Withdrawal</TabsTrigger>
-                </TabsList>
-                <TabsContent value="crypto" className="mt-3">
-                  {renderCryptoWithdraw()}
-                </TabsContent>
-                <TabsContent value="ngn" className="mt-3">
-                  {renderNGNWithdraw()}
-                </TabsContent>
-              </Tabs>
-            )}
-
+            <Tabs value={withdrawTab} onValueChange={v => setWithdrawTab(v as 'crypto' | 'ngn')} className="w-full">
+              <TabsList className="grid w-full grid-cols-2 bg-black/20 h-8">
+                <TabsTrigger value="crypto" className="text-xs text-white data-[state=active]:bg-green-600">Crypto Withdrawal</TabsTrigger>
+                <TabsTrigger value="ngn" className="text-xs text-white data-[state=active]:bg-green-600">NGN Withdrawal</TabsTrigger>
+              </TabsList>
+              <TabsContent value="crypto" className="mt-3">
+                {renderCryptoWithdraw()}
+              </TabsContent>
+              <TabsContent value="ngn" className="mt-3">
+                {renderNGNWithdraw()}
+              </TabsContent>
+            </Tabs>
             <DialogFooter>
               <Button
-                onClick={handleWithdraw}
-                disabled={isLoading || !amount || (!address && !accountNumber) || (!selectedNetwork && currency.toLowerCase() !== 'ngn')}
+                onClick={handleSubmit}
+                disabled={isLoading}
                 className="w-full bg-green-600 hover:bg-green-700 text-white text-sm h-9"
               >
                 {isLoading ? (

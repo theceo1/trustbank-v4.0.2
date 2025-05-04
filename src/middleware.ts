@@ -157,16 +157,6 @@ const PUBLIC_PATHS = [
 const ADMIN_ROUTES = /^\/admin(?:\/.*)?$/;
 
 export async function middleware(req: NextRequest) {
-  console.log('\n[MAIN MIDDLEWARE] ====== Request Start ======');
-  console.log('[MAIN MIDDLEWARE] Path:', req.nextUrl.pathname);
-  console.log('[MAIN MIDDLEWARE] Method:', req.method);
-  console.log('[MAIN MIDDLEWARE] Cookies:', {
-    names: req.cookies.getAll().map(c => c.name),
-    hasAccessToken: !!req.cookies.get('sb-access-token'),
-    hasSession: !!req.cookies.get('sb-session'),
-    hasAdminSession: !!req.cookies.get('admin-session')
-  });
-
   const res = NextResponse.next();
   const path = req.nextUrl.pathname;
 
@@ -175,34 +165,21 @@ export async function middleware(req: NextRequest) {
 
   // Check if the path is the admin login page FIRST
   if (path === '/admin/login') {
-    console.log('[MAIN MIDDLEWARE] Admin login page detected, bypassing all checks');
     res.cookies.set('next-url', path);
     return res;
   }
 
   // Check if the path is an admin route
   const isAdminRoute = ADMIN_ROUTES.test(path) || path.startsWith('/api/admin');
-  console.log('[MAIN MIDDLEWARE] Route check:', {
-    path,
-    isAdminRoute,
-    isApiRoute: path.startsWith('/api/')
-  });
 
   // For admin routes, delegate to admin middleware
   if (isAdminRoute) {
-    console.log('[MAIN MIDDLEWARE] Delegating to admin middleware');
     try {
       const adminResponse = await adminMiddleware(req);
       if (adminResponse) {
-        console.log('[MAIN MIDDLEWARE] Admin middleware returned response:', {
-          status: adminResponse.status,
-          location: adminResponse.headers.get('location'),
-          type: adminResponse instanceof NextResponse ? 'NextResponse' : 'unknown'
-        });
         return adminResponse;
       }
     } catch (error) {
-      console.error('[MAIN MIDDLEWARE] Admin middleware error:', error);
       const redirectUrl = req.nextUrl.clone();
       redirectUrl.pathname = '/admin/login';
       return NextResponse.redirect(redirectUrl);
@@ -211,39 +188,21 @@ export async function middleware(req: NextRequest) {
 
   // Then check if the path is public
   const isPublicPath = PUBLIC_PATHS.some(p => path.startsWith(p));
-  console.log('[MAIN MIDDLEWARE] Public path check:', {
-    path,
-    isPublicPath,
-    publicPaths: PUBLIC_PATHS
-  });
 
   if (isPublicPath) {
-    console.log('[MAIN MIDDLEWARE] Allowing public path access');
     return res;
   }
 
   const supabase = createMiddlewareClient({ req, res });
 
   try {
-    console.log('[MAIN MIDDLEWARE] Checking session...');
     const { data: { session }, error } = await supabase.auth.getSession();
     
-    console.log('[MAIN MIDDLEWARE] Session check result:', {
-      hasSession: !!session,
-      userId: session?.user?.id,
-      email: session?.user?.email,
-      error: error?.message,
-      accessToken: session?.access_token ? 'Present' : 'Missing',
-      refreshToken: session?.refresh_token ? 'Present' : 'Missing'
-    });
-
     if (error) {
-      console.error('[MAIN MIDDLEWARE] Session error:', error);
       await supabase.auth.signOut();
       const redirectUrl = req.nextUrl.clone();
       redirectUrl.pathname = '/auth/login';
       redirectUrl.searchParams.set('redirect', req.nextUrl.pathname);
-      console.log('[MAIN MIDDLEWARE] Redirecting to auth login due to session error');
       return NextResponse.redirect(redirectUrl);
     }
 
@@ -251,16 +210,7 @@ export async function middleware(req: NextRequest) {
     const isAuthRequired = AUTH_REQUIRED_PATHS.some(route => path.startsWith(route));
     const isAuthRoute = path.startsWith('/auth');
 
-    console.log('[MAIN MIDDLEWARE] Auth route check:', {
-      path,
-      isAuthRequired,
-      isAuthRoute,
-      hasSession: !!session,
-      sessionExpiry: session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : 'N/A'
-    });
-
     if (isAuthRequired && !session) {
-      console.log('[MAIN MIDDLEWARE] Protected route accessed without session, redirecting to login');
       const redirectUrl = req.nextUrl.clone();
       redirectUrl.pathname = '/auth/login';
       redirectUrl.searchParams.set('redirect', req.nextUrl.pathname);
@@ -268,13 +218,11 @@ export async function middleware(req: NextRequest) {
     }
 
     if (isAuthRoute && session) {
-      console.log('[MAIN MIDDLEWARE] Auth route accessed with active session, redirecting to dashboard');
       return NextResponse.redirect(new URL('/dashboard', req.url));
     }
 
     // Set session cookies for client-side access
     if (session) {
-      console.log('[MAIN MIDDLEWARE] Setting session cookies');
       const maxAge = 30 * 24 * 60 * 60; // 30 days in seconds
       
       res.cookies.set('sb-access-token', session.access_token, {
@@ -302,10 +250,8 @@ export async function middleware(req: NextRequest) {
       });
     }
 
-    console.log('[MAIN MIDDLEWARE] ====== Request End ======\n');
     return res;
   } catch (error) {
-    console.error('[MAIN MIDDLEWARE] Unexpected error:', error);
     return res;
   }
 }

@@ -50,7 +50,6 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      console.log('Fetching profile for user:', userId);
       const { data, error: profileError } = await supabase
         .from('user_profiles')
         .select('*')
@@ -58,12 +57,9 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         .single();
 
       if (profileError) {
-        console.error('Error fetching profile:', profileError);
         throw profileError;
       }
 
-      console.log('Profile data:', data);
-      
       // Check if the user has completed basic KYC
       // A user is considered KYC verified if they have completed basic info
       // AND have at least one form of ID verification (bvn, nin, passport, or government_id)
@@ -80,11 +76,9 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         kyc_basic_verified: hasBasicKyc && hasIdVerification
       };
 
-      console.log('Profile with KYC status:', profileWithKycStatus);
       setProfile(profileWithKycStatus);
       setError(null);
     } catch (err) {
-      console.error('Error fetching profile:', err);
       setError(err instanceof Error ? err : new Error('Failed to fetch profile'));
       setProfile(null);
     } finally {

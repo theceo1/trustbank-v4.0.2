@@ -20,21 +20,8 @@ export function PortfolioValue({ value }: PortfolioValueProps) {
   const { isHidden, toggleHidden } = useBalance();
   const router = useRouter();
 
-  console.log('[PortfolioValue] Received props:', {
-    value,
-    isHidden,
-    valueType: typeof value,
-    isNumber: !isNaN(value)
-  });
-
   const formattedValue = useMemo(() => {
     const numberValue = typeof value === 'string' ? parseFloat(value) : value;
-    console.log('[PortfolioValue] Formatting value:', {
-      originalValue: value,
-      parsedValue: numberValue,
-      isValidNumber: !isNaN(numberValue)
-    });
-    
     return new Intl.NumberFormat('en-NG', {
       style: 'currency',
       currency: 'NGN',
@@ -42,11 +29,6 @@ export function PortfolioValue({ value }: PortfolioValueProps) {
       maximumFractionDigits: 2
     }).format(isNaN(numberValue) ? 0 : numberValue);
   }, [value]);
-
-  console.log('[PortfolioValue] Rendering with:', {
-    formattedValue,
-    isHidden
-  });
 
   const handleRefresh = () => {
     window.location.reload();
