@@ -15,7 +15,7 @@ import { InstantSwapModal } from '@/components/InstantSwapModal'
 import { WithdrawModal } from '@/components/wallet/WithdrawModal'
 import { DepositModal } from '@/components/wallet/DepositModal'
 import { GeneralDepositModal } from '@/components/wallet/GeneralDepositModal'
-import { GeneralWithdrawModal } from '@/components/wallet/GeneralWithdrawModal'
+// import { GeneralWithdrawModal } from '@/components/wallet/GeneralWithdrawModal'
 import { GeneralSwapModal } from '@/components/wallet/GeneralSwapModal'
 import { Input } from '@/components/ui/input'
 
@@ -423,7 +423,7 @@ export default function WalletPage() {
         isOpen={isGeneralDepositOpen}
         onClose={() => setIsGeneralDepositOpen(false)}
       />
-      <GeneralWithdrawModal
+      <GeneralSwapModal
         isOpen={isGeneralWithdrawOpen}
         onClose={() => setIsGeneralWithdrawOpen(false)}
       />
