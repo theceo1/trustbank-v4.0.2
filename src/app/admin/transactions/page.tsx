@@ -56,7 +56,13 @@ interface Transaction {
     destination: string;
     source: string;
     notes?: string;
+    // Extended for provider-specific fields
+    provider?: string;
+    korapay?: any;
+    korapay_event?: any;
+    [key: string]: any;
   };
+
 }
 
 interface TransactionStats {
