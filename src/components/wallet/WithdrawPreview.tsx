@@ -27,6 +27,7 @@ export interface WithdrawPreviewProps {
   accountNumber?: string;
   accountName?: string;
   status?: 'initiated' | 'processing' | 'completed';
+  showCurrencyIcon?: boolean;
 }
 
 export function WithdrawPreview({
@@ -47,6 +48,7 @@ export function WithdrawPreview({
   accountNumber,
   accountName,
   status = 'initiated',
+  showCurrencyIcon = true,
 }: WithdrawPreviewProps) {
   const [timeLeft, setTimeLeft] = useState(14);
   const [isExpired, setIsExpired] = useState(false);
@@ -61,14 +63,7 @@ export function WithdrawPreview({
   const [networkFeeLoading, setNetworkFeeLoading] = useState(true);
   const [networkFeeError, setNetworkFeeError] = useState<string | null>(null);
 
-  // Fallback static network fee map (same as WithdrawModal)
-  const NETWORK_FEES: Record<string, number> = {
-    btc: 0.0001,
-    eth: 0.005,
-    usdt: 1,
-    usdc: 1,
-    bnb: 0.001
-  };
+  // (Removed static NETWORK_FEES, now using Quidax API for crypto fees)
 
   // Platform fee calculation for crypto: use percentage tier (default to 0.5%)
   function getCryptoPlatformFee(amount: number): number {
@@ -88,17 +83,24 @@ export function WithdrawPreview({
       setNetworkFee(0);
       setNetworkFeeLoading(false);
       setNetworkFeeError(null);
-      return;
+      return; // Guard: never fetch network fee for NGN
     }
     async function fetchNetworkFee() {
       setNetworkFeeLoading(true);
       setNetworkFeeError(null);
       try {
-        const res = await fetch(`/api/fees/network?currency=${currency}`);
+        // Fetch withdrawal fee from Quidax API
+        const res = await fetch(`https://www.quidax.com/api/v1/fee?currency=${currency.toLowerCase()}`);
         if (!res.ok) throw new Error('Failed to fetch network fee');
         const data = await res.json();
-        // Assume API returns { fee: number }
-        const fee = data?.fee;
+        // Quidax returns an array of fee ranges
+        // Find the correct fee for the withdrawal amount
+        const feeRanges = data?.data?.fee;
+        let fee = 0;
+        if (Array.isArray(feeRanges) && typeof amountInCrypto === 'number') {
+          const found = feeRanges.find((range: any) => amountInCrypto >= range.min && amountInCrypto < range.max);
+          fee = found ? found.value : 0;
+        }
         setNetworkFee(typeof fee === 'number' ? fee : 0);
       } catch (err: any) {
         setNetworkFeeError(err.message || 'Error fetching network fee');
@@ -108,18 +110,22 @@ export function WithdrawPreview({
       }
     }
     fetchNetworkFee();
-  }, [currency]);
+  }, [currency, amountInCrypto]);
 
   useEffect(() => {
     async function fetchPlatformFee() {
       setFeeLoading(true);
       setFeeError(null);
       try {
-        const res = await fetch('/api/config/fees');
+        const res = await fetch('/api/config/fees', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount: parseFloat(amount), currency }),
+        });
         if (!res.ok) throw new Error('Failed to fetch platform fee');
         const data = await res.json();
-        const fee = data?.data?.base_fees?.platform;
-        setPlatformFee(typeof fee === 'number' ? fee : 0);
+        // Expecting response: { fee, currency, display? }
+        setPlatformFee(typeof data.fee === 'number' ? data.fee : 0);
       } catch (err: any) {
         setFeeError(err.message || 'Error fetching platform fee');
         setPlatformFee(0);
@@ -127,8 +133,8 @@ export function WithdrawPreview({
         setFeeLoading(false);
       }
     }
-    fetchPlatformFee();
-  }, []);
+    if (amount && currency) fetchPlatformFee();
+  }, [amount, currency]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -169,97 +175,100 @@ export function WithdrawPreview({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {/* Dynamic Progress Bar */}
-<div className="flex justify-between text-sm text-muted-foreground mb-2">
-  {['initiated', 'processing', 'completed'].map((step, idx) => (
-    <span
-      key={step}
-      className={
-        status === step
-          ? 'font-bold text-green-400'
-          : idx < ['initiated', 'processing', 'completed'].indexOf(status)
-          ? 'text-green-600'
-          : ''
-      }
-    >
-      {step.charAt(0).toUpperCase() + step.slice(1)}
-    </span>
-  ))}
-</div>
-
-{currency.toLowerCase() === 'ngn' ? (
-  <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Amount to Withdraw</Label>
-                <div className="font-mono">
-                  {(() => {
-                    const symbols: Record<string, string> = { ngn: '₦', usd: '$', btc: '₿', eth: 'Ξ', usdt: '₮', usdc: '＄', bnb: '🟡' };
-                    const sym = symbols[currency.toLowerCase()] || currency.toUpperCase();
-                    return `${sym}${formatCurrency(parseFloat(amount), currency.toUpperCase())}`;
-                  })()}
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Withdrawal Fee</Label>
-                <div className="font-mono">
-                  {ngnFeeLoading || feeLoading ? (
-                    <span>Loading...</span>
-                  ) : ngnFeeError || feeError ? (
-                    <span className="text-red-500">{ngnFeeError || feeError}</span>
-                  ) : (
-                    (() => {
-                      const symbols: Record<string, string> = { ngn: '₦', usd: '$', btc: '₿', eth: 'Ξ', usdt: '₮', usdc: '＄', bnb: '🟡' };
-                      const sym = symbols[currency.toLowerCase()] || currency.toUpperCase();
-                      // Use ngnFee if available, else fallback to platformFee
-                      const feeToShow = typeof ngnFee === 'number' ? ngnFee : platformFee ?? 0;
-                      return <span>{sym}{formatCurrency(feeToShow, currency.toUpperCase())}</span>;
-                    })()
-                  )}
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>You Will Receive</Label>
-                <div className="font-mono text-lg font-bold">
-                  {ngnFeeLoading || feeLoading ? (
-                    <span>Loading...</span>
-                  ) : ngnFeeError || feeError ? (
-                    <span className="text-red-500">-</span>
-                  ) : (
-                    (() => {
-                      const symbols: Record<string, string> = { ngn: '₦', usd: '$', btc: '₿', eth: 'Ξ', usdt: '₮', usdc: '＄', bnb: '🟡' };
-                      const sym = symbols[currency.toLowerCase()] || currency.toUpperCase();
-                      const feeToShow = typeof ngnFee === 'number' ? ngnFee : platformFee ?? 0;
-                      return <span>{sym}{formatCurrency(Math.max(0, parseFloat(amount) - feeToShow), currency.toUpperCase())}</span>;
-                    })()
-                  )}
-                </div>
-              </div>
-              {/* Transaction Details */}
-              {bankName && (
-                <div className="space-y-2">
-                  <Label>Destination Bank</Label>
-                  <div className="font-mono">{bankName}</div>
-                </div>
-              )}
-              {accountNumber && (
-                <div className="space-y-2">
-                  <Label>Account Number</Label>
-                  <div className="font-mono">{accountNumber}</div>
-                </div>
-              )}
-              {accountName && (
-                <div className="space-y-2">
-                  <Label>Account Name</Label>
-                  <div className="font-mono">{accountName}</div>
-                </div>
-              )}
+          {/* Single Progress/Status Row reflecting withdrawal status */}
+          <div className="flex items-center gap-3 my-4">
+            <div className="flex-1 h-2 bg-gray-200 rounded-full">
+              <div
+                className={`h-2 rounded-full transition-all duration-500 ${
+                  status === 'completed'
+                    ? 'bg-green-500 w-full'
+                    : status === 'processing'
+                    ? 'bg-yellow-400 w-2/3'
+                    : status === 'initiated'
+                    ? 'bg-blue-500 w-1/3'
+                    : 'bg-gray-300 w-0'
+                }`}
+              />
             </div>
+            <span className="text-xs font-semibold">
+              {status === 'completed' && 'Completed'}
+              {status === 'processing' && 'Processing'}
+              {status === 'initiated' && 'Initiated'}
+            </span>
+          </div>
+          {/* End Progress/Status Row */}
+          {currency.toLowerCase() === 'ngn' ? (
+  <div>
+    {/* Amount to Withdraw */}
+    <div className="space-y-2">
+      <Label>Amount to Withdraw</Label>
+      <div className="font-mono">
+        {/* Only show symbol, never code */}
+        ₦{formatCurrency(parseFloat(amount), 'NGN')}
+      </div>
+    </div>
+    {/* Withdrawal Fee */}
+    <div className="space-y-2">
+      <Label>Withdrawal Fee</Label>
+      <div className="font-mono">
+        {ngnFeeLoading || feeLoading ? (
+          <span>Loading...</span>
+        ) : ngnFeeError || feeError ? (
+          <span className="text-red-500">{ngnFeeError || feeError}</span>
+        ) : (
+          <span>
+            ₦{formatCurrency(Math.max(typeof ngnFee === 'number' ? ngnFee : platformFee ?? 0, 200), 'NGN')}
+          </span>
+        )}
+      </div>
+    </div>
+    {/* You Will Receive */}
+    <div className="space-y-2">
+      <Label>You Will Receive</Label>
+      <div className="font-mono font-bold">
+        {ngnFeeLoading || feeLoading ? (
+          <span>Loading...</span>
+        ) : ngnFeeError || feeError ? (
+          <span className="text-red-500">{ngnFeeError || feeError}</span>
+        ) : (
+          <span>
+            ₦{formatCurrency(
+              Math.max(
+                0,
+                parseFloat(amount) - Math.max(typeof ngnFee === 'number' ? ngnFee : platformFee ?? 0, 200)
+              ),
+              'NGN'
+            )}
+          </span>
+        )}
+      </div>
+    </div>
+    {/* Transaction Details - always show, fallback to '-' if missing */}
+    {/* Transaction Details - show bank name, but not code */}
+    <div className="space-y-2">
+      <Label>Account Number</Label>
+      <div className="font-mono">{accountNumber || '-'}</div>
+    </div>
+    <div className="space-y-2">
+      <Label>Bank Name</Label>
+      <div className="font-mono">{typeof bankName === 'string' && isNaN(Number(bankName)) ? bankName : '-'}
+      </div>
+    </div>
+    <div className="space-y-2">
+      <Label>Account Name</Label>
+      <div className="font-mono">{accountName || '-'}</div>
+    </div>
+  </div>
           ) : (
             <div>
               <div className="space-y-2">
                 <Label>Amount to Withdraw</Label>
                 <div className="font-mono text-lg">
-                  {amountInCrypto?.toFixed(8)} {currency.toUpperCase()}
+                  {(() => {
+                    const symbols: Record<string, string> = { btc: '₿', eth: 'Ξ', usdt: '₮', usdc: '＄', bnb: '🟡' };
+                    const sym = showCurrencyIcon ? (symbols[currency.toLowerCase()] || '') : '';
+                    return `${sym}${amountInCrypto?.toFixed(8)}`;
+                  })()}
                   <div className="text-sm text-muted-foreground">
                     ≈ ₦{formatCurrency((amountInCrypto ?? 0) * (rate || 0), 'NGN')} / ${formatCurrency((amountInCrypto ?? 0) * ((rate || 0) / (usdRate || 1)), 'USD')}
                   </div>
@@ -273,14 +282,22 @@ export function WithdrawPreview({
                   ) : networkFeeError ? (
                     <span className="text-red-500">{networkFeeError}</span>
                   ) : (
-                    <span>{networkFee?.toFixed(8)} {currency.toUpperCase()}</span>
+                    (() => {
+                      const symbols: Record<string, string> = { btc: '₿', eth: 'Ξ', usdt: '₮', usdc: '＄', bnb: '🟡' };
+                      const sym = showCurrencyIcon ? (symbols[currency.toLowerCase()] || '') : '';
+                      return <span>{sym}{networkFee?.toFixed(8)}</span>;
+                    })()
                   )}
                 </div>
               </div>
               <div className="space-y-2">
                 <Label>Platform Fee</Label>
                 <div className="font-mono">
-                  {platformFeeCrypto.toFixed(8)} {currency.toUpperCase()}
+                  {(() => {
+                    const symbols: Record<string, string> = { btc: '₿', eth: 'Ξ', usdt: '₮', usdc: '＄', bnb: '🟡' };
+                    const sym = showCurrencyIcon ? (symbols[currency.toLowerCase()] || '') : '';
+                    return `${sym}${platformFeeCrypto.toFixed(8)}`;
+                  })()}
                   <div className="text-sm text-muted-foreground">
                     ≈ ₦{formatCurrency(platformFeeCrypto * (rate || 0), 'NGN')} / ${formatCurrency(platformFeeCrypto * ((rate || 0) / (usdRate || 1)), 'USD')}
                   </div>
@@ -291,8 +308,8 @@ export function WithdrawPreview({
                 <div className="font-mono text-lg font-bold">
                   {(() => {
                     const symbols: Record<string, string> = { btc: '₿', eth: 'Ξ', usdt: '₮', usdc: '＄', bnb: '🟡', ngn: '₦' };
-                    const sym = symbols[currency.toLowerCase()] || currency.toUpperCase();
-                    return `${finalAmount.toFixed(8)} ${sym}`;
+                    const sym = showCurrencyIcon ? (symbols[currency.toLowerCase()] || '') : '';
+                    return `${sym}${finalAmount.toFixed(8)}`;
                   })()}
                   <div className="text-sm text-muted-foreground font-normal">
                     ≈ ₦{formatCurrency(finalAmount * (rate || 0), 'NGN')} / ${formatCurrency(finalAmount * ((rate || 0) / (usdRate || 1)), 'USD')}

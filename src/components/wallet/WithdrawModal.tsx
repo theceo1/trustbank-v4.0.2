@@ -91,6 +91,8 @@ function getFeeTier(volumeUsd: number) {
 }
 
 export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModalProps) {
+  // ...existing hooks...
+  const [rateError, setRateError] = useState<string | null>(null);
   // =====================
   // ALL HOOKS MUST BE AT THE TOP! DO NOT ADD HOOKS BELOW THIS BLOCK OR AFTER THE EARLY RETURN.
   // =====================
@@ -104,10 +106,13 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
   const [amount, setAmount] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [withdrawTab, setWithdrawTab] = useState<'crypto' | 'ngn'>(wallet?.currency?.toLowerCase() === 'ngn' ? 'ngn' : 'crypto');
+  const [banks, setBanks] = useState<Bank[]>([]);
   const [selectedBank, setSelectedBank] = useState("");
+  // Make selectedBankName available in component scope
+  const selectedBankName = banks.find(b => b.code === selectedBank)?.name;
+
   const [accountNumber, setAccountNumber] = useState("");
   const [accountName, setAccountName] = useState("");
-  const [banks, setBanks] = useState<Bank[]>([]);
   const [isLoadingBanks, setIsLoadingBanks] = useState(false);
   const [isValidatingAccount, setIsValidatingAccount] = useState(false);
   const [bankSearch, setBankSearch] = useState("");
@@ -217,7 +222,6 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
           setBanks(data.entity);
         }
       } catch (error) {
-        console.error('Error fetching banks:', error);
         toast({
           title: "Error",
           description: "Failed to fetch banks. Please try again.",
@@ -257,7 +261,6 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
             });
           }
         } catch (error) {
-          console.error('Error validating account:', error);
           setAccountName('');
           toast({
             title: "Error",
@@ -290,10 +293,18 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
       try {
         // Fetch USD/NGN rate
         const res = await fetch('/api/markets/usdtngn/ticker');
+        if (!res.ok) throw new Error('Failed to fetch USD/NGN rate');
         const data = await res.json();
-        setUsdRate(parseFloat(data.data.price) || 0);
+        if (!data || !data.data || isNaN(parseFloat(data.data.price))) {
+          setUsdRate(0);
+          setRateError('Could not fetch USD/NGN rate. Some conversions may be unavailable.');
+        } else {
+          setUsdRate(parseFloat(data.data.price));
+          setRateError(null);
+        }
       } catch (e) {
         setUsdRate(0);
+        setRateError('Could not fetch USD/NGN rate. Some conversions may be unavailable.');
       }
     }
     fetchUserVolumeAndRate();
@@ -366,7 +377,6 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
       }
       setShowPreview(true);
     } catch (error) {
-      console.error('Error preparing withdrawal:', error);
       toast({
         title: "Error",
         description: "Failed to prepare withdrawal. Please try again.",
@@ -393,7 +403,6 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
       }, 1200);
     } catch (error) {
       setWithdrawStatus('initiated');
-      console.error('Error processing withdrawal:', error);
       toast({
         title: "Error",
         description: "Failed to process withdrawal. Please try again.",
@@ -704,6 +713,11 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {rateError && (
+              <div className="bg-yellow-800 text-yellow-200 rounded px-3 py-2 mb-2 text-sm">
+                {rateError}
+              </div>
+            )}
             {showPreview ? (
               <WithdrawPreview
                 amount={amount}
@@ -719,7 +733,11 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
                 ngnFee={ngnFee}
                 ngnFeeLoading={ngnFeeLoading}
                 ngnFeeError={ngnFeeError}
+                bankName={selectedBankName || '-'}
+                accountNumber={accountNumber || '-'}
+                accountName={accountName || '-'}
                 status={withdrawStatus}
+                showCurrencyIcon={isCryptoWallet ? false : true}
               />
             ) : renderForm()}
           </div>
@@ -727,4 +745,4 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
       </Dialog>
     </TooltipProvider>
   );
-} 
+}

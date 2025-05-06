@@ -20,17 +20,21 @@ console.log('API URL:', QUIDAX_API_URL);
 console.log('Secret key loaded:', !!QUIDAX_SECRET_KEY);
 console.log('Redis configured:', !!(UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN));
 
-// Validate market parameter
+// Dynamically validate market parameter using SUPPORTED_CURRENCIES
+import { SUPPORTED_CURRENCIES } from 'src/config/supportedCurrencies';
+
 function isValidMarket(market: string): boolean {
-  const validMarkets = [
-    'qdxusdt', 'btcusdt', 'btcngn', 'ethngn', 'qdxngn', 'xrpngn', 
-    'dashngn', 'ltcngn', 'usdtngn', 'btcghs', 'usdtghs', 'trxngn', 
-    'dogeusdt', 'bnbusdt', 'maticusdt', 'safemoonusdt', 'aaveusdt', 
-    'shibusdt', 'dotusdt', 'linkusdt', 'cakeusdt', 'xlmusdt', 'xrpusdt', 
-    'ltcusdt', 'ethusdt', 'trxusdt', 'axsusdt', 'wsgusdt', 'afenusdt', 
-    'blsusdt', 'dashusdt'
-  ];
-  return validMarkets.includes(market.toLowerCase());
+  if (!market || typeof market !== 'string' || market.length < 6) return false;
+  const lower = market.toLowerCase();
+  // Try all possible base/quote splits (from 3/3 to 5/5)
+  for (let i = 3; i <= Math.min(5, lower.length - 3); i++) {
+    const base = lower.slice(0, i).toUpperCase();
+    const quote = lower.slice(i).toUpperCase();
+    const baseOk = SUPPORTED_CURRENCIES.some(c => c.code === base);
+    const quoteOk = SUPPORTED_CURRENCIES.some(c => c.code === quote);
+    if (baseOk && quoteOk) return true;
+  }
+  return false;
 }
 
 export async function GET(

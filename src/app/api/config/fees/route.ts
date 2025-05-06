@@ -1,6 +1,9 @@
+//src/app/api/config/fees/route.ts
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { QuidaxService } from 'src/lib/quidax';
+import { SUPPORTED_CURRENCIES } from 'src/config/supportedCurrencies';
 
 type VolumeTier = {
   min: number;
@@ -26,12 +29,22 @@ export async function GET() {
       TIER_5: { min: 100000, max: null, fee: 2.5 }    // 100K+ USD: 2.5%
     };
 
-    // Define network fees
-    const networkFees = {
-      BTC: 0.0001,
-      ETH: 0.005,
-      USDT: 1
-    };
+    // Fetch network fees for all supported currencies from Quidax API
+    // Use centralized supported currencies config
+    const networkFees: Record<string, any> = {};
+    for (const { code: currency } of SUPPORTED_CURRENCIES) {
+      try {
+        const res = await fetch(`https://www.quidax.com/api/v1/fee?currency=${currency}`);
+        const data = await res.json();
+        if (data?.data?.fee) {
+          networkFees[currency] = data.data.fee; // Expose all fee ranges
+        } else {
+          networkFees[currency] = [];
+        }
+      } catch (e) {
+        networkFees[currency] = [];
+      }
+    }
 
     // Get user session
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -107,4 +120,60 @@ export async function GET() {
       { status: 500 }
     );
   }
-} 
+}
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const { amount, currency } = body;
+    if (!amount || !currency) {
+      return NextResponse.json({ error: 'Missing amount or currency' }, { status: 400 });
+    }
+    // Use markup percent from environment variable for easy control (default 0.15 = 15%)
+    const markupPercent = parseFloat(process.env.TRUSTBANK_MARKUP_PERCENT || '0.15'); // trustBank markup for profitability
+    let baseFee = 0;
+    let trustBankFee = 0;
+    let feeCurrency = currency.toUpperCase();
+    let feeRanges = [];
+    let display = '';
+
+    if (currency.toLowerCase() === 'ngn') {
+      // For NGN, min fee ₦200 or 0.5% of amount
+      baseFee = Math.max(200, 0.005 * Number(amount));
+      trustBankFee = Math.ceil(baseFee + baseFee * markupPercent);
+      display = `₦${trustBankFee}`;
+      feeRanges = [{min: 0, max: null, type: 'flat', value: baseFee}];
+    } else {
+      // For crypto, fetch fee ranges from Quidax
+      try {
+        const res = await fetch(`https://www.quidax.com/api/v1/fee?currency=${currency.toUpperCase()}`);
+        const data = await res.json();
+        feeRanges = data?.data?.fee || [];
+        // Find the highest allowed fee for this withdrawal amount
+        let bestRange = null;
+        for (const r of feeRanges) {
+          if (Number(amount) >= r.min && Number(amount) < r.max) {
+            if (!bestRange || r.value > bestRange.value) bestRange = r;
+          }
+        }
+        if (!bestRange && feeRanges.length > 0) bestRange = feeRanges[feeRanges.length-1];
+        baseFee = bestRange ? bestRange.value : 0;
+        trustBankFee = baseFee > 0 ? +(baseFee + baseFee * markupPercent).toFixed(8) : 0;
+        display = `${trustBankFee} ${currency.toUpperCase()}`;
+      } catch (e) {
+        return NextResponse.json({ error: 'Failed to fetch fee structure from Quidax' }, { status: 500 });
+      }
+    }
+
+    return NextResponse.json({
+      base_fee: baseFee,
+      trustbank_fee: trustBankFee,
+      currency: feeCurrency,
+      display,
+      markup_percent: markupPercent,
+      fee_ranges: feeRanges
+    });
+  } catch (error) {
+    return NextResponse.json({ error: 'Internal server error', details: error instanceof Error ? error.message : error }, { status: 500 });
+  }
+}

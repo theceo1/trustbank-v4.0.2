@@ -252,6 +252,11 @@ export default function TradingGuidePage() {
                     <li>Volume is calculated in USD based on your 30-day trading activity</li>
                     <li>All fees are transparent and displayed before each trade</li>
                   </ul>
+                  <div className="mt-3 p-3 rounded bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800">
+                    <strong>Withdrawal Markup Notice:</strong>
+                    <br />
+                    For every withdrawal (crypto or fiat), trustBank applies a small 15% markup to the base network or processing fee. This helps ensure platform sustainability and supports ongoing improvements. We believe in transparency—your total withdrawal fee (including markup) is always shown before you confirm a transaction.
+                  </div>
                 </AlertDescription>
               </Alert>
             </div>
