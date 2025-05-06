@@ -62,28 +62,76 @@ export async function POST(request: Request) {
         user_id: profile.quidax_id
       });
 
-      // Store order in database for tracking
-      const { error: dbError } = await supabase
-        .from('spot_orders')
-        .insert({
-          user_id: session.user.id,
-          quidax_order_id: order.id,
-          market,
-          side,
-          order_type: ord_type,
-          price: price || null,
-          volume,
-          status: order.state
-        });
+      // Fetch user's trading volume and fee tier from fees config endpoint
+      const feesRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/config/fees`, {
+        headers: { Cookie: request.headers.get('cookie') || '' }
+      });
+      const feesData = await feesRes.json();
+      const tradeFeePercent = feesData?.data?.base_fees?.platform || 4.0; // fallback to 4%
 
-      if (dbError) {
-        console.error('Error storing order:', dbError);
-        // Don't return error since order was created successfully on Quidax
+      // Calculate fee and update wallets
+      let feeAmount = 0;
+      let netAmount = 0;
+      let tradeCurrency = market.replace('ngn', '').replace('NGN', '').toUpperCase();
+      let updates = [];
+      if (side === 'buy') {
+        // User buys BTC with NGN
+        // Deduct NGN (including fee) from fiat wallet, credit BTC to crypto wallet
+        // Assume order.executed_volume is the BTC bought, order.avg_price is NGN/BTC
+        const btcAmount = Number(order.executed_volume || volume);
+        const ngnAmount = Number(order.avg_price) * btcAmount;
+        feeAmount = (tradeFeePercent / 100) * ngnAmount;
+        netAmount = ngnAmount + feeAmount; // Total NGN to deduct
+        updates.push(
+          supabase.rpc('debit_wallet', {
+            user_id: session.user.id,
+            wallet: 'ngn_wallet',
+            amount: netAmount
+          }),
+          supabase.rpc('credit_wallet', {
+            user_id: session.user.id,
+            wallet: `${tradeCurrency.toLowerCase()}_wallet`,
+            amount: btcAmount
+          })
+        );
+      } else if (side === 'sell') {
+        // User sells BTC for NGN
+        // Deduct BTC from crypto wallet, credit NGN (minus fee) to fiat wallet
+        const btcAmount = Number(order.executed_volume || volume);
+        const ngnAmount = Number(order.avg_price) * btcAmount;
+        feeAmount = (tradeFeePercent / 100) * ngnAmount;
+        netAmount = ngnAmount - feeAmount; // NGN to credit after fee
+        updates.push(
+          supabase.rpc('debit_wallet', {
+            user_id: session.user.id,
+            wallet: `${tradeCurrency.toLowerCase()}_wallet`,
+            amount: btcAmount
+          }),
+          supabase.rpc('credit_wallet', {
+            user_id: session.user.id,
+            wallet: 'ngn_wallet',
+            amount: netAmount
+          })
+        );
       }
+      // Execute wallet updates
+      await Promise.all(updates);
+      // Log fee as a transaction
+      await supabase.from('transactions').insert({
+        user_id: session.user.id,
+        type: 'trade_fee',
+        amount: feeAmount,
+        currency: 'NGN',
+        status: 'completed',
+        metadata: { market, side, order_id: order.id }
+      });
 
       return NextResponse.json({
         status: 'success',
-        data: order
+        data: order,
+        fee: feeAmount,
+        net_amount: netAmount,
+        fee_percent: tradeFeePercent
       });
     } catch (error: any) {
       return NextResponse.json(

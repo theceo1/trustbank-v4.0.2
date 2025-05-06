@@ -49,29 +49,63 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
     }
 
-    // Create withdrawal using Quidax service
-    const withdrawal = await quidaxService.request(`/users/${profile.quidax_id}/withdrawals`, {
-      method: 'POST',
-      data: {
-        currency: params.currency,
-        amount: params.amount,
-        address: params.address,
-        network: params.network
-      }
-    }) as QuidaxResponse<WithdrawalResponse>;
+    // Only allow NGN withdrawals to bank accounts (fiat withdrawal)
+    if (params.currency.toUpperCase() !== 'NGN') {
+      return NextResponse.json({ error: 'Only NGN withdrawals to bank accounts are allowed. Please convert your crypto to NGN first.' }, { status: 400 });
+    }
 
-    // Record the withdrawal in the database
+    // Integrate with Korapay API to send NGN to user's bank account
+    const { amount, bank_code, account_number, email, name, narration } = params;
+    const reference = `tbk-${Date.now()}-${Math.floor(Math.random()*100000)}`;
+    const korapayRes = await fetch(`${process.env.KORAPAY_API_URL}/transactions/disburse`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.KORAPAY_SECRET_KEY}`
+      },
+      body: JSON.stringify({
+        reference,
+        destination: {
+          type: 'bank_account',
+          amount: Number(amount),
+          currency: 'NGN',
+          narration: narration || 'trustBank withdrawal',
+          bank_account: {
+            bank: bank_code,
+            account: account_number
+          },
+          customer: {
+            name: name || '',
+            email
+          }
+        }
+      })
+    });
+    const korapayData = await korapayRes.json();
+    if (!korapayData.status) {
+      return NextResponse.json({ error: korapayData.message || 'Korapay payout failed', details: korapayData }, { status: 502 });
+    }
+
+    // Debit NGN from user's fiat wallet (ngn_wallet)
+    await supabase.rpc('debit_wallet', {
+      user_id: user.id,
+      wallet: 'ngn_wallet',
+      amount: Number(amount)
+    });
+
+    // Record the withdrawal in the database as processing
     await supabase.from('transactions').insert({
       user_id: user.id,
       type: 'withdrawal',
-      amount: params.amount,
-      currency: params.currency,
-      status: 'pending',
-      quidax_transaction_id: withdrawal.data.id,
-      metadata: withdrawal.data
+      amount: Number(amount),
+      currency: 'NGN',
+      status: 'processing',
+      quidax_transaction_id: null, // Not a Quidax withdrawal
+      korapay_reference: reference,
+      metadata: { bank_code, account_number, korapay: korapayData }
     });
 
-    return NextResponse.json({ data: withdrawal.data });
+    return NextResponse.json({ status: 'success', message: 'Withdrawal initiated. Funds will be sent to your bank account.', korapay: korapayData });
   } catch (error: any) {
     console.error('Withdrawal error:', error);
     return NextResponse.json(

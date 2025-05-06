@@ -122,6 +122,12 @@ export async function GET() {
   }
 }
 
+// List of currencies supported by Quidax /fee endpoint
+const SUPPORTED_FEE_CURRENCIES = [
+  'USDC', 'BUSD', 'BTC', 'LTC', 'ETH', 'XRP', 'USDT', 'DASH', 'TRX', 'DOGE', 'BNB', 'MATIC', 'SHIB', 'AXS', 'SAFE', 'CAKE', 'XLM', 'AAVE', 'LINK'
+  // Add/remove as Quidax updates their API
+];
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -143,12 +149,32 @@ export async function POST(request: Request) {
       trustBankFee = Math.ceil(baseFee + baseFee * markupPercent);
       display = `₦${trustBankFee}`;
       feeRanges = [{min: 0, max: null, type: 'flat', value: baseFee}];
-    } else {
-      // For crypto, fetch fee ranges from Quidax
+      console.log('[FEE DEBUG][NGN]', { amount, baseFee, trustBankFee, display, feeRanges });
+    } else if (SUPPORTED_FEE_CURRENCIES.includes(currency.toUpperCase())) {
+      // For supported crypto, fetch fee ranges from Quidax
       try {
-        const res = await fetch(`https://www.quidax.com/api/v1/fee?currency=${currency.toUpperCase()}`);
-        const data = await res.json();
-        feeRanges = data?.data?.fee || [];
+        const fetchUrl = `https://www.quidax.com/api/v1/fee?currency=${currency.toUpperCase()}`;
+        console.log('[FEE DEBUG] Fetching Quidax:', fetchUrl);
+        const res = await fetch(fetchUrl);
+        console.log('[FEE DEBUG] Quidax response status:', res.status);
+        let data: any = {};
+        let isJson = false;
+        try {
+          data = await res.json();
+          isJson = true;
+        } catch (parseErr) {
+          // Not JSON, likely HTML or text error
+          console.error('[FEE DEBUG] Failed to parse Quidax response as JSON', parseErr);
+        }
+        if (!isJson || res.status !== 200 || !data || data.status !== 'success' || !data.data || !Array.isArray(data.data.fee)) {
+          // Return a structured error to frontend
+          return NextResponse.json({
+            error: 'Quidax fee API error',
+            details: data && data.message ? data.message : `Invalid response for currency: ${currency}`
+          }, { status: 502 });
+        }
+        feeRanges = data.data.fee;
+        console.log('[FEE DEBUG] feeRanges:', feeRanges);
         // Find the highest allowed fee for this withdrawal amount
         let bestRange = null;
         for (const r of feeRanges) {
@@ -160,9 +186,23 @@ export async function POST(request: Request) {
         baseFee = bestRange ? bestRange.value : 0;
         trustBankFee = baseFee > 0 ? +(baseFee + baseFee * markupPercent).toFixed(8) : 0;
         display = `${trustBankFee} ${currency.toUpperCase()}`;
+        console.log('[FEE DEBUG] bestRange:', bestRange);
+        console.log('[FEE DEBUG] baseFee:', baseFee, 'trustBankFee:', trustBankFee, 'display:', display);
       } catch (e) {
-        return NextResponse.json({ error: 'Failed to fetch fee structure from Quidax' }, { status: 500 });
+        if (e instanceof Error) {
+          console.error('[FEE DEBUG] Error fetching/parsing Quidax fee:', e.stack);
+          return NextResponse.json({ error: 'Failed to fetch fee structure from Quidax', details: e.message }, { status: 500 });
+        } else {
+          console.error('[FEE DEBUG] Error fetching/parsing Quidax fee:', String(e));
+          return NextResponse.json({ error: 'Failed to fetch fee structure from Quidax', details: String(e) }, { status: 500 });
+        }
       }
+    } else {
+      // Not a supported fee currency
+      return NextResponse.json({
+        error: `Network fee not supported for currency: ${currency}`,
+        details: `Allowed currencies: ${SUPPORTED_FEE_CURRENCIES.join(', ')}`
+      }, { status: 400 });
     }
 
     return NextResponse.json({
@@ -174,6 +214,6 @@ export async function POST(request: Request) {
       fee_ranges: feeRanges
     });
   } catch (error) {
-    return NextResponse.json({ error: 'Internal server error', details: error instanceof Error ? error.message : error }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error', details: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
 }

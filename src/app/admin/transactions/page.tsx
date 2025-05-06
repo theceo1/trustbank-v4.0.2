@@ -356,6 +356,8 @@ export default function TransactionsPage() {
                   <TableHead>Amount</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Date</TableHead>
+                  <TableHead>Provider</TableHead>
+                  <TableHead>Details</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -420,6 +422,39 @@ export default function TransactionsPage() {
                             {formatDate(transaction.createdAt)}
                           </span>
                         </div>
+                      </TableCell>
+                      {/* Provider column */}
+                      <TableCell>
+                        {transaction.metadata?.provider
+                          ? transaction.metadata.provider === 'korapay'
+                            ? <span className="text-blue-600 font-semibold">KoraPay</span>
+                            : <span className="text-yellow-600 font-semibold">Quidax</span>
+                          : <span className="text-muted-foreground">N/A</span>
+                        }
+                      </TableCell>
+                      {/* Details column */}
+                      <TableCell>
+                        {transaction.metadata?.provider === 'korapay' ? (
+                          <div className="text-xs space-y-1">
+                            {transaction.metadata?.korapay?.data?.virtual_bank_account_details?.virtual_bank_account?.bank_name && (
+                              <div>Bank: {transaction.metadata.korapay.data.virtual_bank_account_details.virtual_bank_account.bank_name}</div>
+                            )}
+                            {transaction.metadata?.korapay?.data?.virtual_bank_account_details?.virtual_bank_account?.account_number && (
+                              <div>Acct: {transaction.metadata.korapay.data.virtual_bank_account_details.virtual_bank_account.account_number}</div>
+                            )}
+                            {transaction.metadata?.korapay?.data?.narration && (
+                              <div>Narration: {transaction.metadata.korapay.data.narration}</div>
+                            )}
+                            {transaction.metadata?.korapay_event?.event && (
+                              <div>Webhook: {transaction.metadata.korapay_event.event}</div>
+                            )}
+                            <div>Status: {transaction.status}</div>
+                          </div>
+                        ) : transaction.metadata?.provider === 'quidax' ? (
+                          <div className="text-xs text-yellow-700">Quidax transaction</div>
+                        ) : (
+                          <div className="text-xs text-muted-foreground">—</div>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Button variant="ghost" size="icon">
