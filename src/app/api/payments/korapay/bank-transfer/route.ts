@@ -52,25 +52,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: feeData.error || 'Failed to fetch fee config' }, { status: 500 });
     }
     // New fee structure:
-    // Korapay Fee: 1.5% of deposit
-    // VAT: 7.5% of Korapay fee (prefer Korapay API, else calculate)
-    // trustBank Markup: greater of (7% of deposit) OR (₦200 + 3% of deposit)
-    const korapay_fee = +(Number(amount) * 0.015).toFixed(2);
-    const trustbank_fee_option1 = Number(amount) * 0.07;
-    const trustbank_fee_option2 = 200 + (Number(amount) * 0.03);
-    const trustbank_fee = Math.max(trustbank_fee_option1, trustbank_fee_option2);
-    // Prefer VAT from Korapay API, else calculate
-    let vat = korapayData.data?.fees?.vat ?? korapayData.data?.vat;
-    if (vat === undefined || vat === null) {
-      vat = +(korapay_fee * 0.075).toFixed(2);
-    }
+    // trustBank Markup: controlled by env (max/min percent)
+    const markupPercent = parseFloat(process.env.TRUSTBANK_MARKUP_PERCENT || '0.025'); // 2.5% max
+    const markupMinPercent = parseFloat(process.env.TRUSTBANK_MARKUP_MIN_PERCENT || '0.015'); // 1.5% min
+    let trustbank_fee = Number(amount) * markupPercent;
+    const markupMin = Number(amount) * markupMinPercent;
+    if (trustbank_fee < markupMin) trustbank_fee = markupMin;
+    const korapay_fee = korapayData.data?.fee ?? 0;
+    let vat = korapayData.data?.fees?.vat ?? korapayData.data?.vat ?? 0;
 
     // LOG: Show extracted backend-calculated fees
     console.log('[DEBUG][BACKEND FEE STRUCTURE]', { korapay_fee, trustbank_fee, vat });
 
     // Calculate new fee structure for frontend
-    const service_fee = trustbank_fee + korapay_fee;
-    const total_fee = service_fee + vat;
+    const service_fee = trustbank_fee; // Only markup
+    const total_fee = service_fee + korapay_fee + vat;
     const you_receive = Number(amount) - total_fee;
 
     // LOG: Show backend-calculated fees

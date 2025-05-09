@@ -278,6 +278,7 @@ const DepositModal = ({ isOpen, onClose, wallet }: DepositModalProps) => {
       });
       return;
     }
+    const maxAmount = 1000000;
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
       setError('Enter a valid deposit amount');
       toast({
@@ -287,10 +288,46 @@ const DepositModal = ({ isOpen, onClose, wallet }: DepositModalProps) => {
       });
       return;
     }
+    if (Number(amount) > maxAmount) {
+      setError(`Maximum deposit per transaction is ₦${maxAmount.toLocaleString()}`);
+      toast({
+        title: "Deposit Limit",
+        description: `Maximum deposit per transaction is ₦${maxAmount.toLocaleString()}. Please enter a lower amount.`,
+        className: "bg-yellow-500 text-white"
+      });
+      return;
+    }
     setLoading(true);
     setError("");
     try {
-      // Fetch fees breakdown from backend
+      // 1. Fetch a Korapay fee quote (simulate bank transfer, do not finalize)
+      let korapay_fee = 0;
+      let vat = 0;
+      try {
+        const korapayQuoteRes = await fetch('/api/payments/korapay/bank-transfer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: Number(amount),
+            account_name: userName || 'trustBank User',
+            customer: { name: userName || 'trustBank User', email: userEmail || 'user@trustbank.com' },
+            preview: true // Add a preview flag so backend does NOT finalize or create a real account
+          })
+        });
+        const korapayQuoteData = await korapayQuoteRes.json();
+        if (korapayQuoteRes.ok && korapayQuoteData.fee !== undefined && korapayQuoteData.vat !== undefined) {
+          korapay_fee = korapayQuoteData.fee;
+          vat = korapayQuoteData.vat;
+        } else if (korapayQuoteRes.ok && korapayQuoteData.data && korapayQuoteData.data.fee !== undefined && korapayQuoteData.data.vat !== undefined) {
+          korapay_fee = korapayQuoteData.data.fee;
+          vat = korapayQuoteData.data.vat;
+        }
+      } catch (e) {
+        // fallback to 0 if quote fails
+        korapay_fee = 0;
+        vat = 0;
+      }
+      // 2. Fetch fees breakdown from backend, passing korapay_fee and vat for accurate preview
       const res = await fetch('/api/config/fees', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -298,6 +335,8 @@ const DepositModal = ({ isOpen, onClose, wallet }: DepositModalProps) => {
           amount: Number(amount),
           currency: wallet?.currency || 'ngn',
           type: 'deposit',
+          korapay_fee,
+          vat
         })
       });
       const data = await res.json();
@@ -316,6 +355,7 @@ const DepositModal = ({ isOpen, onClose, wallet }: DepositModalProps) => {
       console.log('[DepositModal] handleContinue finished', { showPreview });
     }
   };
+
 
 
   // [LOG] Confirm deposit and fetch virtual account
@@ -339,6 +379,8 @@ const DepositModal = ({ isOpen, onClose, wallet }: DepositModalProps) => {
       if (!res.ok || data.error) {
         throw new Error(data.error || "Failed to fetch virtual account");
       }
+      // Use backend's fee breakdown for confirmation/final step
+      if (data.data) setFees(data.data);
       setVirtualAccount(data.data || data);
       console.log('[DepositModal] setVirtualAccount', data.data || data);
     } catch (err: any) {
@@ -349,6 +391,17 @@ const DepositModal = ({ isOpen, onClose, wallet }: DepositModalProps) => {
       console.log('[DepositModal] handleConfirm finished', { virtualAccount });
     }
   };
+
+  // Helper: choose which fee breakdown to show (preview or authoritative)
+  const getFeeDisplay = () => {
+    // If virtualAccount is present, use backend authoritative fees
+    if (virtualAccount && fees && fees.total_fee) {
+      return fees;
+    }
+    // Otherwise, use preview
+    return fees;
+  };
+
 
   const handleDone = () => {
     setVirtualAccount(null);
@@ -385,6 +438,10 @@ const DepositModal = ({ isOpen, onClose, wallet }: DepositModalProps) => {
                   min={1}
                   aria-label="Deposit amount"
                 />
+                <div className="mt-2 flex items-center gap-2 text-xs sm:text-sm text-yellow-300 dark:text-yellow-200">
+                  <Icons.info className="w-4 h-4 text-yellow-400 dark:text-yellow-300" />
+                  <span>Maximum deposit per transaction is <b>₦1,000,000</b>. This increases based on your transaction volume.</span>
+                </div>
               </div>
               <div className="flex gap-4 mt-4">
                 <Button variant="outline" onClick={onClose} className="flex-1 border-white text-white hover:bg-purple-800 bg-transparent font-semibold py-3 text-lg rounded-lg">Close</Button>
@@ -417,14 +474,12 @@ const DepositModal = ({ isOpen, onClose, wallet }: DepositModalProps) => {
               <DepositPreview
                 amount={Number(amount) || 0}
                 currency={wallet?.currency || 'ngn'}
-                userName={userName}
                 depositAmount={Number(amount) || 0}
-                markup={Number(fees.markup) || 0}
-                processingFee={Number(fees.processing_fee) || 0}
-                serviceFee={Number(fees.service_fee) || 0}
-                vat={Number(fees.vat) || 0}
-                totalFee={Number(fees.total_fee) || 0}
-                youWillReceive={Number(fees.you_receive) || ((Number(amount) || 0) - (Number(fees.total_fee) || 0))}
+                userName={userName}
+                serviceFee={Number(getFeeDisplay().service_fee) || 0}
+                vat={Number(getFeeDisplay().vat) || 0}
+                totalFee={Number(getFeeDisplay().total_fee) || 0}
+                youWillReceive={Number(getFeeDisplay().you_receive) || ((Number(amount) || 0) - (Number(getFeeDisplay().total_fee) || 0))}
                 loading={loading}
                 error={error}
                 onCancel={() => setShowPreview(false)}

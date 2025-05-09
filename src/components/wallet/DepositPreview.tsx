@@ -14,8 +14,8 @@ export interface DepositPreviewProps {
   currency: string;
   userName: string;
   depositAmount: number;
-  markup?: number;
-  processingFee?: number;
+  // markup and processingFee are deprecated, use serviceFee from backend only
+
   serviceFee: number;
   vat: number;
   totalFee: number;
@@ -35,8 +35,7 @@ export default function DepositPreview({
   amount,
   currency,
   depositAmount,
-  markup,
-  processingFee,
+
   serviceFee,
   vat,
   totalFee,
@@ -62,7 +61,14 @@ export default function DepositPreview({
       <div className="flex flex-col gap-3 sm:gap-5" role="region" aria-labelledby="deposit-preview-title" aria-describedby={descriptionId || 'deposit-preview-desc'}>
         <div className="flex flex-row justify-between items-center border-b border-gray-100 pb-2 mb-1">
           <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Depositor</span>
-          <span className="text-base font-semibold text-primary truncate max-w-[150px] text-right">{userName}</span>
+          <span
+            className="text-base font-semibold text-primary truncate max-w-[150px] text-right"
+            title={userName}
+            tabIndex={0}
+            aria-label={`Depositor: ${userName}`}
+          >
+            {userName}
+          </span>
         </div>
         <div className="flex flex-row justify-between items-center">
           <span className="text-sm text-gray-600 dark:text-gray-300">You Pay</span>

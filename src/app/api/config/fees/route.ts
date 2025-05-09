@@ -139,41 +139,41 @@ export async function POST(request: Request) {
     // Only this logic is valid for NGN fees. All legacy/base fee logic is removed.
     if (currency.toLowerCase() === 'ngn') {
       /**
-       * trustBank NGN Deposit Fee Logic (2025+):
-       * - Service Fee: trustBank Markup (between 2.5% and 4%) + processing fee (1.5%)
-       * - VAT: To be provided by payment processor API (not calculated here, fallback 7.5%)
+       * trustBank NGN Deposit Fee Logic (PREVIEW ONLY):
+       * - Service Fee: trustBank Markup (env, fallback 4%) + processing fee (1.5%)
+       * - VAT: Optionally passed in request body for preview, otherwise 0 (final VAT comes from payment processor API)
        * - Total Fee: service_fee + vat
-       * - All values sent to frontend for UI breakdown
-       * - No Korapay branding in response
+       * - you_receive = amount - total_fee
+       * - This is for preview only; final values come from payment processor API.
        */
       const korapayPercent = 0.015; // 1.5%
-      const markupMax = parseFloat(process.env.TRUSTBANK_MARKUP_PERCENT || '0.04'); // 4% highest
-      const markupMin = parseFloat(process.env.TRUSTBANK_MARKUP_MIN_PERCENT || '0.025');// 2.5% lowest
-      const markupPercent = Math.max(markupMax, markupMin); // Always use the higher of the two
-      const markup = Number(amount) * markupPercent;
-      const processingFee = Number(amount) * korapayPercent;
-      // Fetch VAT from payment processor API if available (pseudo code, replace with real API call if needed)
-      let vat = 0.075; // fallback 7.5%
-      try {
-        // Example: fetch VAT from API
-        // const vatRes = await fetch('https://api.korapay.com/v1/vat?amount=' + amount);
-        // const vatData = await vatRes.json();
-        // if (vatData && typeof vatData.vat === 'number') vat = vatData.vat;
-        // For now, keep fallback as placeholder
-      } catch (e) {
-        // If API fails, fallback remains
+      // Markup is capped at TRUSTBANK_MARKUP_PERCENT (max) and floored at TRUSTBANK_MARKUP_MIN_PERCENT (min)
+      const markupPercent = parseFloat(process.env.TRUSTBANK_MARKUP_PERCENT || '0.025'); // 2.5% max
+      const markupMinPercent = parseFloat(process.env.TRUSTBANK_MARKUP_MIN_PERCENT || '0.015'); // 1.5% min
+      let markup = Number(amount) * markupPercent;
+      const markupMin = Number(amount) * markupMinPercent;
+      if (markup < markupMin) markup = markupMin;
+      // Korapay fee and VAT provided by frontend (from Korapay API) for preview, else default to 0
+      let korapay_fee = 0;
+      if ('korapay_fee' in body && typeof body.korapay_fee === 'number') {
+        korapay_fee = Number(body.korapay_fee);
       }
-      const serviceFee = markup + processingFee;
-      const totalFee = serviceFee + vat;
+      let vat = 0;
+      if ('vat' in body && typeof body.vat === 'number') {
+        vat = Number(body.vat);
+      }
+      // Service fee is just the markup
+      const serviceFee = markup;
+      const totalFee = serviceFee + korapay_fee + vat;
       const youReceive = Number(amount) - totalFee;
-      // Respond with all values for frontend (trustBank branded only)
+      // Respond with all values for frontend (preview only)
       return NextResponse.json({
         status: 'success',
         data: {
           amount: Number(amount),
           service_fee: +serviceFee.toFixed(2),
           markup: +markup.toFixed(2),
-          processing_fee: +processingFee.toFixed(2),
+          korapay_fee: +korapay_fee.toFixed(2),
           vat: +vat.toFixed(2),
           total_fee: +totalFee.toFixed(2),
           you_receive: +youReceive.toFixed(2),
