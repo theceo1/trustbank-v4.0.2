@@ -1,4 +1,12 @@
-export type TransactionType = 'deposit' | 'withdrawal';
+export type TransactionType =
+  | 'deposit'
+  | 'withdrawal'
+  | 'transfer'
+  | 'buy'
+  | 'sell'
+  | 'trade'
+  | 'referral_bonus'
+  | 'referral_commission';
 export type TransactionStatus = 'pending' | 'completed' | 'failed';
 
 export interface Transaction {

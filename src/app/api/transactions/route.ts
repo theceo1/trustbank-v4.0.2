@@ -4,7 +4,16 @@ import { cookies } from 'next/headers'
 import { z } from "zod"
 
 const transactionSchema = z.object({
-  type: z.enum(["DEPOSIT", "WITHDRAWAL", "TRANSFER"]),
+  type: z.enum([
+    "deposit",
+    "withdrawal",
+    "transfer",
+    "buy",
+    "sell",
+    "trade",
+    "referral_bonus",
+    "referral_commission"
+  ]),
   amount: z.number().positive(),
   description: z.string().optional(),
   recipientId: z.string().optional(), // For transfers
@@ -31,19 +40,7 @@ export async function GET(req: NextRequest) {
     // Fetch transactions where user is either sender or recipient
     const { data: transactions, error: transactionsError } = await supabase
       .from('transactions')
-      .select(`
-        *,
-        sender:user_id (
-          id,
-          email,
-          user_metadata->full_name
-        ),
-        recipient:recipient_id (
-          id,
-          email,
-          user_metadata->full_name
-        )
-      `)
+      .select('*')
       .or(`user_id.eq.${userId},recipient_id.eq.${userId}`)
       .order('created_at', { ascending: false })
 
@@ -103,7 +100,7 @@ export async function POST(req: NextRequest) {
 
     // Check if user has sufficient balance for withdrawal or transfer
     if (
-      (validatedData.type === "WITHDRAWAL" || validatedData.type === "TRANSFER") &&
+      (validatedData.type === "withdrawal" || validatedData.type === "transfer") &&
       user.balance < validatedData.amount
     ) {
       return NextResponse.json(
@@ -113,7 +110,7 @@ export async function POST(req: NextRequest) {
     }
 
     // For transfers, verify recipient exists
-    if (validatedData.type === "TRANSFER") {
+    if (validatedData.type === "transfer") {
       if (!validatedData.recipientId) {
         return NextResponse.json(
           { error: "Recipient ID is required for transfers" },

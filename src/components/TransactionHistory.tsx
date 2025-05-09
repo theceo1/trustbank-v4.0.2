@@ -6,21 +6,10 @@ export default function TransactionHistory() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const supabase = createClientComponentClient();
-
+  // Removed supabase and session logic for unauthenticated debug
   const fetchTransactions = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        setError('No session found');
-        return;
-      }
-
-      const response = await fetch('/api/transactions', {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        }
-      });
+      const response = await fetch('/api/transactions');
 
       if (!response.ok) {
         throw new Error('Failed to fetch transactions');

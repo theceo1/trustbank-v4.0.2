@@ -18,6 +18,8 @@ import { ArrowUpDown, Wallet, Clock, TrendingUp, Users, Loader2, Info, Shield, C
 import Link from 'next/link';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/use-toast';
+import TransactionHistory from '@/components/TransactionHistory';
+// Removed all supabase and session imports for unauthenticated trade page
 import {
   formatCurrency,
   formatCryptoAmount,
@@ -1149,6 +1151,12 @@ export default function TradePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+    {/* Recent Transactions Table */}
+    <div className="mt-12">
+      <h2 className="text-xl font-semibold mb-4">Recent Transactions</h2>
+      <TransactionHistory />
     </div>
-  );
+  </div>
+);
 }
