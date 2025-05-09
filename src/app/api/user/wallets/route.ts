@@ -58,8 +58,6 @@ export async function GET() {
                      Array.isArray((response as QuidaxResponse)?.data) ? (response as QuidaxResponse).data :
                      [];
 
-      console.log('[UserWallets] Processed wallets:', wallets.length);
-
       return NextResponse.json({
         status: 'success',
         data: wallets

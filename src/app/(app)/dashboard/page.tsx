@@ -61,48 +61,19 @@ export default async function DashboardPage() {
     .eq('user_id', user.id)
     .single();
 
-  // Get recent transactions from both tables
-  const [{ data: recentTrades }, { data: recentSwaps }] = await Promise.all([
-    supabase
-      .from('trades')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(5),
-    supabase
-      .from('swap_transactions')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(5)
-  ]);
-
-  // Format trades
-  const formattedTrades = (recentTrades || []).map(trade => ({
-    id: trade.id,
-    type: trade.type,
-    amount: Number(trade.amount),
-    currency: trade.currency,
-    status: trade.status,
-    created_at: trade.created_at
-  }));
-
-  // Format swaps
-  const formattedSwaps = (recentSwaps || []).map(swap => ({
-    id: swap.id,
-    type: 'swap',
-    amount: Number(swap.from_amount),
-    currency: swap.from_currency,
-    to_amount: Number(swap.to_amount),
-    to_currency: swap.to_currency,
-    status: swap.status,
-    created_at: swap.created_at
-  }));
-
-  // Combine and sort all transactions
-  const recentTransactions = [...formattedTrades, ...formattedSwaps]
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    .slice(0, 5); // Keep only the 5 most recent
+  // Fetch all recent transactions (including swaps, trades, deposits, withdrawals, transfers, referral_bonus, referral_commission, etc)
+  const transactionsRes = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || ''}/api/transactions`, {
+    headers: {
+      'Cookie': cookieStore.getAll().map(c => `${c.name}=${c.value}`).join('; ')
+    }
+  });
+  let recentTransactions = [];
+  if (transactionsRes.ok) {
+    const allTransactions = await transactionsRes.json();
+    recentTransactions = (allTransactions || [])
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 5);
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">

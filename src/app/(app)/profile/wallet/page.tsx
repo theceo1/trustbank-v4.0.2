@@ -5,6 +5,9 @@ import { Button } from '@/components/ui/button'
 import { Icons } from '@/components/ui/icons'
 import { WalletListWrapper } from '@/components/wallet/WalletListWrapper'
 import { TransactionHistory } from '@/components/wallet/TransactionHistory'
+
+// ...other imports
+
 import { AssetDistribution } from '@/components/wallet/AssetDistribution'
 import { PortfolioValue } from '@/components/wallet/PortfolioValue'
 import Link from 'next/link'
@@ -40,6 +43,7 @@ export default function WalletPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [walletData, setWalletData] = useState<WalletData | null>(null);
+  const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
   const [isInstantSwapOpen, setIsInstantSwapOpen] = useState(false);
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
   const [isDepositOpen, setIsDepositOpen] = useState(false);
@@ -48,6 +52,18 @@ export default function WalletPage() {
   const [isGeneralSwapOpen, setIsGeneralSwapOpen] = useState(false);
   const [selectedWallet, setSelectedWallet] = useState<any>(null);
   const supabase = createClientComponentClient();
+
+  // Fetch all transactions for recent list
+  const fetchRecentTransactions = async () => {
+    try {
+      const response = await fetch('/api/transactions');
+      if (!response.ok) throw new Error('Failed to fetch transactions');
+      const allTransactions = await response.json();
+      setRecentTransactions((allTransactions || []).sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 5));
+    } catch (err) {
+      setRecentTransactions([]);
+    }
+  };
 
   // Function to fetch wallet data
   const fetchWalletData = async () => {
@@ -87,6 +103,7 @@ export default function WalletPage() {
   // Initial data fetch
   useEffect(() => {
     fetchWalletData();
+    fetchRecentTransactions();
   }, []);
 
   // Set up polling for real-time updates
@@ -163,6 +180,9 @@ export default function WalletPage() {
       </div>
     );
   }
+
+  // ...rest of component
+
 
   if (error) {
     // Special UI for session/auth errors
@@ -419,7 +439,7 @@ export default function WalletPage() {
           </div>
 
           {/* Transaction History */}
-          <TransactionHistory transactions={transactions} />
+          <TransactionHistory transactions={recentTransactions} />
         </div>
       </BalanceProvider>
 

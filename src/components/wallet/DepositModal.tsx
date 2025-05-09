@@ -427,7 +427,7 @@ const DepositModal = ({ isOpen, onClose, wallet }: DepositModalProps) => {
       const requestBody = {
         type: 'DEPOSIT', // UPPERCASE to match API schema
         amount: Number(amount),
-        description: `NGN Deposit via Korapay (ref: ${korapayReference})`,
+        description: `NGN Deposit (ref: ${korapayReference})`,
         reference: korapayReference,
         currency: 'NGN'
       };

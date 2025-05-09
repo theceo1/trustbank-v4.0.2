@@ -261,7 +261,12 @@ export default function TradePage() {
           setFeeConfig(data.data);
         }
       } catch (error) {
-        console.error('Error fetching fee config:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to fetch fee configuration',
+          variant: 'destructive',
+          className: "bg-red-500 text-white border-none",
+        });
       }
     };
 
@@ -275,7 +280,12 @@ export default function TradePage() {
       const data = await response.json();
       setUsdRate(parseFloat(data.data.price));
     } catch (error) {
-      console.error('Error fetching USD rate:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch USD rate',
+        variant: 'destructive',
+        className: "bg-red-500 text-white border-none",
+      });
     }
   };
 
@@ -306,6 +316,12 @@ export default function TradePage() {
       if (retryCount < 3) {
         setTimeout(() => fetchBalances(retryCount + 1), 1000);
       }
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch balances',
+        variant: 'destructive',
+        className: "bg-red-500 text-white border-none",
+      });
     }
   };
 
@@ -346,13 +362,11 @@ export default function TradePage() {
     try {
       setQuoting(true);
       
-      // Log the request payload for debugging
       const payload = {
         from_currency: tab === 'buy' ? 'ngn' : selectedCrypto.toLowerCase(),
         to_currency: tab === 'buy' ? selectedCrypto.toLowerCase() : 'ngn',
         from_amount: amount
       };
-      console.log('Quote request payload:', payload);
 
       const response = await fetch('/api/swap/quotation', {
         method: 'POST',
@@ -362,12 +376,11 @@ export default function TradePage() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('Quote error response:', errorData);
         throw new Error(errorData.error || 'Failed to get quote');
       }
       
       const data = await response.json();
-      console.log('Quote response:', data);
+      
 
       if (data.status !== 'success' || !data.data) {
         throw new Error('Invalid quote response');
@@ -488,7 +501,6 @@ export default function TradePage() {
       setNgnEquivalent(ngnAmount.toString());
       handleQuoteExpired();
     } catch (error) {
-      console.error('Error converting amount:', error);
       toast({
         title: 'Error',
         description: 'Failed to validate amount. Please try again.',
@@ -606,7 +618,7 @@ export default function TradePage() {
         to_currency: tab === 'buy' ? selectedCrypto.toLowerCase() : 'ngn',
         from_amount: amount
       };
-      console.log('Quote request payload:', payload);
+      
 
       const response = await fetch('/api/swap/quotation', {
         method: 'POST',
@@ -616,12 +628,12 @@ export default function TradePage() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('Quote error response:', errorData);
+        
         throw new Error(errorData.message || 'Failed to get quote');
       }
 
       const data = await response.json();
-      console.log('Quote response:', data);
+      
 
       if (data.status !== 'success' || !data.data) {
         throw new Error('Invalid quote response');
@@ -692,7 +704,7 @@ export default function TradePage() {
       setShowRate(false);
       fetchBalances();
     } catch (error) {
-      console.error('Error confirming trade:', error);
+
       toast({
         title: 'Error',
         description: 'Failed to confirm trade. Please try again.',

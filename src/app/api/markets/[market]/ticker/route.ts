@@ -16,9 +16,9 @@ const redis = new Redis({
 const CACHE_TTL = 5;
 
 // Debug log
-console.log('API URL:', QUIDAX_API_URL);
-console.log('Secret key loaded:', !!QUIDAX_SECRET_KEY);
-console.log('Redis configured:', !!(UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN));
+
+
+
 
 // Dynamically validate market parameter using SUPPORTED_CURRENCIES
 import { SUPPORTED_CURRENCIES } from 'src/config/supportedCurrencies';
@@ -43,7 +43,7 @@ export async function GET(
 ) {
   try {
     if (!QUIDAX_SECRET_KEY) {
-      console.error('QUIDAX_SECRET_KEY is not configured');
+      
       return NextResponse.json(
         { 
           error: 'API configuration error',
@@ -87,7 +87,7 @@ export async function GET(
         }
       } else {
         useFallback = true;
-        console.warn('[USD/NGN Fallback] Direct fetch failed:', directResponse.status, directResponse.statusText);
+        
       }
       if (!useFallback && ticker) {
         // Normal transformation as before
@@ -167,12 +167,12 @@ export async function GET(
           await redis.set(`market_ticker:${marketLower}`, transformedData, { ex: CACHE_TTL });
           return NextResponse.json({ status: 'success', data: transformedData, source: 'derived' });
         } else {
-          console.error('[USD/NGN Fallback] Could not fetch usdtngn or usdtusd/usdusdt from Quidax', { usdtngn, usdtusd });
+          
           return NextResponse.json({ error: 'Could not derive USD/NGN rate from Quidax', details: { usdtngn, usdtusd } }, { status: 502 });
         }
       } catch (err) {
-        console.error('[USD/NGN Fallback] Error composing USD/NGN:', err);
-        return NextResponse.json({ error: 'Error deriving USD/NGN rate from Quidax', details: err instanceof Error ? err.message : String(err) }, { status: 502 });
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        return NextResponse.json({ error: 'Error deriving USD/NGN rate from Quidax', details: errorMessage }, { status: 502 });
       }
     }
 
@@ -200,8 +200,8 @@ export async function GET(
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Quidax API error:', response.status, response.statusText);
-      console.error('Error response:', errorText);
+      
+      
       
       // Try to return stale cache if available
       const staleData = await redis.get(CACHE_KEY);
@@ -226,7 +226,7 @@ export async function GET(
     const data = await response.json();
 
     if (!data || !data.data || !data.data.ticker) {
-      console.error('Invalid response from Quidax API:', data);
+      
       return NextResponse.json(
         { 
           error: 'Invalid response format from Quidax API',
@@ -262,7 +262,7 @@ export async function GET(
       source: 'api'
     });
   } catch (error) {
-    console.error('Error fetching market ticker:', error);
+    
     return NextResponse.json(
       { 
         error: 'Failed to fetch market data',

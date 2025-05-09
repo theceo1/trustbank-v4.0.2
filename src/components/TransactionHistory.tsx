@@ -37,23 +37,9 @@ export default function TransactionHistory() {
     return () => clearInterval(interval);
   }, []);
 
-  // Set up real-time subscription
-  useEffect(() => {
-    const subscription = supabase
-      .channel('transaction_updates')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'transactions'
-      }, () => {
-        fetchTransactions();
-      })
-      .subscribe();
+  // Removed supabase real-time subscription (not needed)
+  // Only use polling for updates
 
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
 
   if (loading) {
     return <div className="animate-pulse">Loading transactions...</div>;
