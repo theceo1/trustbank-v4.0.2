@@ -44,6 +44,9 @@ interface Transaction {
     description: string;
     reference: string;
     destination: string;
+    trustbank_fee?: number | string;
+    korapay_fee?: number | string;
+    [key: string]: any;
   };
 }
 
@@ -171,6 +174,8 @@ export function TransactionList() {
               <TableHead>User</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Amount</TableHead>
+              <TableHead>trustBank Fee</TableHead>
+              <TableHead>Korapay Fee</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Date</TableHead>
               <TableHead className="w-[100px]">Actions</TableHead>
@@ -210,6 +215,16 @@ export function TransactionList() {
                   <TableCell className="capitalize">{transaction.type}</TableCell>
                   <TableCell>
                     {formatCurrency(transaction.amount, transaction.currency)}
+                  </TableCell>
+                  <TableCell>
+                    {transaction.metadata?.trustbank_fee != null ? (
+                      <span>₦{formatCurrency(Number(transaction.metadata.trustbank_fee), 'NGN')}</span>
+                    ) : '-'}
+                  </TableCell>
+                  <TableCell>
+                    {transaction.metadata?.korapay_fee != null ? (
+                      <span>₦{formatCurrency(Number(transaction.metadata.korapay_fee), 'NGN')}</span>
+                    ) : '-'}
                   </TableCell>
                   <TableCell>
                     <Badge variant={getStatusBadgeVariant(transaction.status)}>

@@ -6,7 +6,8 @@ import { Database } from '@/lib/database.types';
 export async function POST(request: NextRequest) {
   try {
     const supabase = createRouteHandlerClient<Database>({ cookies });
-    const { amount, name, email } = await request.json();
+    // Accept trustbank_fee and korapay_fee for admin logging
+    const { amount, name, email, trustbank_fee, korapay_fee } = await request.json();
     if (!amount || !name || !email) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
@@ -38,6 +39,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Log the deposit initiation in transactions table (pending)
+    // Store trustbank_fee and korapay_fee in metadata for admin/audit
     await supabase.from('transactions').insert({
       type: 'deposit',
       amount: Number(amount),
@@ -45,7 +47,12 @@ export async function POST(request: NextRequest) {
       status: 'pending',
       reference,
       user_email: email,
-      metadata: { korapay: korapayData, provider: 'korapay' }
+      metadata: {
+        korapay: korapayData,
+        provider: 'korapay',
+        trustbank_fee: trustbank_fee ?? null,
+        korapay_fee: korapay_fee ?? null
+      }
     });
 
     // Return virtual account details to frontend for user to transfer funds

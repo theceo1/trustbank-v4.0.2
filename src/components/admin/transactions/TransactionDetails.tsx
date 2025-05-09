@@ -1,3 +1,4 @@
+//src/components/admin/transactions/TransactionDetails.tsx
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
@@ -28,6 +29,9 @@ interface Transaction {
     destination: string;
     source?: string;
     notes?: string;
+    trustbank_fee?: number | string;
+    korapay_fee?: number | string;
+    [key: string]: any;
   };
   history?: {
     timestamp: string;
@@ -252,6 +256,14 @@ export function TransactionDetails({ transactionId }: TransactionDetailsProps) {
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Description</p>
                 <p>{transaction.metadata.description}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">trustBank Fee</p>
+                <p>{transaction.metadata?.trustbank_fee != null ? `₦${formatCurrency(Number(transaction.metadata.trustbank_fee), 'NGN')}` : '-'}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Korapay Fee</p>
+                <p>{transaction.metadata?.korapay_fee != null ? `₦${formatCurrency(Number(transaction.metadata.korapay_fee), 'NGN')}` : '-'}</p>
               </div>
               {transaction.metadata.source && (
                 <div>

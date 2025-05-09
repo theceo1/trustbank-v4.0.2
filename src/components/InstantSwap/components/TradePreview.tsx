@@ -5,6 +5,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatAmount } from "../utils/currency";
@@ -18,20 +19,42 @@ export function TradePreview({
   countdown,
 }: TradePreviewModalProps) {
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md bg-white dark:bg-gray-800">
+    <Dialog 
+      open={isOpen} 
+      onOpenChange={onClose}
+      aria-describedby="trade-preview-modal-desc"
+    >
+      <DialogContent className="sm:max-w-md bg-white dark:bg-gray-800" aria-describedby="trade-preview-modal-desc">
         <DialogHeader>
           <DialogTitle>Confirm Swap</DialogTitle>
-          <DialogDescription>
+          <DialogDescription id="trade-preview-modal-desc">
             Please review your swap details. This quote expires in {countdown} seconds.
           </DialogDescription>
         </DialogHeader>
-
-        <div className="space-y-6">
-          <Card>
-            <CardContent className="space-y-6 pt-6">
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }} 
+          animate={{ opacity: 1, y: 0 }} 
+          exit={{ opacity: 0, y: 20 }}
+          transition={{ duration: 0.3 }}
+        >
+          <div className="space-y-6">
+            <Card>
+              <CardContent className="space-y-6 pt-6">
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">From</p>
+                      <p className="font-medium">
+                        {formatAmount(trade.amount, trade.currency)} {trade.currency}
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        ≈ ₦{trade.ngn_equivalent.toLocaleString()}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">To</p>
+                      <p className="font-medium">{trade.quote_amount}</p>
+                    </div>
                   <div>
                     <p className="text-sm text-muted-foreground">From</p>
                     <p className="font-medium">
@@ -97,6 +120,7 @@ export function TradePreview({
             </Button>
           </div>
         </div>
+        </motion.div>
       </DialogContent>
     </Dialog>
   );

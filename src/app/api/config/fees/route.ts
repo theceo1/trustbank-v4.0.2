@@ -135,21 +135,52 @@ export async function POST(request: Request) {
     if (!amount || !currency) {
       return NextResponse.json({ error: 'Missing amount or currency' }, { status: 400 });
     }
-    // Use markup percent from environment variable for easy control (default 0.15 = 15%)
-    const markupPercent = parseFloat(process.env.TRUSTBANK_MARKUP_PERCENT || '0.15'); // trustBank markup for profitability
-    let baseFee = 0;
-    let trustBankFee = 0;
-    let feeCurrency = currency.toUpperCase();
-    let feeRanges = [];
-    let display = '';
-
+    // --- trustBank NGN Deposit Fee Logic (2025+) ---
+    // Only this logic is valid for NGN fees. All legacy/base fee logic is removed.
     if (currency.toLowerCase() === 'ngn') {
-      // For NGN, min fee ₦200 or 0.5% of amount
-      baseFee = Math.max(200, 0.005 * Number(amount));
-      trustBankFee = Math.ceil(baseFee + baseFee * markupPercent);
-      display = `₦${trustBankFee}`;
-      feeRanges = [{min: 0, max: null, type: 'flat', value: baseFee}];
-      console.log('[FEE DEBUG][NGN]', { amount, baseFee, trustBankFee, display, feeRanges });
+      /**
+       * trustBank NGN Deposit Fee Logic (2025+):
+       * - Service Fee: trustBank Markup (between 2.5% and 4%) + processing fee (1.5%)
+       * - VAT: To be provided by payment processor API (not calculated here, fallback 7.5%)
+       * - Total Fee: service_fee + vat
+       * - All values sent to frontend for UI breakdown
+       * - No Korapay branding in response
+       */
+      const korapayPercent = 0.015; // 1.5%
+      const markupMax = parseFloat(process.env.TRUSTBANK_MARKUP_PERCENT || '0.04'); // 4% highest
+      const markupMin = parseFloat(process.env.TRUSTBANK_MARKUP_MIN_PERCENT || '0.025');// 2.5% lowest
+      const markupPercent = Math.max(markupMax, markupMin); // Always use the higher of the two
+      const markup = Number(amount) * markupPercent;
+      const processingFee = Number(amount) * korapayPercent;
+      // Fetch VAT from payment processor API if available (pseudo code, replace with real API call if needed)
+      let vat = 0.075; // fallback 7.5%
+      try {
+        // Example: fetch VAT from API
+        // const vatRes = await fetch('https://api.korapay.com/v1/vat?amount=' + amount);
+        // const vatData = await vatRes.json();
+        // if (vatData && typeof vatData.vat === 'number') vat = vatData.vat;
+        // For now, keep fallback as placeholder
+      } catch (e) {
+        // If API fails, fallback remains
+      }
+      const serviceFee = markup + processingFee;
+      const totalFee = serviceFee + vat;
+      const youReceive = Number(amount) - totalFee;
+      // Respond with all values for frontend (trustBank branded only)
+      return NextResponse.json({
+        status: 'success',
+        data: {
+          amount: Number(amount),
+          service_fee: +serviceFee.toFixed(2),
+          markup: +markup.toFixed(2),
+          processing_fee: +processingFee.toFixed(2),
+          vat: +vat.toFixed(2),
+          total_fee: +totalFee.toFixed(2),
+          you_receive: +youReceive.toFixed(2),
+          markup_percent: markupPercent,
+          currency: 'NGN',
+        }
+      });
     } else if (SUPPORTED_FEE_CURRENCIES.includes(currency.toUpperCase())) {
       // For supported crypto, fetch fee ranges from Quidax
       try {
@@ -173,7 +204,7 @@ export async function POST(request: Request) {
             details: data && data.message ? data.message : `Invalid response for currency: ${currency}`
           }, { status: 502 });
         }
-        feeRanges = data.data.fee;
+        const feeRanges = data.data.fee;
         console.log('[FEE DEBUG] feeRanges:', feeRanges);
         // Find the highest allowed fee for this withdrawal amount
         let bestRange = null;
@@ -183,11 +214,12 @@ export async function POST(request: Request) {
           }
         }
         if (!bestRange && feeRanges.length > 0) bestRange = feeRanges[feeRanges.length-1];
-        baseFee = bestRange ? bestRange.value : 0;
-        trustBankFee = baseFee > 0 ? +(baseFee + baseFee * markupPercent).toFixed(8) : 0;
-        display = `${trustBankFee} ${currency.toUpperCase()}`;
+        const baseFee = bestRange ? bestRange.value : 0;
+        // Markup for crypto withdrawals (if applicable)
+        const markupPercent = parseFloat(process.env.TRUSTBANK_MARKUP_PERCENT || '0.04');
+        const trustBankFee = baseFee > 0 ? +(baseFee + baseFee * markupPercent).toFixed(8) : 0;
         console.log('[FEE DEBUG] bestRange:', bestRange);
-        console.log('[FEE DEBUG] baseFee:', baseFee, 'trustBankFee:', trustBankFee, 'display:', display);
+        console.log('[FEE DEBUG] baseFee:', baseFee, 'trustBankFee:', trustBankFee);
       } catch (e) {
         if (e instanceof Error) {
           console.error('[FEE DEBUG] Error fetching/parsing Quidax fee:', e.stack);
@@ -204,15 +236,6 @@ export async function POST(request: Request) {
         details: `Allowed currencies: ${SUPPORTED_FEE_CURRENCIES.join(', ')}`
       }, { status: 400 });
     }
-
-    return NextResponse.json({
-      base_fee: baseFee,
-      trustbank_fee: trustBankFee,
-      currency: feeCurrency,
-      display,
-      markup_percent: markupPercent,
-      fee_ranges: feeRanges
-    });
   } catch (error) {
     return NextResponse.json({ error: 'Internal server error', details: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }

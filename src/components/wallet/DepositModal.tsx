@@ -1,6 +1,10 @@
+//src/components/wallet/DepositModal.tsx
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import DepositPreview from './DepositPreview';
+import { VirtualAccountModal } from './VirtualAccountModal';
 import {
   Dialog,
   DialogContent,
@@ -16,7 +20,6 @@ import { QRCodeSVG } from 'qrcode.react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { motion } from "framer-motion"
 import { Command, CommandInput, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command"
 import { cn } from "@/lib/utils"
 import { Check, ChevronsUpDown } from "lucide-react"
@@ -30,6 +33,11 @@ interface DepositModalProps {
     currency: string;
     balance: string;
   } | null;
+}
+
+// Helper: returns true if currency is fiat/NGN
+const isFiatCurrency = (currency: string) => {
+  return currency?.toLowerCase() === 'ngn';
 }
 
 // Networks available for each currency
@@ -203,371 +211,248 @@ const getCurrencyName = (currency: string): string => {
   return names[currency.toUpperCase()] || currency.toUpperCase();
 };
 
-export function DepositModal({ isOpen, onClose, wallet }: DepositModalProps) {
-  const { toast } = useToast()
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [address, setAddress] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
-  const [selectedNetwork, setSelectedNetwork] = useState('')
-  const [selectedCurrency, setSelectedCurrency] = useState('')
-  const [open, setOpen] = useState(false)
-  const supabase = createClientComponentClient()
-  const [fromSearchQuery, setFromSearchQuery] = useState('')
-  const [destinationTag, setDestinationTag] = useState('')
+const DepositModal = ({ isOpen, onClose, wallet }: DepositModalProps) => {
+  const supabase = createClientComponentClient();
+  const { toast } = useToast();
 
-  // Define FIAT_CURRENCIES constant
-  const FIAT_CURRENCIES = ['ngn', 'usd', 'eur', 'gbp'];
+  // State
+  const [amount, setAmount] = useState<string>("");
+  const [showPreview, setShowPreview] = useState(false);
+  const [virtualAccount, setVirtualAccount] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [userName, setUserName] = useState("");
+  const [userEmail, setUserEmail] = useState("");
+  const [fees, setFees] = useState<any>(null);
+  const [userLoaded, setUserLoaded] = useState(false);
 
-  const fetchAddress = async (currency?: string, network?: string) => {
-    if (!currency || !network) {
-      setError('Please select a currency and network');
+  // [LOG] Fetch user info on modal open
+  useEffect(() => {
+    if (!isOpen) return;
+    setUserLoaded(false);
+    setLoading(true);
+    setError("");
+    (async () => {
+      try {
+        
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError || !user) {
+          throw new Error(userError?.message || "User not found");
+        }
+        setUserName(user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'trustBank User');
+        setUserEmail(user.email || 'user@trustbank.com');
+        setUserLoaded(true);
+        setLoading(false);
+        // Removed success toast for user loaded
+        
+      } catch (err: any) {
+        setError("Failed to load user info.");
+        setLoading(false);
+        setUserLoaded(false);
+        toast({
+          title: "User Error",
+          description: err.message || "Could not load user info.",
+          className: "bg-red-600 text-white"
+        });
+        console.error("[DepositModal] User load error:", err);
+      }
+    })();
+  }, [isOpen, supabase, toast]);
+
+  // [LOG] Amount change
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setAmount(e.target.value.replace(/[^\d.]/g, ""));
+    setError("");
+    
+  };
+
+  // [LOG] Proceed to preview
+  const handleContinue = async () => {
+    console.log('[DepositModal] handleContinue called', { amount, userLoaded });
+    if (!userLoaded) {
+      setError("User info not loaded.");
+      toast({
+        title: "User Error",
+        description: "User info not loaded.",
+        className: "bg-red-600 text-white"
+      });
       return;
     }
-
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+      setError('Enter a valid deposit amount');
+      toast({
+        title: "Invalid Amount",
+        description: "Enter a valid deposit amount.",
+        className: "bg-red-600 text-white"
+      });
+      return;
+    }
+    setLoading(true);
+    setError("");
     try {
-      setLoading(true);
-      setError('');
-      setAddress('');
-      setDestinationTag('');
-
-      console.log('[DepositModal] Fetching address for:', { currency, network });
-      
-      // First try to get existing addresses
-      const response = await fetch(
-        `/api/wallet/address?currency=${currency}&network=${network}`,
-        { method: 'GET' }
-      );
-
-      const data = await response.json();
-      console.log('[DepositModal] Address API response:', data);
-
-      if (!response.ok) {
-        // If the error indicates account setup is pending, show a more user-friendly message
-        if (data.code === 'ACCOUNT_SETUP_PENDING') {
-          toast({
-            title: "Account Setup in Progress",
-            description: "Your account is still being set up. Please try again in a few minutes.",
-            variant: "default"
-          });
-          onClose();
-          return;
-        }
-        
-        const errorMessage = data.error || data.message || 'Failed to fetch deposit address';
-        console.error('[DepositModal] API error:', { status: response.status, error: errorMessage });
-        throw new Error(errorMessage);
+      // Fetch fees breakdown from backend
+      const res = await fetch('/api/config/fees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: Number(amount),
+          currency: wallet?.currency || 'ngn',
+          type: 'deposit',
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || data.error || !data.data) {
+        throw new Error(data.error || "Failed to fetch fee breakdown");
       }
-
-      if (data.status === 'error') {
-        throw new Error(data.error || data.message || 'Failed to fetch deposit address');
-      }
-
-      // Handle fiat currencies
-      if (data.data?.is_crypto === false) {
-        setError(data.data.message || 'Please use bank transfer for fiat deposits');
-        return;
-      }
-
-      // Validate deposit address
-      if (!data.data?.address) {
-        throw new Error('No deposit address returned from API');
-      }
-
-      setAddress(data.data.address);
-      if (data.data.tag) {
-        setDestinationTag(data.data.tag);
-      }
-
-    } catch (error) {
-      console.error('[DepositModal] Error fetching address:', error);
-      setError(error instanceof Error ? error.message : 'Failed to generate deposit address');
+      setFees(data.data);
+      setShowPreview(true);
+      setError("");
+      console.log('[DepositModal] showPreview set to true, fees:', data.data);
+    } catch (err: any) {
+      setError(err.message || "Failed to fetch fee breakdown");
+      setShowPreview(false);
     } finally {
       setLoading(false);
+      console.log('[DepositModal] handleContinue finished', { showPreview });
     }
   };
 
-  useEffect(() => {
-    if (!isOpen) {
-      setAddress('');
-      setDestinationTag('');
-      setError('');
-      setLoading(false);
-      setSelectedCurrency('');
-      setSelectedNetwork('');
-      return;
-    }
 
-    if (!wallet?.currency) {
-      return;
-    }
-
-    const currency = wallet.currency.toLowerCase();
-    setSelectedCurrency(currency);
-
-    if (FIAT_CURRENCIES.includes(currency)) {
-      setError('Please use bank transfer for fiat deposits');
-      return;
-    }
-
-    const networks = NETWORKS_BY_CURRENCY[currency];
-    if (!networks?.length) {
-      setError(`${currency.toUpperCase()} deposits are not supported`);
-      return;
-    }
-
-    const recommendedNetwork = networks.find(n => n.isRecommended);
-    const defaultNetwork = recommendedNetwork || networks[0];
-    
-    if (defaultNetwork) {
-      setSelectedNetwork(defaultNetwork.id);
-      setTimeout(() => {
-        fetchAddress(currency, defaultNetwork.id);
-      }, 100);
-    }
-  }, [isOpen, wallet?.currency]);
-
-
-  const handleNetworkChange = (network: string) => {
-    setSelectedNetwork(network);
-    if (selectedCurrency) {
-      fetchAddress(selectedCurrency, network);
-    }
-  };
-
-  const handleCurrencyChange = (currency: string) => {
-    const currencyLower = currency.toLowerCase();
-    setSelectedCurrency(currencyLower);
-    setAddress('');
-    setDestinationTag('');
-    setError('');
-
-    if (FIAT_CURRENCIES.includes(currencyLower)) {
-      setError('Please use bank transfer for fiat deposits');
-      return;
-    }
-
-    const networks = NETWORKS_BY_CURRENCY[currencyLower];
-    if (networks?.length) {
-      const defaultNetwork = networks.find(n => n.isRecommended) || networks[0];
-      setSelectedNetwork(defaultNetwork.id);
-      fetchAddress(currencyLower, defaultNetwork.id);
-    } else {
-      setError(`${currency.toUpperCase()} deposits are not supported`);
-    }
-  };
-
-  const handleCopy = async (text: string) => {
+  // [LOG] Confirm deposit and fetch virtual account
+  const handleConfirm = async () => {
+    console.log('[DepositModal] handleConfirm called', { amount, userName, userEmail });
+    setLoading(true);
+    setError("");
+    setShowPreview(false);
     try {
-      await navigator.clipboard.writeText(text)
-      setCopied(true)
-      toast({
-        title: "Success",
-        description: "Copied to clipboard",
-        className: "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-600 dark:text-green-400"
-      })
-      setTimeout(() => setCopied(false), 2000)
-    } catch (err) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to copy to clipboard"
-      })
+      const res = await fetch('/api/payments/korapay/bank-transfer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: Number(amount),
+          account_name: userName || 'trustBank User',
+          customer: { name: userName || 'trustBank User', email: userEmail || 'user@trustbank.com' }
+        })
+      });
+      const data = await res.json();
+      console.log('[DepositModal] Virtual account API response', data);
+      if (!res.ok || data.error) {
+        throw new Error(data.error || "Failed to fetch virtual account");
+      }
+      setVirtualAccount(data.data || data);
+      console.log('[DepositModal] setVirtualAccount', data.data || data);
+    } catch (err: any) {
+      setError(err.message || "Failed to fetch virtual account");
+      console.error('[DepositModal] handleConfirm error', err);
+    } finally {
+      setLoading(false);
+      console.log('[DepositModal] handleConfirm finished', { virtualAccount });
     }
-  }
+  };
 
-  const networks = selectedCurrency ? NETWORKS_BY_CURRENCY[selectedCurrency.toLowerCase()] : []
+  const handleDone = () => {
+    setVirtualAccount(null);
+    setAmount("");
+    setFees(null);
+    setShowPreview(false);
+    setError("");
+    onClose();
+  };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px] max-h-[80vh] sm:max-h-[85vh] overflow-y-auto bg-gradient-to-br from-black via-green-950 to-black border-green-800/50">
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          <DialogHeader className="space-y-1">
-            <DialogTitle className="text-lg sm:text-xl font-bold text-white">
-              Deposit {selectedCurrency?.toUpperCase()}
-            </DialogTitle>
-            <DialogDescription className="text-sm text-white/70">
-              {NETWORKS_BY_CURRENCY[selectedCurrency.toLowerCase()]?.[0]?.isFiat 
-                ? "Get bank transfer details from support"
-                : "Select a network to generate your deposit address"
-              }
-            </DialogDescription>
-          </DialogHeader>
+    <Dialog open={isOpen} onOpenChange={open => { if (!open) onClose(); }}>
+      <DialogContent>
+        <DialogTitle className="sr-only">Deposit</DialogTitle>
+        <DialogDescription className="sr-only">Deposit funds into your trustBank account. Please review the fee breakdown and confirm your deposit.</DialogDescription>
+        <div className="p-0 bg-gradient-to-br from-[#2d014d] via-[#17002d] to-[#0d001a] rounded-2xl shadow-2xl border-2 border-purple-900" aria-describedby="deposit-modal-desc">
+          <DialogTitle id="deposit-modal-title" className="text-white text-2xl font-bold text-center mb-6">Deposit Funds</DialogTitle>
+          <DialogDescription id="deposit-modal-desc" className="text-purple-200 text-center mb-8">
+            Deposit NGN into your trustBank wallet. Enter the amount and follow the steps to fund your wallet instantly.
+          </DialogDescription>
 
-          <div className="space-y-3 mt-3">
-            {/* Currency Selection */}
-            <div className="space-y-1.5">
-              <Label className="text-xs sm:text-sm font-medium text-white">Select Currency</Label>
-              <Select value={selectedCurrency} onValueChange={handleCurrencyChange}>
-                <SelectTrigger className="w-full h-9 sm:h-10 bg-black text-white border-green-800/50">
-                  <SelectValue placeholder="Select currency" />
-                </SelectTrigger>
-                <SelectContent className="bg-black border-green-800/50 max-h-[200px]">
-                  <div className="sticky top-0 z-10 bg-black p-2 border-b border-green-800/50">
-                    <Input
-                      type="text"
-                      placeholder="Search currencies..."
-                      value={fromSearchQuery}
-                      onChange={(e) => setFromSearchQuery(e.target.value)}
-                      className="h-8 bg-black text-white placeholder:text-white/50 border-green-800/50"
-                    />
-                  </div>
-                  <div className="overflow-y-auto max-h-[160px]">
-                    {Object.keys(NETWORKS_BY_CURRENCY)
-                      .filter(currency => 
-                        !fromSearchQuery || 
-                        currency.toLowerCase().includes(fromSearchQuery.toLowerCase()) ||
-                        getCurrencyName(currency).toLowerCase().includes(fromSearchQuery.toLowerCase())
-                      )
-                      .map((currency) => (
-                        <SelectItem 
-                          key={currency} 
-                          value={currency}
-                          className="text-white hover:bg-green-900/20 cursor-pointer"
-                        >
-                          <div className="flex items-center justify-between w-full">
-                            <span className="font-medium">{currency.toUpperCase()}</span>
-                            <span className="text-xs text-white/70">
-                              {getCurrencyName(currency)}
-                            </span>
-                    </div>
-                        </SelectItem>
-                      ))}
-                  </div>
-                </SelectContent>
-              </Select>
+          {/* 1. Deposit amount input */}
+          {!showPreview && !virtualAccount && (
+            <div className="flex flex-col gap-6 px-8 py-8 rounded-2xl">
+              <div className="mb-2">
+                <Label htmlFor="deposit-amount" className="text-purple-200 mb-1 block text-lg font-semibold">Amount</Label>
+                <Input
+                  id="deposit-amount"
+                  type="number"
+                  className="bg-purple-900 text-white border-2 border-purple-500 focus:border-white focus:ring-2 focus:ring-purple-300 placeholder-purple-400 text-xl px-4 py-3 rounded-lg shadow-inner"
+                  placeholder="Enter amount"
+                  value={amount}
+                  onChange={handleAmountChange}
+                  min={1}
+                  aria-label="Deposit amount"
+                />
               </div>
+              <div className="flex gap-4 mt-4">
+                <Button variant="outline" onClick={onClose} className="flex-1 border-white text-white hover:bg-purple-800 bg-transparent font-semibold py-3 text-lg rounded-lg">Close</Button>
+                <Button
+                  variant="default"
+                  className="flex-1 bg-white text-purple-800 font-extrabold hover:bg-purple-200 py-3 text-lg rounded-lg shadow"
+                  onClick={handleContinue}
+                  disabled={loading}
+                  aria-label="Proceed to trade details"
+                >
+                  {loading ? 'Processing...' : 'Proceed'}
+                </Button>
+              </div>
+            </div>
+          )}
 
-            {/* Network Selection - Only show for non-fiat currencies */}
-            {networks && networks.length > 1 && !networks[0].isFiat && (
-              <div className="space-y-1.5">
-                <Label className="text-xs sm:text-sm font-medium text-white">Select Network</Label>
-                <Select value={selectedNetwork} onValueChange={handleNetworkChange}>
-                  <SelectTrigger className="w-full h-9 sm:h-10 bg-black text-white border-green-800/50">
-                      <SelectValue placeholder="Select network" />
-                    </SelectTrigger>
-                  <SelectContent className="bg-black border-green-800/50">
-                    {networks.map((network) => (
-                        <SelectItem 
-                          key={network.id} 
-                          value={network.id}
-                        className="text-white"
-                        >
-                        <div className="flex items-center justify-between w-full">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm">{network.name}</span>
-                            {network.isRecommended && (
-                              <span className="text-[10px] sm:text-xs text-green-400">(Recommended)</span>
-                            )}
-                          </div>
-                          {network.fee && (
-                            <span className="text-[10px] sm:text-xs text-white/70">Fee: ~{network.fee}</span>
-                          )}
-                        </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {selectedNetwork === 'trc20' && (
-                  <p className="text-xs text-green-400">
-                      TRC20 is recommended for faster and cheaper transactions
-                    </p>
-                  )}
-                </div>
-              )}
-
-            {/* Address Display or Fiat Message */}
-            {error ? (
-              <Alert className="bg-red-900/20 border-red-800/50 py-2">
-                <Icons.warning className="h-4 w-4 text-red-400" />
-                <AlertDescription className="text-xs sm:text-sm text-red-100">
-                  {error}
-                </AlertDescription>
-              </Alert>
-            ) : address ? (
-              <motion.div 
-                className="space-y-3"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.2 }}
-              >
-                <div className="flex justify-center p-3 bg-white rounded-lg">
-                  <QRCodeSVG 
-                    value={address} 
-                    size={150}
-                    level="H"
-                    includeMargin
-                    className="rounded-lg"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs sm:text-sm font-medium text-white">Deposit Address</Label>
-                    <div className="flex items-center gap-2">
-                    <code className="flex-1 rounded bg-black px-2 py-1.5 text-xs sm:text-sm break-all text-white">
-                        {address}
-                      </code>
-                      <Button
-                      variant="ghost"
-                        size="icon"
-                      className="h-8 w-8 text-green-400 hover:text-green-300"
-                        onClick={() => handleCopy(address)}
-                      >
-                        {copied ? (
-                          <Icons.check className="h-4 w-4" />
-                        ) : (
-                          <Icons.copy className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-
-                <Alert className="bg-yellow-900/20 border-yellow-800/50 py-2">
-                  <Icons.warning className="h-4 w-4 text-yellow-400" />
-                  <AlertDescription className="text-xs sm:text-sm text-yellow-100">
-                    Only send {selectedCurrency?.toUpperCase()} to this address on the {selectedNetwork.toUpperCase()} network.
-                      Sending any other asset may result in permanent loss.
-                    </AlertDescription>
-                  </Alert>
-              </motion.div>
+          {/* 2. Deposit preview or loading spinner */}
+          {showPreview && !virtualAccount && (
+            (!fees || !amount || Number(amount) === 0) ? (
+              <div className="w-full max-w-[95vw] sm:max-w-[340px] mx-auto p-3 sm:p-5 rounded-xl shadow-xl border border-gray-200 bg-white dark:bg-[#18132a] flex flex-col items-center justify-center min-h-[180px]">
+                <DialogTitle id="deposit-loading-title" className="text-lg font-bold mb-2 text-gray-900 dark:text-gray-100">Deposit Funds</DialogTitle>
+                <DialogDescription id="deposit-loading-desc" className="mb-4 text-gray-500 text-sm text-center">Deposit NGN into your trustBank wallet. Enter the amount and follow the steps to fund your wallet instantly.</DialogDescription>
+                <svg className="animate-spin h-9 w-9 text-primary mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                </svg>
+                <span className="text-base font-medium text-gray-700 dark:text-gray-200">Loading fee breakdown…</span>
+              </div>
             ) : (
-              <motion.div 
-                className="flex flex-col items-center justify-center py-4 space-y-3"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.2 }}
-              >
-                {loading ? (
-                  <>
-                    <Icons.spinner className="h-6 w-6 text-green-400 animate-spin" />
-                    <p className="text-xs sm:text-sm text-white">
-                      {NETWORKS_BY_CURRENCY[selectedCurrency.toLowerCase()]?.[0]?.isFiat 
-                        ? "Getting bank transfer details..."
-                        : "Generating deposit address..."
-                      }
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <Icons.info className="h-6 w-6 text-green-400" />
-                    <p className="text-xs sm:text-sm text-white">
-                      {NETWORKS_BY_CURRENCY[selectedCurrency.toLowerCase()]?.[0]?.isFiat 
-                        ? "Contact support for bank transfer details"
-                        : selectedCurrency 
-                          ? 'Select a network to generate a deposit address' 
-                          : 'Select a currency to continue'
-                      }
-                    </p>
-                  </>
-                )}
-              </motion.div>
-            )}
-          </div>
-        </motion.div>
+              <DepositPreview
+                amount={Number(amount) || 0}
+                currency={wallet?.currency || 'ngn'}
+                userName={userName}
+                depositAmount={Number(amount) || 0}
+                markup={Number(fees.markup) || 0}
+                processingFee={Number(fees.processing_fee) || 0}
+                serviceFee={Number(fees.service_fee) || 0}
+                vat={Number(fees.vat) || 0}
+                totalFee={Number(fees.total_fee) || 0}
+                youWillReceive={Number(fees.you_receive) || ((Number(amount) || 0) - (Number(fees.total_fee) || 0))}
+                loading={loading}
+                error={error}
+                onCancel={() => setShowPreview(false)}
+                onConfirm={handleConfirm}
+                descriptionId="deposit-preview-desc"
+              />
+            )
+          )}
+
+          {/* 3. Virtual account details */}
+          {virtualAccount && (
+            <VirtualAccountModal
+              open={!!virtualAccount}
+              onDone={handleDone}
+              accountName={virtualAccount.bank_account?.account_name || virtualAccount.account_name}
+              accountNumber={virtualAccount.bank_account?.account_number || virtualAccount.account_number}
+              bankName={virtualAccount.bank_account?.bank_name || virtualAccount.bank_name}
+              amount={virtualAccount.amount}
+              loading={loading} userName={''}            />
+          )}
+
+          {/* 4. Error message */}
+          {!virtualAccount && error && (
+            <div className="text-red-600 py-4 text-center font-semibold">{error}</div>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
-  )
-} 
+  );
+}
+export default DepositModal;

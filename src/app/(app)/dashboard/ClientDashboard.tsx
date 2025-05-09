@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { formatAmount, cn } from "@/lib/utils";
 import Link from 'next/link';
 import { InstantSwapModal } from '@/components/InstantSwapModal';
-import { DepositModal } from '@/components/wallet/DepositModal';
+import DepositModal from '@/components/wallet/DepositModal';
 import {
   ArrowRightLeft,
   LineChart,

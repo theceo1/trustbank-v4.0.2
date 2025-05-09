@@ -13,7 +13,7 @@ import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { InstantSwapModal } from '@/components/InstantSwapModal'
 import { WithdrawModal } from '@/components/wallet/WithdrawModal'
-import { DepositModal } from '@/components/wallet/DepositModal'
+import DepositModal from '@/components/wallet/DepositModal'
 import { GeneralDepositModal } from '@/components/wallet/GeneralDepositModal'
 // import { GeneralWithdrawModal } from '@/components/wallet/GeneralWithdrawModal'
 import { GeneralSwapModal } from '@/components/wallet/GeneralSwapModal'
@@ -53,6 +53,7 @@ export default function WalletPage() {
   const fetchWalletData = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
+      console.log('Supabase session:', session);
       if (!session) {
         setError('No session found');
         return;
@@ -65,6 +66,11 @@ export default function WalletPage() {
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          setError('Your session has expired or you are not logged in. Please log in again to access your wallet.');
+          setWalletData(null);
+          return;
+        }
         throw new Error('Failed to fetch wallet data');
       }
 
@@ -159,6 +165,30 @@ export default function WalletPage() {
   }
 
   if (error) {
+    // Special UI for session/auth errors
+    if (error.includes('session') || error.toLowerCase().includes('log in')) {
+      return (
+        <div className="container mx-auto px-4 sm:px-6 py-8">
+          <div className="bg-white dark:bg-gray-900 rounded-lg p-4 sm:p-6 border border-gray-200 dark:border-gray-800">
+            <div className="flex items-center justify-center">
+              <div className="text-center">
+                <Icons.warning className="h-8 w-8 text-yellow-500 mx-auto mb-4" />
+                <h1 className="text-xl font-medium text-gray-900 dark:text-gray-100 mb-2">Session Expired</h1>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                  {error}
+                </p>
+                <Button asChild>
+                  <Link href="/auth/login">
+                    Log In Again
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    // Default error UI
     return (
       <div className="container mx-auto px-4 sm:px-6 py-8">
         <div className="bg-white dark:bg-gray-900 rounded-lg p-4 sm:p-6 border border-gray-200 dark:border-gray-800">

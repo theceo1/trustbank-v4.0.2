@@ -255,14 +255,39 @@ export default function TradingGuidePage() {
                   <div className="mt-3 p-3 rounded bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800">
                     <strong>Withdrawal Markup Notice:</strong>
                     <br />
-                    For every withdrawal (crypto or fiat), trustBank applies a small 15% markup to the base network or processing fee. This helps ensure platform sustainability and supports ongoing improvements. We believe in transparency—your total withdrawal fee (including markup) is always shown before you confirm a transaction.
+                    For every withdrawal (crypto or fiat), trustBank applies a small markup to the base network or processing fee. 
+                    This helps ensure platform sustainability and supports ongoing improvements. 
+                    We believe in transparency—your total withdrawal fee (including markup) is always shown before you confirm a transaction.
                   </div>
                 </AlertDescription>
               </Alert>
             </div>
           </CardContent>
         </Card>
-      </div>
+      {/* trustBank Deposit Fee Explanation Section */}
+      <Card className="mt-10 text-sm bg-blue-800/50">
+        <CardHeader>
+          <CardTitle className="text-lg mb-2 text-green-600">trustBank Deposit Fee Structure</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {/* <div className="mt-2"> */}
+            <p className="text-muted-sm">
+              <b>How fees work when you deposit NGN to your trustBank wallet:</b>
+            </p>
+            <ul className="list-disc list-inside text-muted-foreground">
+              <li><b>Service Fee</b>: trustBank applies a markup between <b>2.5%</b> and <b>4%</b> of your deposit, plus a small processing fee. This ensures platform sustainability and a premium experience.</li>
+              <li><b>VAT</b>: Calculated as required by law and shown before you confirm.</li>
+              <li><b>Total Fee</b>: Service Fee + VAT</li>
+              <li><b>You Receive</b>: Your deposit amount minus the Total Fee</li>
+            </ul>
+            <p className="text-sm text-muted-foreground">
+              All fees are shown transparently before you confirm your deposit. 
+              For any fee-related queries, please contact <a href="mailto:fees@trustbank.tech" className="underline text-primary"><b>fees@trustbank.tech</b></a>
+            </p>
+          {/* </div> */}
+        </CardContent>
+      </Card>
     </div>
-  );
-} 
+  </div>
+);
+}

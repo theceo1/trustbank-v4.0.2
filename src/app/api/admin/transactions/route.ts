@@ -158,7 +158,10 @@ export async function GET(req: NextRequest) {
           reference: tx.reference || tx.id,
           destination: tx.recipient_id || 'N/A',
           source: tx.user_id,
-          fee: tx.platform_revenue?.[0]?.amount || 'N/A'
+          fee: tx.platform_revenue?.[0]?.amount || 'N/A',
+          // Expose korapay_fee and trustbank_fee for admin panel
+          trustbank_fee: tx.metadata?.trustbank_fee ?? null,
+          korapay_fee: tx.metadata?.korapay_fee ?? null
         }
       })),
       ...(swapData || []).map((tx: any) => ({

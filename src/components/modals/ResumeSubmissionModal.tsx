@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -102,15 +103,25 @@ export function ResumeSubmissionModal({ isOpen, onClose }: ResumeSubmissionModal
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
+    <Dialog
+      open={isOpen}
+      onOpenChange={onClose}
+    >
+      <DialogContent className="sm:max-w-[500px]" aria-describedby="resume-submission-modal-desc">
         <DialogHeader>
-          <DialogTitle>Submit Your Resume</DialogTitle>
-          <DialogDescription>
+          <DialogTitle id="resume-submission-modal-title">Submit Your Resume</DialogTitle>
+          <DialogDescription id="resume-submission-modal-desc">
             Share your experience with us. We'll review your profile and reach out if there's a potential match.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <motion.form
+          onSubmit={handleSubmit}
+          className="space-y-4"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 20 }}
+          transition={{ duration: 0.3 }}
+        >
           <div className="grid gap-4">
             <div className="grid gap-2">
               <Label htmlFor="name">Full Name</Label>
@@ -199,7 +210,7 @@ export function ResumeSubmissionModal({ isOpen, onClose }: ResumeSubmissionModal
               )}
             </Button>
           </div>
-        </form>
+        </motion.form>
       </DialogContent>
     </Dialog>
   );
