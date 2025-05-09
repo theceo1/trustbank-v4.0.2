@@ -360,6 +360,15 @@ const DepositModal = ({ isOpen, onClose, wallet }: DepositModalProps) => {
 
   // [LOG] Confirm deposit and fetch virtual account
   const handleConfirm = async () => {
+    // Only allow NGN fiat deposits
+    if (wallet?.currency && wallet.currency.toUpperCase() !== 'NGN') {
+      toast({
+        title: 'Coming Soon',
+        description: 'Deposits in USD and GBP will be available soon.',
+        className: 'bg-yellow-500 text-white'
+      });
+      return;
+    }
     console.log('[DepositModal] handleConfirm called', { amount, userName, userEmail });
     setLoading(true);
     setError("");
@@ -383,12 +392,12 @@ const DepositModal = ({ isOpen, onClose, wallet }: DepositModalProps) => {
       if (data.data) setFees(data.data);
       setVirtualAccount(data.data || data);
       console.log('[DepositModal] setVirtualAccount', data.data || data);
+      // Do NOT record transaction here. Wait until user clicks Done.
     } catch (err: any) {
       setError(err.message || "Failed to fetch virtual account");
       console.error('[DepositModal] handleConfirm error', err);
     } finally {
       setLoading(false);
-      console.log('[DepositModal] handleConfirm finished', { virtualAccount });
     }
   };
 
@@ -403,14 +412,68 @@ const DepositModal = ({ isOpen, onClose, wallet }: DepositModalProps) => {
   };
 
 
-  const handleDone = () => {
+  const resetModal = () => {
     setVirtualAccount(null);
     setAmount("");
     setFees(null);
     setShowPreview(false);
     setError("");
+  };
+
+  const handleDone = async () => {
+    // Record transaction only when user clicks Done
+    if (virtualAccount) {
+      const korapayReference = (virtualAccount.bank_account && virtualAccount.bank_account.reference) || virtualAccount.reference || '';
+      const requestBody = {
+        type: 'DEPOSIT', // UPPERCASE to match API schema
+        amount: Number(amount),
+        description: `NGN Deposit via Korapay (ref: ${korapayReference})`,
+        reference: korapayReference,
+        currency: 'NGN'
+      };
+      try {
+        console.log('[DepositModal] handleDone POST body:', requestBody);
+        const txRes = await fetch('/api/transactions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody)
+        });
+        const responseText = await txRes.text();
+        console.log('[DepositModal] handleDone response status:', txRes.status);
+        console.log('[DepositModal] handleDone response text:', responseText);
+        if (txRes.status === 404) {
+          toast({
+            title: 'Transaction Recording Error',
+            description: 'Transaction recording endpoint not found. Please contact support.',
+            className: 'bg-yellow-500 text-white'
+          });
+        } else if (!txRes.ok) {
+          toast({
+            title: 'Transaction Error',
+            description: `Failed to record transaction: ${responseText}`,
+            className: 'bg-red-600 text-white'
+          });
+          throw new Error('Failed to record transaction.');
+        } else {
+          toast({
+            title: 'Deposit Successful',
+            description: 'Your deposit was successful and has been recorded.',
+            className: 'bg-green-600 text-white'
+          });
+        }
+      } catch (txErr: any) {
+        toast({
+          title: 'Deposit Recorded (Partial)',
+          description: 'Deposit succeeded but failed to record transaction. Please contact support.',
+          className: 'bg-yellow-500 text-white'
+        });
+        console.error('[DepositModal] Failed to record transaction:', txErr);
+      }
+    }
+    resetModal();
     onClose();
   };
+
 
   return (
     <Dialog open={isOpen} onOpenChange={open => { if (!open) onClose(); }}>
@@ -510,4 +573,19 @@ const DepositModal = ({ isOpen, onClose, wallet }: DepositModalProps) => {
     </Dialog>
   );
 }
+// --- Transaction History Display (for wiring in main wallet/dashboard UI) ---
+// import { useEffect, useState } from 'react';
+// import TransactionHistory from './TransactionHistory';
+//
+// const [transactions, setTransactions] = useState<any[]>([]);
+// useEffect(() => {
+//   fetch('/api/transactions')
+//     .then(res => res.json())
+//     .then(setTransactions);
+// }, []);
+//
+// <TransactionHistory transactions={transactions} />
+//
+// Place this block in your wallet or dashboard page (NOT inside DepositModal) to show all user transactions (deposits, withdrawals, swaps, transfers, etc.)
+
 export default DepositModal;

@@ -42,14 +42,29 @@ export async function POST(req: NextRequest) {
 
     // Fetch trustBank fee config for this amount/currency
     // Use BASE_URL for server-side API calls (set BASE_URL in .env.local)
-    const feeRes = await fetch(`${process.env.BASE_URL}/api/config/fees`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount, currency: 'ngn' })
-    });
-    const feeData = await feeRes.json();
-    if (!feeRes.ok || feeData.error) {
-      return NextResponse.json({ error: feeData.error || 'Failed to fetch fee config' }, { status: 500 });
+    const baseUrl = process.env.BASE_URL;
+    console.log('[DEBUG][BASE_URL]', baseUrl);
+    let feeData: any = null;
+    let feeRes: Response | null = null;
+    try {
+      feeRes = await fetch(`${baseUrl}/api/config/fees`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount, currency: 'ngn' })
+      });
+      const feeText = await feeRes.text();
+      try {
+        feeData = JSON.parse(feeText);
+      } catch (jsonErr) {
+        console.error('[ERROR][FEE API NON-JSON]', feeText);
+        return NextResponse.json({ error: 'Fee API error: Non-JSON response', feeText }, { status: 500 });
+      }
+      if (!feeRes.ok || feeData.error) {
+        return NextResponse.json({ error: feeData.error || 'Failed to fetch fee config' }, { status: 500 });
+      }
+    } catch (feeErr: any) {
+      console.error('[ERROR][FEE FETCH FAILED]', feeErr);
+      return NextResponse.json({ error: 'Fee fetch failed', details: feeErr?.message }, { status: 500 });
     }
     // New fee structure:
     // trustBank Markup: controlled by env (max/min percent)

@@ -8,7 +8,9 @@ const transactionSchema = z.object({
   amount: z.number().positive(),
   description: z.string().optional(),
   recipientId: z.string().optional(), // For transfers
-})
+  reference: z.string().optional(),  
+  currency: z.string().default('NGN'), // Ensure currency is always present
+});
 
 export async function GET(req: NextRequest) {
   try {
@@ -81,6 +83,10 @@ export async function POST(req: NextRequest) {
     const validatedData = transactionSchema.parse(body)
     const userId = session.user.id
 
+    // Map type to lowercase for the database
+    const dbType = validatedData.type.toLowerCase();
+    // Note: If you want to track currency per transaction, add a 'currency' column to the DB and update the function signature.
+
     // Get user's current balance
     const { data: user, error: userError } = await supabase
       .from('user_profiles')
@@ -130,16 +136,18 @@ export async function POST(req: NextRequest) {
     }
 
     // Start a Supabase transaction using RPC
-    const { data: transaction, error: transactionError } = await supabase.rpc(
-      'create_transaction',
-      {
-        p_type: validatedData.type,
+    // Insert transaction using lowercase type for DB
+    const { data: transaction, error: transactionError } = await supabase
+      .rpc('create_transaction', {
+        p_type: dbType, // always lowercase for DB
         p_amount: validatedData.amount,
-        p_description: validatedData.description,
+        p_description: validatedData.description || '',
         p_user_id: userId,
-        p_recipient_id: validatedData.recipientId
-      }
-    )
+        p_recipient_id: validatedData.recipientId || null,
+        p_reference: validatedData.reference || null,
+        // p_currency removed to match DB schema
+      })
+      .single();
 
     if (transactionError) {
       console.error("Transaction error:", transactionError)

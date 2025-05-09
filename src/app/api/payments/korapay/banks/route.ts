@@ -1,3 +1,4 @@
+//src/app/api/payments/korapay/banks/route.ts
 import { NextResponse } from 'next/server';
 import { SUPPORTED_BANKS } from '@/lib/constants/banks';
 

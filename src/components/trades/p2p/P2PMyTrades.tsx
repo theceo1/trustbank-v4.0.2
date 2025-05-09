@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { TransactionHistory } from '@/components/wallet/TransactionHistory';
 import {
   Table,
   TableBody,
