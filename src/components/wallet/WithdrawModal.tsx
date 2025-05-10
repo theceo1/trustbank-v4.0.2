@@ -91,6 +91,35 @@ function getFeeTier(volumeUsd: number) {
 }
 
 export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModalProps) {
+  // Helper to reset modal state
+  function resetState() {
+    setAmount("");
+    setIsLoading(false);
+    setWithdrawTab(wallet?.currency?.toLowerCase() === 'ngn' ? 'ngn' : 'crypto');
+    setSelectedBank("");
+    setAccountNumber("");
+    setAccountName("");
+    setBankSearch("");
+    setDropdownOpen(false);
+    setHighlightedIndex(0);
+    setShowPreview(false);
+    setRateError(null);
+    setUsdRate(0);
+    setNgnFee(null);
+    setNgnFeeError(null);
+    setNgnFeeLoading(false);
+    setUserVolumeUsd(0);
+    setWithdrawStatus('initiated');
+    setSelectedNetwork("");
+    setDestinationAddress("");
+    // Add any other state resets as needed
+  }
+
+  // Wrap onClose to reset state
+  function handleClose() {
+    resetState();
+    onClose();
+  }
   // ...existing hooks...
   const [rateError, setRateError] = useState<string | null>(null);
   // =====================
@@ -137,16 +166,7 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
   // Reset form state and tab when modal opens or wallet changes
   useEffect(() => {
     if (isOpen) {
-      setAmount("");
-      setIsLoading(false);
-      setWithdrawTab(wallet?.currency?.toLowerCase() === 'ngn' ? 'ngn' : 'crypto');
-      setSelectedBank("");
-      setAccountNumber("");
-      setAccountName("");
-      setBankSearch("");
-      setDropdownOpen(false);
-      setHighlightedIndex(0);
-      setShowPreview(false);
+      resetState();
       // Fetch NGN withdrawal fee if NGN wallet
       if (wallet?.currency?.toLowerCase() === 'ngn') {
         setNgnFeeLoading(true);
@@ -291,16 +311,42 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
         setUserVolumeUsd(0);
       }
       try {
-        // Fetch USD/NGN rate
-        const res = await fetch('/api/markets/usdtngn/ticker');
-        if (!res.ok) throw new Error('Failed to fetch USD/NGN rate');
+        // Fetch all market tickers and compute USD/NGN using USDT as bridge
+        console.log("Fetching tickers...");
+        const res = await fetch('/api/markets/tickers');
         const data = await res.json();
-        if (!data || !data.data || isNaN(parseFloat(data.data.price))) {
+        console.log("Tickers data:", data);
+        const tickers = data?.data || {};
+        // usdtngn and usdtusd are objects with a .ticker property
+        const usdtngn = tickers['usdtngn']?.ticker;
+        const usdtusd = tickers['usdtusd']?.ticker;
+
+        // Log for debugging
+        console.log("usdtngn:", usdtngn, "usdtusd:", usdtusd);
+
+        // Use 'last', fallback to 'buy', then 'sell', then 'open'
+        const getPrice = (tickerObj: any) => {
+          if (!tickerObj) return undefined;
+          return tickerObj.last || tickerObj.buy || tickerObj.sell || tickerObj.open;
+        };
+
+        const usdtngnPrice = getPrice(usdtngn);
+        const usdtusdPrice = getPrice(usdtusd);
+
+        console.log("usdtngnPrice:", usdtngnPrice, "usdtusdPrice:", usdtusdPrice);
+
+        if (
+          usdtngnPrice &&
+          usdtusdPrice &&
+          !isNaN(parseFloat(usdtngnPrice)) &&
+          !isNaN(parseFloat(usdtusdPrice))
+        ) {
+          const usdNgnRate = parseFloat(usdtngnPrice) / parseFloat(usdtusdPrice);
+          setUsdRate(usdNgnRate);
+          setRateError(null);
+        } else {
           setUsdRate(0);
           setRateError('Could not fetch USD/NGN rate. Some conversions may be unavailable.');
-        } else {
-          setUsdRate(parseFloat(data.data.price));
-          setRateError(null);
         }
       } catch (e) {
         setUsdRate(0);
@@ -704,7 +750,7 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
 
   return (
     <TooltipProvider>
-      <Dialog open={isOpen} onOpenChange={onClose}>
+      <Dialog open={isOpen} onOpenChange={open => { if (!open) handleClose(); }}>
         <DialogContent className="sm:max-w-[425px] bg-gradient-to-br from-indigo-950 via-purple-900 to-black border-purple-800/50">
           <DialogHeader>
             <DialogTitle className="text-white">Withdraw {wallet?.currency?.toUpperCase()}</DialogTitle>

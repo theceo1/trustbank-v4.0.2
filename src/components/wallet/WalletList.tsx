@@ -1,8 +1,9 @@
+//src/components/wallet/WalletList.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
 import { WalletCard } from '@/components/wallet/WalletCard';
-import { DepositModal } from '@/components/wallet/DepositModal';
+import  DepositModal from '@/components/wallet/DepositModal';
 import { WithdrawModal } from '@/components/wallet/WithdrawModal';
 import { InstantSwapModal } from '@/components/InstantSwapModal';
 import { Button } from '@/components/ui/button';

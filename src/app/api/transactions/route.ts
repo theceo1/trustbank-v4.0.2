@@ -1,3 +1,4 @@
+//src/app/api/transactions/route.ts
 import { NextRequest, NextResponse } from "next/server"
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
@@ -37,22 +38,67 @@ export async function GET(req: NextRequest) {
 
     const userId = session.user.id
 
-    // Fetch transactions where user is either sender or recipient
-    const { data: transactions, error: transactionsError } = await supabase
+    // Fetch transactions from all relevant tables
+    const { data: fiatTxs, error: fiatError } = await supabase
       .from('transactions')
       .select('*')
       .or(`user_id.eq.${userId},recipient_id.eq.${userId}`)
-      .order('created_at', { ascending: false })
 
-    if (transactionsError) {
-      console.error("Error fetching transactions:", transactionsError)
+    const { data: swapTxs, error: swapError } = await supabase
+      .from('swap_transactions')
+      .select('*')
+      .eq('user_id', userId)
+
+    const { data: tradeTxs, error: tradeError } = await supabase
+      .from('trades')
+      .select('*')
+      .eq('user_id', userId)
+
+    if (fiatError || swapError || tradeError) {
+      console.error("Error fetching transactions:", fiatError, swapError, tradeError)
       return NextResponse.json(
         { error: "Failed to fetch transactions" },
         { status: 500 }
       )
     }
 
-    return NextResponse.json(transactions)
+  
+
+    // Normalize and merge
+    const fiat = (fiatTxs || []).map(tx => ({
+      ...tx,
+      _source: 'fiat',
+      _type: tx.type,
+      _amount: tx.amount,
+      _currency: tx.currency,
+      _status: tx.status,
+      _created_at: tx.created_at,
+    }))
+    const swaps = (swapTxs || []).map(tx => ({
+      ...tx,
+      _source: 'swap',
+      _type: 'swap',
+      _amount: tx.from_amount ?? tx.amount, // fallback to amount
+      _currency: tx.from_currency ?? tx.currency, // fallback to currency
+      _status: tx.status,
+      _created_at: tx.created_at,
+    }))
+    const trades = (tradeTxs || []).map(tx => ({
+      ...tx,
+      _source: 'trade',
+      _type: tx.type,
+      _amount: tx.amount,
+      _currency: tx.currency,
+      _status: tx.status,
+      _created_at: tx.created_at,
+    }))
+
+    // Merge and sort by date
+    const allTxs = [...fiat, ...swaps, ...trades].sort(
+      (a, b) => new Date(b._created_at).getTime() - new Date(a._created_at).getTime()
+    )
+
+    return NextResponse.json(allTxs)
   } catch (error) {
     console.error("Error fetching transactions:", error)
     return NextResponse.json(

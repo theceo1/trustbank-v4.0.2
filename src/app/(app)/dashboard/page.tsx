@@ -2,7 +2,7 @@ import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import ClientDashboard from './ClientDashboard';
-import { TransactionHistory } from '@/components/wallet/TransactionHistory';
+import TransactionHistory from '@/components/TransactionHistory';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,7 +71,7 @@ export default async function DashboardPage() {
   if (transactionsRes.ok) {
     const allTransactions = await transactionsRes.json();
     recentTransactions = (allTransactions || [])
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       .slice(0, 5);
   }
 

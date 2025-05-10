@@ -4,7 +4,7 @@
 import { Button } from '@/components/ui/button'
 import { Icons } from '@/components/ui/icons'
 import { WalletListWrapper } from '@/components/wallet/WalletListWrapper'
-import { TransactionHistory } from '@/components/wallet/TransactionHistory'
+import TransactionHistory from '@/components/TransactionHistory'
 
 // ...other imports
 
@@ -17,8 +17,8 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { InstantSwapModal } from '@/components/InstantSwapModal'
 import { WithdrawModal } from '@/components/wallet/WithdrawModal'
 import DepositModal from '@/components/wallet/DepositModal'
+import CryptoDepositModal from '@/components/wallet/CryptoDepositModal' // Added for crypto deposits
 import { GeneralDepositModal } from '@/components/wallet/GeneralDepositModal'
-// import { GeneralWithdrawModal } from '@/components/wallet/GeneralWithdrawModal'
 import { GeneralSwapModal } from '@/components/wallet/GeneralSwapModal'
 import { Input } from '@/components/ui/input'
 
@@ -444,14 +444,26 @@ export default function WalletPage() {
       </BalanceProvider>
 
       {/* Modals */}
-      <DepositModal
-        isOpen={isDepositOpen}
-        onClose={() => {
-          setIsDepositOpen(false);
-          setSelectedWallet(null);
-        }}
-        wallet={selectedWallet}
-      />
+      {/* Show DepositModal for NGN, CryptoDepositModal for crypto */}
+      {selectedWallet?.currency?.toLowerCase() === 'ngn' ? (
+        <DepositModal
+          isOpen={isDepositOpen}
+          onClose={() => {
+            setIsDepositOpen(false);
+            setSelectedWallet(null);
+          }}
+          wallet={selectedWallet}
+        />
+      ) : (
+        <CryptoDepositModal
+          isOpen={isDepositOpen}
+          onClose={() => {
+            setIsDepositOpen(false);
+            setSelectedWallet(null);
+          }}
+          wallet={selectedWallet}
+        />
+      )}
       <WithdrawModal
         isOpen={isWithdrawOpen && selectedWallet !== null}
         onClose={() => {

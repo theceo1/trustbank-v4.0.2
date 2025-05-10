@@ -1,3 +1,4 @@
+//src/components/transactions/TransactionList.tsx
 import { formatAmount } from '@/lib/utils';
 import { Icons } from '@/components/ui/icons';
 import { format, isValid, parseISO } from 'date-fns';
@@ -7,7 +8,7 @@ interface TransactionListProps {
   transactions: AnyTransaction[];
 }
 
-export function TransactionList({ transactions }: TransactionListProps) {
+export function TransactionList({ transactions }: { transactions: any[] }) {
   const getTransactionIcon = (transaction: AnyTransaction) => {
     const type = 'type' in transaction ? transaction.type : 'swap';
     switch (type) {

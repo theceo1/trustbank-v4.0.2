@@ -1,3 +1,4 @@
+//src/app/api/user/wallets/route.ts
 import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
@@ -49,9 +50,7 @@ export async function GET() {
 
     // Fetch wallets from Quidax with error logging
     try {
-      console.log('[UserWallets] Fetching wallets for user:', profile.quidax_id);
       const response = await quidaxService.getWallets(profile.quidax_id);
-      console.log('[UserWallets] Raw response:', response);
 
       // Handle both wrapped and unwrapped responses
       const wallets = Array.isArray(response) ? response : 
@@ -63,15 +62,9 @@ export async function GET() {
         data: wallets
       });
     } catch (error: any) {
-      console.error('[UserWallets] Error fetching wallets:', {
-        error: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
       throw error;
     }
   } catch (error) {
-    console.error('[UserWallets] Error:', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to fetch wallets' },
       { status: 500 }

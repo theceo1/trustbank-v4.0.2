@@ -110,7 +110,6 @@ export async function GET() {
     });
 
   } catch (error) {
-    console.error('Error in fees endpoint:', error);
     return NextResponse.json(
       { 
         status: 'error', 

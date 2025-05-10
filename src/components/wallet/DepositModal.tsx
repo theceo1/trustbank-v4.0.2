@@ -425,7 +425,7 @@ const DepositModal = ({ isOpen, onClose, wallet }: DepositModalProps) => {
     if (virtualAccount) {
       const korapayReference = (virtualAccount.bank_account && virtualAccount.bank_account.reference) || virtualAccount.reference || '';
       const requestBody = {
-        type: 'DEPOSIT', // UPPERCASE to match API schema
+        type: 'deposit', // lowercase to match backend enum
         amount: Number(amount),
         description: `NGN Deposit (ref: ${korapayReference})`,
         reference: korapayReference,

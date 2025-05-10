@@ -567,7 +567,7 @@ function WalletTable({ wallets, loading }: { wallets: PlatformWallet[], loading:
                 {expandedWallet === wallet.id && (
                   <TableRow>
                     <TableCell colSpan={8} className="p-4 bg-gray-50 dark:bg-gray-900">
-                      <TransactionHistory wallet={wallet} />
+                      <AdminWalletTransactionHistory wallet={wallet} />
                     </TableCell>
                   </TableRow>
                 )}
@@ -586,7 +586,7 @@ function WalletTable({ wallets, loading }: { wallets: PlatformWallet[], loading:
   );
 }
 
-function TransactionHistory({ wallet }: { wallet: PlatformWallet }) {
+function AdminWalletTransactionHistory({ wallet }: { wallet: PlatformWallet }) {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 

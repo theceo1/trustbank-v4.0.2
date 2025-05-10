@@ -1,3 +1,4 @@
+//src/app/(app)/transactions/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -27,7 +28,6 @@ export default function TransactionsPage() {
         const transactions = await transactionService.getTransactions(filters);
         setTransactions(transactions);
       } catch (error) {
-        console.error('Error fetching transactions:', error);
         // You might want to show an error toast here
       } finally {
         setIsLoading(false);

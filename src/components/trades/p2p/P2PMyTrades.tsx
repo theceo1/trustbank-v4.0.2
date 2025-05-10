@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { TransactionHistory } from '@/components/wallet/TransactionHistory';
+import TransactionHistory from '@/components/TransactionHistory';
 import {
   Table,
   TableBody,

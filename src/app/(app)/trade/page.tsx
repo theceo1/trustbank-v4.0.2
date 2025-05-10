@@ -181,9 +181,15 @@ const AMOUNT_LIMITS: Record<string, { min: number }> = {
   ADA: { min: 10 }
 };
 
+// Set this to true to show debug info in the modal
+const DEBUG = true;
+
 export default function TradePage() {
-  const [tab, setTab] = useState<'buy' | 'sell'>('buy');
+  // ...existing states...
   const [amount, setAmount] = useState('');
+  const [amountError, setAmountError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [tab, setTab] = useState<'buy' | 'sell'>('buy');
   const [selectedCrypto, setSelectedCrypto] = useState('');
   const [inputCurrency, setInputCurrency] = useState('NGN');
   const [loading, setLoading] = useState(false);
@@ -417,36 +423,38 @@ export default function TradePage() {
     handleQuoteExpired();
   };
 
-  const handleAmountChange = async (value: string) => {
-    const numericValue = value.replace(/,/g, '');
-    
+  // Only allow numeric input and always update
+  const handleAmountChange = (value: string) => {
+    const sanitized = value.replace(/[^0-9.]/g, '');
+    setAmount(sanitized);
+    setAmountError(null); // Clear error while typing
+  };
+
+  // Validate on blur (after user leaves the input)
+  const handleAmountBlur = async () => {
+    const numericValue = amount.replace(/,/g, '');
+    if (!numericValue) {
+      setAmountError(null);
+      return;
+    }
     // Basic numeric validation
     const error = validateNumericInput(numericValue, {
       decimals: inputCurrency === 'CRYPTO' ? 8 : 2
     });
     if (error) {
-      toast({
-        title: 'Invalid Input',
-        description: error,
-        variant: 'destructive',
-        className: "bg-red-500 text-white border-none",
-      });
+      setAmountError(error);
       return;
     }
-
     try {
       let convertedAmount = parseFloat(numericValue);
       let ngnAmount = 0;
-
       // Get current rates
       const rateResponse = await fetch(`/api/markets/rate?from=USDT&to=NGN`);
       if (!rateResponse.ok) throw new Error('Failed to fetch rate');
       const rateData = await rateResponse.json();
       const ngnUsdtRate = rateData.rate;
-
       if (inputCurrency === 'CRYPTO') {
         if (tab === 'sell') {
-          // For sell orders, get NGN equivalent
           const cryptoUsdtResponse = await fetch(`/api/markets/rate?from=${selectedCrypto}&to=USDT`);
           if (!cryptoUsdtResponse.ok) throw new Error('Failed to fetch rate');
           const cryptoUsdtData = await cryptoUsdtResponse.json();
@@ -456,57 +464,32 @@ export default function TradePage() {
         ngnAmount = convertedAmount * ngnUsdtRate;
         convertedAmount = ngnAmount;
       } else {
-        // Input is already in NGN
         ngnAmount = convertedAmount;
       }
-
-      // Validate minimum NGN amount for both buy and sell
+      // Validate minimum NGN amount
       if (ngnAmount < 1000) {
-        toast({
-          title: 'Invalid Amount',
-          description: `Minimum amount is ₦1,000 (current: ₦${formatNumber(ngnAmount)})`,
-          variant: 'destructive',
-          className: "bg-red-500 text-white border-none",
-        });
+        setAmountError(`Minimum amount is ₦1,000 (current: ₦${formatNumber(ngnAmount)})`);
         return;
       }
-
       // For sell orders, also validate crypto minimum
       if (tab === 'sell' && inputCurrency === 'CRYPTO') {
         const cryptoMin = AMOUNT_LIMITS[selectedCrypto]?.min || 0;
         if (cryptoMin > 0 && convertedAmount < cryptoMin) {
-          toast({
-            title: 'Invalid Amount',
-            description: `Minimum amount is ${cryptoMin} ${selectedCrypto}`,
-            variant: 'destructive',
-            className: "bg-red-500 text-white border-none",
-          });
+          setAmountError(`Minimum amount is ${cryptoMin} ${selectedCrypto}`);
           return;
         }
-
         // Check balance
         const balance = parseFloat(balances[selectedCrypto.toLowerCase()] || '0');
         if (convertedAmount > balance) {
-          toast({
-            title: 'Insufficient Balance',
-            description: `You have ${formatNumber(balance)} ${selectedCrypto} available`,
-            variant: 'destructive',
-            className: "bg-red-500 text-white border-none",
-          });
+          setAmountError(`You have ${formatNumber(balance)} ${selectedCrypto} available`);
           return;
         }
       }
-
-      setAmount(convertedAmount.toString());
+      setAmountError(null);
       setNgnEquivalent(ngnAmount.toString());
       handleQuoteExpired();
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to validate amount. Please try again.',
-        variant: 'destructive',
-        className: "bg-red-500 text-white border-none",
-      });
+      setAmountError('Failed to validate amount. Please try again.');
     }
   };
 
@@ -626,14 +609,16 @@ export default function TradePage() {
         body: JSON.stringify(payload)
       });
 
+      console.log('[DEBUG] swap quotation raw response:', response);
+
       if (!response.ok) {
         const errorData = await response.json();
-        
+        console.log('[DEBUG] swap quotation errorData:', errorData);
         throw new Error(errorData.message || 'Failed to get quote');
       }
 
       const data = await response.json();
-      
+      console.log('[DEBUG] swap quotation parsed data:', data);
 
       if (data.status !== 'success' || !data.data) {
         throw new Error('Invalid quote response');
@@ -662,6 +647,11 @@ export default function TradePage() {
         ngn_equivalent: ngnAmount,
         quotation_id: data.data.id
       });
+
+      // Also set quotation and rate for modal UI
+      setQuotation(data.data);
+      setRate(parseFloat(data.data.quoted_price));
+      console.log('[DEBUG] setQuotation called with:', data.data);
 
       // Show confirmation dialog
       setShowConfirmation(true);
@@ -703,6 +693,7 @@ export default function TradePage() {
       setShowConfirmation(false);
       setShowRate(false);
       fetchBalances();
+      setRefreshKey((k) => k + 1);
     } catch (error) {
 
       toast({
@@ -938,10 +929,14 @@ export default function TradePage() {
                       type="text"
                       value={amount}
                       onChange={(e) => handleAmountChange(e.target.value)}
+                      onBlur={handleAmountBlur}
                       className="w-full pr-24"
                       placeholder="0.00"
                       disabled={!hasBasicKyc}
                     />
+                    {amountError && (
+                      <div className="text-xs text-red-600 mt-1">{amountError}</div>
+                    )}
                     <Select
                       value={inputCurrency}
                       onValueChange={setInputCurrency}
@@ -1161,13 +1156,15 @@ export default function TradePage() {
               )}
             </Button>
           </DialogFooter>
+
+
         </DialogContent>
       </Dialog>
 
     {/* Recent Transactions Table */}
     <div className="mt-12">
       <h2 className="text-xl font-semibold mb-4">Recent Transactions</h2>
-      <TransactionHistory />
+      <TransactionHistory refreshKey={refreshKey} />
     </div>
   </div>
 );

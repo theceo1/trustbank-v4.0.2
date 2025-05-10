@@ -1,83 +1,102 @@
+'use client';
+
 import { useEffect, useState } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { format } from 'date-fns';
+import { TransactionList } from '@/components/transactions/TransactionList';
 
-export default function TransactionHistory() {
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+interface AnyTransaction {
+  id: string;
+  type: string;
+  amount: number;
+  currency: string;
+  status: string;
+  created_at: string;
+  [key: string]: any;
+}
+
+interface TransactionHistoryProps {
+  transactions?: AnyTransaction[];
+  limit?: number;
+  filterType?: string;
+  showFilters?: boolean;
+  header?: string;
+  emptyMessage?: string;
+  loading?: boolean;
+  refreshKey?: number;
+}
+
+export default function TransactionHistory({
+  transactions: propTransactions,
+  limit = 5,
+  filterType,
+  showFilters = true,
+  header = '',
+  emptyMessage = 'No transactions found',
+  loading: propLoading,
+  refreshKey
+}: TransactionHistoryProps) {
+  const [transactions, setTransactions] = useState<AnyTransaction[]>([]);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Removed supabase and session logic for unauthenticated debug
-  const fetchTransactions = async () => {
-    try {
-      const response = await fetch('/api/transactions');
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch transactions');
-      }
-
-      const data = await response.json();
-      setTransactions(data);
-      setError(null);
-    } catch (err) {
-      console.error('Error fetching transactions:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch transactions');
-    } finally {
-      setLoading(false);
+  // Fetch transactions only if not provided as prop
+  useEffect(() => {
+    let ignore = false;
+    if (!propTransactions) {
+      setLoading(true);
+      fetch('/api/transactions')
+        .then(res => {
+          if (!res.ok) throw new Error('Failed to fetch transactions');
+          return res.json();
+        })
+        .then(data => { if (!ignore) setTransactions(data); })
+        .catch(err => { if (!ignore) setError(err.message); })
+        .finally(() => { if (!ignore) setLoading(false); });
     }
-  };
+    return () => { ignore = true; };
+  }, [propTransactions, refreshKey]);
 
-  // Initial fetch
-  useEffect(() => {
-    fetchTransactions();
-  }, []);
+  const allTransactions = propTransactions || transactions;
 
-  // Set up polling for updates
-  useEffect(() => {
-    const interval = setInterval(fetchTransactions, 10000);
-    return () => clearInterval(interval);
-  }, []);
+  // Filtering
+  const filtered = filterType && filterType !== 'all'
+    ? allTransactions.filter(tx => tx.type === filterType)
+    : allTransactions;
+  const limited = limit ? filtered.slice(0, limit) : filtered;
 
-  // Removed supabase real-time subscription (not needed)
-  // Only use polling for updates
-
-
-  if (loading) {
-    return <div className="animate-pulse">Loading transactions...</div>;
-  }
-
-  if (error) {
-    return <div className="text-red-500">Error: {error}</div>;
-  }
-
-  if (!transactions.length) {
-    return <div className="text-gray-500">No transactions found</div>;
-  }
+  // Loading state
+  const isLoading = typeof propLoading === 'boolean' ? propLoading : loading;
 
   return (
-    <div className="space-y-4">
-      {transactions.map((transaction) => (
-        <div key={transaction.id} className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-          <div className="flex justify-between items-start">
-            <div>
-              <h3 className="font-medium">{transaction.type}</h3>
-              <p className="text-sm text-gray-500">
-                {format(new Date(transaction.created_at), 'PPpp')}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className={`font-medium ${
-                transaction.type === 'deposit' ? 'text-green-500' : 'text-red-500'
-              }`}>
-                {transaction.type === 'deposit' ? '+' : '-'}{transaction.amount} {transaction.currency}
-              </p>
-              <p className="text-sm text-gray-500">{transaction.status}</p>
-            </div>
-          </div>
-          {transaction.description && (
-            <p className="text-sm text-gray-600 mt-2">{transaction.description}</p>
-          )}
+    <div className="rounded-xl border bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 p-6 shadow-lg">
+      {header && <h2 className="text-lg font-semibold mb-4">{header}</h2>}
+      {showFilters && (
+        <div className="flex gap-2 mb-4">
+          {['all', 'deposit', 'withdrawal', 'swap'].map(type => (
+            <button
+              key={type}
+              className={`px-3 py-1 rounded text-xs font-medium border ${filterType === type ? 'bg-primary text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200'} transition`}
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  const event = new CustomEvent('transaction-filter', { detail: { type } });
+                  window.dispatchEvent(event);
+                }
+              }}
+              type="button"
+            >
+              {type.charAt(0).toUpperCase() + type.slice(1)}
+            </button>
+          ))}
         </div>
-      ))}
+      )}
+      {isLoading ? (
+        <div className="animate-pulse">Loading transactions...</div>
+      ) : error ? (
+        <div className="text-red-500">Error: {error}</div>
+      ) : limited.length === 0 ? (
+        <div className="text-gray-500">{emptyMessage}</div>
+      ) : (
+        <TransactionList transactions={limited} />
+      )}
     </div>
   );
-} 
+}
