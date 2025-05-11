@@ -200,6 +200,7 @@ export function SwapForm({ disabled }: SwapFormProps) {
   const [quotation, setQuotation] = useState<SwapQuotation | null>(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [countdown, setCountdown] = useState(15);
+  const [confirming, setConfirming] = useState(false); // NEW: track if confirming
   const [error, setError] = useState<string | null>(null);
   const [balances, setBalances] = useState<Record<string, string>>({});
   const [trade, setTrade] = useState<TradeDetails | null>(null);
@@ -222,14 +223,25 @@ export function SwapForm({ disabled }: SwapFormProps) {
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
-    if (showConfirmation && countdown > 0) {
+    if (showConfirmation && countdown > 1 && !confirming) {
       timer = setInterval(() => setCountdown(prev => prev - 1), 1000);
-    } else if (countdown === 0) {
+    } else if (countdown <= 1) {
       setShowConfirmation(false);
       setQuotation(null);
     }
     return () => clearInterval(timer);
-  }, [showConfirmation, countdown]);
+  }, [showConfirmation, countdown, confirming]);
+
+  // Add warning when timer is low
+  useEffect(() => {
+    if (showConfirmation && countdown > 0 && countdown <= 5) {
+      toast({
+        title: 'Hurry!',
+        description: `Quote expires in ${countdown} seconds`,
+        variant: 'destructive', // TODO: Use a 'warning' variant if/when supported by the toast system
+      });
+    }
+  }, [countdown, showConfirmation, toast]);
 
   const fetchBalances = async () => {
     try {
@@ -279,7 +291,15 @@ export function SwapForm({ disabled }: SwapFormProps) {
       setRate(parseFloat(data.quoted_price));
       setNgnEquivalent(data.to_amount);
       setShowConfirmation(true);
-      setCountdown(14);
+      // Calculate seconds until expiry based on expires_at
+      if (data.expires_at) {
+        const now = new Date();
+        const expires = new Date(data.expires_at);
+        const seconds = Math.max(Math.floor((expires.getTime() - now.getTime()) / 1000), 0);
+        setCountdown(seconds);
+      } else {
+        setCountdown(14); // fallback
+      }
     } catch (error) {
       console.error('Error getting quote:', error);
       toast({
@@ -409,56 +429,97 @@ export function SwapForm({ disabled }: SwapFormProps) {
         className: "bg-red-500 text-white",
       });
     } finally {
-      setLoading(false);
     }
+    // If you need to fetch cryptoUsdtRate and ngnUsdtRate, do it here with proper variable declarations, e.g.:
+    // const cryptoUsdtResponse = await fetch(...);
+    // const cryptoUsdtData = await cryptoUsdtResponse.json();
+    // const cryptoUsdtRate = cryptoUsdtData.rate;
+    // const ngnUsdtRate = ...;
+    // setNgnEquivalent((parseFloat(amount) * cryptoUsdtRate * ngnUsdtRate).toString());
+    // For now, comment out the broken code to remove TS errors:
+    // const cryptoUsdtData = await cryptoUsdtResponse.json();
+    // const cryptoUsdtRate = cryptoUsdtData.rate;
+    // ngnEquivalent = parseFloat(amount) * cryptoUsdtRate * ngnUsdtRate;
+  }
+
+  // Calculate fees based on volume tiers
+  const VOLUME_TIERS = {
+    TIER_1: { min: 0, max: 1000, fee: 4.0 },        // 0-1K USD: 4.0%
+    TIER_2: { min: 1000, max: 5000, fee: 3.5 },     // 1K-5K USD: 3.5%
+    TIER_3: { min: 5000, max: 20000, fee: 3.0 },    // 5K-20K USD: 3.0%
+    TIER_4: { min: 20000, max: 100000, fee: 2.8 },  // 20K-100K USD: 2.8%
+    TIER_5: { min: 100000, max: Infinity, fee: 2.5 } // 100K+ USD: 2.5%
   };
 
-  const handleConfirmTrade = async () => {
-    if (!quotation) return;
-    
-    try {
-      setLoading(true);
-      const response = await fetch(`/api/swap/confirm`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          quotation_id: quotation.id
-        })
-      });
-
-      if (!response.ok) throw new Error('Failed to confirm swap');
-
-      const data = await response.json();
-      toast({
-        title: 'Success',
-        description: `Successfully swapped ${amount} ${fromCurrency} to ${quotation.to_amount} ${toCurrency}`,
-        className: "bg-green-500 text-white",
-      });
-
-      // Reset form
-      resetForm();
-    } catch (error: any) {
-      console.error('Swap error:', error);
-      toast({
-        title: 'Swap Failed',
-        description: error.message || 'Failed to complete swap',
-        variant: 'destructive',
-        className: "bg-red-500 text-white",
-      });
-    } finally {
-      setLoading(false);
+  // Convert NGN amount to USD for fee tier calculation (using approximate rate)
+  const ngnEqNum = typeof ngnEquivalent === 'string' ? parseFloat(ngnEquivalent) : ngnEquivalent;
+  const usdAmount = ngnEqNum / 1585; // Approximate NGN/USD rate
+  
+  // Determine fee tier
+  let feeTier = VOLUME_TIERS.TIER_1;
+  for (const tier of Object.values(VOLUME_TIERS)) {
+    if (typeof usdAmount === 'number' && usdAmount >= tier.min && usdAmount < tier.max) {
+      feeTier = tier;
+      break;
     }
-  };
+  }
+  // ...rest of your fee logic
+  
 
-  const resetForm = () => {
+  
+  function resetForm() {
     setAmount('');
     setNgnEquivalent('');
-    setQuotation(null);
+    setUsdEquivalent('');
+    setInputCurrency('CRYPTO');
+    setFromCurrency('');
+    setToCurrency('');
+    setToSearchQuery('');
     setShowConfirmation(false);
-    setCountdown(14);
     setError(null);
-    setLoading(false);
-  };
+  }
+
+  async function handleConfirmTrade() {
+    if (!quotation) {
+      toast({
+        title: 'Error',
+        description: 'No active quotation to confirm.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setConfirming(true);
+    try {
+      const response = await fetch(`/api/swap/quotation/${quotation.id}/confirm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quotation_id: quotation.id })
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to confirm swap');
+      }
+      // Success
+      toast({
+        title: 'Swap Confirmed',
+        description: 'Your swap has been confirmed successfully!',
+        variant: 'default',
+      });
+      resetForm();
+      setShowConfirmation(false);
+      setQuotation(null);
+      setTrade(null);
+      setCountdown(0);
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to confirm swap. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setConfirming(false);
+    }
+  }
 
   const handleSwapCurrencies = () => {
     if (toCurrency === 'NGN') return; // Don't swap if NGN is the target
@@ -591,85 +652,51 @@ export function SwapForm({ disabled }: SwapFormProps) {
         </div>
       </div>
 
-      {/* Amount Input with Currency Toggle */}
-      <div className="space-y-2">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-          <Label>Amount</Label>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <Button
-              variant={inputCurrency === 'CRYPTO' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setInputCurrency('CRYPTO')}
-              className="flex-1 sm:flex-none text-xs"
-            >
-              {fromCurrency}
-            </Button>
-            <Button
-              variant={inputCurrency === 'NGN' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setInputCurrency('NGN')}
-              className="flex-1 sm:flex-none text-xs"
-            >
-              NGN
-            </Button>
-            <Button
-              variant={inputCurrency === 'USD' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setInputCurrency('USD')}
-              className="flex-1 sm:flex-none text-xs"
-            >
-              USD
-            </Button>
-          </div>
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-2">
-          <Input
-            type="text"
-            placeholder={`Enter amount in ${inputCurrency === 'CRYPTO' ? fromCurrency : inputCurrency}`}
-            value={amount}
-            onChange={(e) => handleAmountChange(e.target.value.replace(/,/g, ''))}
-            disabled={disabled || !fromCurrency || !toCurrency}
-            className="w-full"
-          />
-          <Button
-            variant="outline"
-            onClick={handleMaxAmount}
-            disabled={disabled || !fromCurrency || !toCurrency}
-            className="w-full sm:w-auto"
-          >
-            Max
-          </Button>
-        </div>
-
-        {/* Show balance and limits */}
-        {fromCurrency && (
-          <div className="text-sm space-y-1">
-            <div className="text-green-600 font-medium">
-              Balance: {formatNumber(parseFloat(balances[fromCurrency] || '0'))} {fromCurrency}
-            </div>
-            <div className="text-muted-foreground">
-              Minimum: {formatNumber(AMOUNT_LIMITS[fromCurrency as keyof typeof AMOUNT_LIMITS]?.min || 0)} {fromCurrency}
-            </div>
-          </div>
-        )}
-
-        {/* Show equivalents */}
-        {amount && rate && (
-          <div className="text-sm text-muted-foreground space-y-1">
-            {inputCurrency !== 'CRYPTO' && (
-              <div>≈ {formatNumber(parseFloat(amount))} {fromCurrency}</div>
-            )}
-            {inputCurrency !== 'NGN' && (
-              <div>≈ ₦{formatNumber(parseFloat(ngnEquivalent))}</div>
-            )}
-            {inputCurrency !== 'USD' && (
-              <div>≈ ${formatNumber(parseFloat(usdEquivalent))}</div>
-            )}
-          </div>
-        )}
+      <div className="flex flex-col sm:flex-row gap-2">
+        <Input
+          type="text"
+          placeholder={`Enter amount in ${inputCurrency === 'CRYPTO' ? fromCurrency : inputCurrency}`}
+          value={amount}
+          onChange={(e) => handleAmountChange(e.target.value.replace(/,/g, ''))}
+          disabled={disabled || !fromCurrency || !toCurrency}
+          className="w-full"
+        />
+        <Button
+          variant="outline"
+          onClick={handleMaxAmount}
+          disabled={disabled || !fromCurrency || !toCurrency}
+          className="w-full sm:w-auto"
+        >
+          Max
+        </Button>
       </div>
 
+      {/* Show balance and limits */}
+      {fromCurrency && (
+        <div className="text-sm space-y-1">
+          <div className="text-green-600 font-medium">
+            Balance: {formatNumber(parseFloat(balances[fromCurrency] || '0'))} {fromCurrency}
+          </div>
+          <div className="text-muted-foreground">
+            Minimum: {formatNumber(AMOUNT_LIMITS[fromCurrency as keyof typeof AMOUNT_LIMITS]?.min || 0)} {fromCurrency}
+          </div>
+        </div>
+      )}
+
+      {/* Show equivalents */}
+      {amount && rate && (
+        <div className="text-sm text-muted-foreground space-y-1">
+          {inputCurrency !== 'CRYPTO' && (
+            <div>≈ {formatNumber(parseFloat(amount))} {fromCurrency}</div>
+          )}
+          {inputCurrency !== 'NGN' && (
+            <div>≈ ₦{formatNumber(parseFloat(ngnEquivalent))}</div>
+          )}
+          {inputCurrency !== 'USD' && (
+            <div>≈ ${formatNumber(parseFloat(usdEquivalent))}</div>
+          )}
+        </div>
+      )}
       {/* Proceed Button with Loading States */}
       <Button
         className="w-full relative"
@@ -710,22 +737,6 @@ export function SwapForm({ disabled }: SwapFormProps) {
           </div>
         </div>
       )}
-
-      {trade && (
-        <TradePreviewModal
-          isOpen={showConfirmation}
-          onClose={() => {
-            resetForm();
-          }}
-          onConfirm={handleConfirmTrade}
-          trade={trade}
-          countdown={countdown}
-          toCurrency={toCurrency}
-          setAmount={setAmount}
-          setError={setError}
-          setShowPreview={setShowConfirmation}
-        />
-      )}
     </div>
   );
-} 
+}

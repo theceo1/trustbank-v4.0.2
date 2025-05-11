@@ -184,6 +184,8 @@ const AMOUNT_LIMITS: Record<string, { min: number }> = {
 // Set this to true to show debug info in the modal
 const DEBUG = true;
 
+import BuyVAModal from '@/components/trades/BuyVAModal';
+
 export default function TradePage() {
   // ...existing states...
   const [amount, setAmount] = useState('');
@@ -205,6 +207,11 @@ export default function TradePage() {
   const [feeConfig, setFeeConfig] = useState<FeeConfig | null>(null);
   const { hasBasicKyc, loading: kycLoading } = useKycStatus();
   const [trade, setTrade] = useState<any>(null);
+  // BuyVAModal integration
+  const [showVAModal, setShowVAModal] = useState(false);
+  const [vamDetails, setVamDetails] = useState<any>(null);
+  const [vamExpiry, setVamExpiry] = useState<number>(600); // 10 minutes
+  const [vamLoading, setVamLoading] = useState(false);
   const [fromCurrency, setFromCurrency] = useState('');
   const [toCurrency, setToCurrency] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -694,6 +701,17 @@ export default function TradePage() {
       setShowRate(false);
       fetchBalances();
       setRefreshKey((k) => k + 1);
+      // Show BuyVAModal after confirming trade (buy flow only)
+      if (tab === 'buy' && data?.data?.virtual_account) {
+        setVamDetails({
+          accountName: data.data.virtual_account.account_name,
+          accountNumber: data.data.virtual_account.account_number,
+          bankName: data.data.virtual_account.bank_name,
+          amount: parseFloat(amount),
+        });
+        setVamExpiry(600); // 10 minutes
+        setShowVAModal(true);
+      }
     } catch (error) {
 
       toast({
@@ -765,9 +783,41 @@ export default function TradePage() {
     return tab === 'sell' ? (NETWORK_FEE[currency.toUpperCase()] || 0) : 0;
   };
 
+  // Handler for Mark as Paid
+  const handleMarkPaid = async () => {
+    if (!vamDetails) return;
+    setVamLoading(true);
+    try {
+      // Notify backend that user marked as paid (optional: send reference, userId, etc.)
+      await fetch('/api/payments/mark-paid', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountNumber: vamDetails.accountNumber,
+          amount: vamDetails.amount,
+          // Add more identifiers as needed
+        }),
+      });
+      toast({ title: 'Marked as Paid', description: 'We will verify your payment shortly.' });
+      setShowVAModal(false);
+    } catch (e) {
+      toast({ title: 'Error', description: 'Failed to notify backend. Please try again.' });
+    } finally {
+      setVamLoading(false);
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 sm:px-6 space-y-8">
-      {/* KYC Banner */}
+      {/* BuyVAModal for Buy Flow */}
+      <BuyVAModal
+        open={showVAModal}
+        onDone={() => setShowVAModal(false)}
+        vamDetails={vamDetails || { accountName: '', accountNumber: '', bankName: '', amount: 0 }}
+        loading={vamLoading}
+        expiry={vamExpiry}
+        onMarkPaid={handleMarkPaid}
+      />
       {!hasBasicKyc && (
         <Alert className="border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20">
           <AlertTitle className="flex items-center gap-2">

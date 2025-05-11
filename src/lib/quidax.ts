@@ -117,6 +117,10 @@ export class QuidaxService {
   }
 
   private async requestWithRetry<T>(endpoint: string, config: AxiosRequestConfig, options: QuidaxRequestOptions = {}): Promise<T> {
+  // Log the request endpoint and config for debugging
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[Quidax] API Request:', { endpoint, config });
+  }
     const { retries = this.maxRetries, timeout = 10000, circuitBreaker = true } = options;
     
     // Check circuit breaker
@@ -183,9 +187,19 @@ export class QuidaxService {
   }
 
   async confirmSwapQuotation(userId: string, quotationId: string): Promise<SwapTransaction> {
-    return this.requestWithRetry(`/users/${userId}/swap_quotation/${quotationId}/confirm`, {
-      method: 'POST'
-    });
+    try {
+      return await this.requestWithRetry(`/users/${userId}/swap_quotation/${quotationId}/confirm`, {
+        method: 'POST'
+      });
+    } catch (error: any) {
+      // Log the request details and error for debugging
+      console.error('[Quidax] Swap confirmation failed:', {
+        userId,
+        quotationId,
+        error: error?.response?.data || error?.message || error
+      });
+      throw error;
+    }
   }
 
   async getSwapTransactions(userId: string = 'me', from?: string): Promise<SwapTransaction[]> {

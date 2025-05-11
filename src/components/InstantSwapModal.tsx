@@ -235,6 +235,7 @@ export function TradePreviewModal({
   setAmount,
   setError,
   setShowPreview,
+  confirmDisabled = false,
 }: { 
   isOpen: boolean; 
   onClose: () => void; 
@@ -245,6 +246,7 @@ export function TradePreviewModal({
   setAmount: (value: string) => void;
   setError: (value: string | null) => void;
   setShowPreview: (value: boolean) => void;
+  confirmDisabled?: boolean;
 }) {
   const handleClose = () => {
     onClose();
@@ -261,6 +263,11 @@ export function TradePreviewModal({
           <DialogDescription>
             Please review your swap details. This quote expires in {countdown} seconds.
           </DialogDescription>
+          {confirmDisabled && (
+            <div className="text-red-600 font-semibold text-sm mt-2">
+              Quote expired. Please request a new quote.
+            </div>
+          )}
         </DialogHeader>
 
         <div className="space-y-6">
@@ -307,7 +314,7 @@ export function TradePreviewModal({
 
         <DialogFooter className="flex space-x-2 sm:space-x-0">
           <Button variant="outline" onClick={handleClose}>Cancel</Button>
-          <Button onClick={onConfirm} disabled={countdown <= 0}>
+          <Button onClick={onConfirm} disabled={confirmDisabled}>
             Confirm Swap
           </Button>
         </DialogFooter>

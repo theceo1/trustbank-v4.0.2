@@ -10,14 +10,25 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const receivedAt = new Date().toISOString();
+  console.log('[Swap Confirm] Incoming request at:', receivedAt);
+  console.log('[Swap Confirm] Request headers:', Object.fromEntries(request.headers.entries()));
+  console.log('[Swap Confirm] Request method:', request.method);
   try {
+    // Log cookies
+    try {
+      const cookieHeader = request.headers.get('cookie');
+      console.log('[Swap Confirm] Cookie header:', cookieHeader);
+    } catch (e) {
+      console.log('[Swap Confirm] Could not log cookie header:', e);
+    }
     // Initialize Supabase client
     const cookieStore = cookies();
     const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
 
     // Get the current user
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-
+    console.log('[Swap Confirm] Supabase user:', { user, authError });
     if (authError || !user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -39,7 +50,7 @@ export async function POST(
       .select('quidax_id')
       .eq('user_id', user.id)
       .single();
-
+    console.log('[Swap Confirm] User profile:', { profile });
     if (!profile?.quidax_id) {
       return NextResponse.json(
         { error: 'User profile not found' },
@@ -47,8 +58,50 @@ export async function POST(
       );
     }
 
-    // Confirm swap quotation
-    const swapTransaction = await quidaxService.confirmSwapQuotation(profile.quidax_id, params.id);
+    // Log the confirmation attempt
+    const confirmAttemptAt = new Date().toISOString();
+    console.log('[Swap Confirm] Attempting to confirm swap quotation', {
+      appUserId: user.id,
+      quidaxId: profile.quidax_id,
+      quotationId: params.id,
+      confirmAttemptAt
+    });
+
+    let swapTransaction;
+    const quidaxCallStart = new Date().toISOString();
+    try {
+      swapTransaction = await quidaxService.confirmSwapQuotation(profile.quidax_id, params.id);
+      const quidaxCallEnd = new Date().toISOString();
+      console.log('[Swap Confirm] Quidax API response:', {
+        quidaxId: profile.quidax_id,
+        quotationId: params.id,
+        swapTransaction,
+        quidaxCallStart,
+        quidaxCallEnd
+      });
+    } catch (quidaxError: unknown) {
+      // Type guard for error logging
+      let errorLog: any = quidaxError;
+      let responseData = undefined;
+      let message = undefined;
+      if (typeof errorLog === 'object' && errorLog !== null) {
+        if ('response' in errorLog && typeof errorLog.response === 'object' && errorLog.response !== null && 'data' in errorLog.response) {
+          responseData = (errorLog.response as any).data;
+        }
+        if ('message' in errorLog) {
+          message = (errorLog as any).message;
+        }
+      }
+      console.error('[Swap Confirm] Quidax API error:', {
+        quidaxId: profile.quidax_id,
+        quotationId: params.id,
+        error: responseData || message || quidaxError
+      });
+      throw quidaxError;
+    }
+
+    // Log the full swapTransaction for debugging
+    console.log('[Swap Confirm] Full swapTransaction object:', swapTransaction);
 
     // Store the transaction in our database
     const { error: swapError } = await supabase
@@ -59,7 +112,7 @@ export async function POST(
         to_currency: swapTransaction.to_currency,
         from_amount: parseFloat(swapTransaction.from_amount),
         to_amount: parseFloat(swapTransaction.received_amount),
-        execution_price: parseFloat(swapTransaction.execution_price),
+        execution_price: null, // Not present in SwapTransaction, fallback to null
         status: swapTransaction.status,
         quidax_swap_id: swapTransaction.id,
         quidax_quotation_id: params.id
@@ -81,4 +134,4 @@ export async function POST(
       { status: 500 }
     );
   }
-} 
+}

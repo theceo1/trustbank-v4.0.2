@@ -42,21 +42,30 @@ export const formatCurrencyDisplay = (currency: string): string => {
   return currencyMap[currency] || currency;
 };
 
-export const getCurrencyIcon = (currency: string) => {
+import React from "react";
+
+export const getCurrencyIcon = (currency: string): JSX.Element => {
+  let Icon: React.ComponentType<{ className?: string }>;
   switch (currency.toUpperCase()) {
     case 'BTC':
-      return <Icons.bitcoin className="h-4 w-4" />;
+      Icon = Icons.bitcoin;
+      break;
     case 'ETH':
-      return <Icons.ethereum className="h-4 w-4" />;
+      Icon = Icons.ethereum;
+      break;
     case 'USDT':
-      return <Icons.dollar className="h-4 w-4" />;
+      Icon = Icons.dollar;
+      break;
     case 'NGN':
-      return <Icons.naira className="h-4 w-4" />;
+      Icon = Icons.naira;
+      break;
     case 'USD':
-      return <Icons.dollar className="h-4 w-4" />;
+      Icon = Icons.dollar;
+      break;
     default:
-      return <Circle className="h-4 w-4" />;
+      Icon = Circle;
   }
+  return <Icon className="h-4 w-4" />;
 };
 
 export const getCurrencyName = (currency: string): string => {
