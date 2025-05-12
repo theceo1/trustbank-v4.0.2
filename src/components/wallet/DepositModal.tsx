@@ -477,7 +477,14 @@ const DepositModal = ({ isOpen, onClose, wallet }: DepositModalProps) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={open => { if (!open) onClose(); }}>
-      <DialogContent>
+      <DialogContent
+  aria-describedby="deposit-modal-desc"
+  aria-labelledby="deposit-modal-title"
+>
+  <DialogTitle id="deposit-modal-title">Deposit</DialogTitle>
+  <DialogDescription id="deposit-modal-desc">
+    Enter deposit information and confirm your transaction.
+  </DialogDescription>
         <DialogTitle className="sr-only">Deposit</DialogTitle>
         <DialogDescription className="sr-only">Deposit funds into your trustBank account. Please review the fee breakdown and confirm your deposit.</DialogDescription>
         <div className="p-0 bg-gradient-to-br from-[#2d014d] via-[#17002d] to-[#0d001a] rounded-2xl shadow-2xl border-2 border-purple-900" aria-describedby="deposit-modal-desc">

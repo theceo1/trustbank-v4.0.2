@@ -49,7 +49,14 @@ export default function BuyVAModal({ open, onDone, vamDetails, loading, expiry =
 
   return (
     <Dialog open={open} onOpenChange={v => !v && onDone()}>
-      <DialogContent>
+      <DialogContent
+  aria-describedby="buy-va-modal-desc"
+  aria-labelledby="buy-va-modal-title"
+>
+  <DialogTitle id="buy-va-modal-title">Virtual Account Payment</DialogTitle>
+  <DialogDescription id="buy-va-modal-desc">
+    Please use the virtual account details below to complete your payment.
+  </DialogDescription>
         <DialogTitle>Make Payment</DialogTitle>
         <DialogDescription id="vam-modal-desc">
           Please transfer exactly <b>₦{vamDetails.amount.toLocaleString()}</b> to the account below.<br />

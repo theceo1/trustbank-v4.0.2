@@ -62,6 +62,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .from('swap_transactions')
       .update({ status: 'payment_received', metadata: { ...trade.metadata, korapay: req.body } })
       .eq('id', trade.id);
+
+    // Also update korapay_references status for reconciliation
+    await supabase
+      .from('korapay_references')
+      .update({ status: 'paid', metadata: req.body })
+      .eq('reference', reference);
     // Optionally, trigger Quidax swap here
     // ...
     // No further response needed, already acknowledged

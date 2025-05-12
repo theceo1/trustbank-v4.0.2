@@ -54,6 +54,10 @@ export default function DepositPreview({
       aria-describedby={descriptionId || 'deposit-preview-desc'}
       aria-labelledby="deposit-preview-title"
     >
+      <DialogTitle id="deposit-preview-title">Deposit Preview</DialogTitle>
+      <DialogDescription id="deposit-preview-desc">
+        Review your deposit details and confirm to proceed.
+      </DialogDescription>
       <DialogTitle className="sr-only">Deposit Preview</DialogTitle>
       <DialogDescription className="sr-only">Preview your deposit details and fee breakdown before confirming your transaction.</DialogDescription>
       <DialogTitle id="deposit-preview-title" className="text-lg sm:text-xl font-bold mb-2 sm:mb-3 text-gray-900 dark:text-gray-100">Confirm Deposit</DialogTitle>

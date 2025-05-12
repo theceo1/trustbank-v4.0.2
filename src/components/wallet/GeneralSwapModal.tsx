@@ -151,7 +151,15 @@ export function GeneralSwapModal({ isOpen, onClose }: { isOpen: boolean; onClose
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px] bg-gradient-to-br from-amber-950 via-orange-900 to-black border-orange-800/50">
+      <DialogContent
+  aria-describedby="general-swap-modal-desc"
+  aria-labelledby="general-swap-modal-title"
+  className="sm:max-w-[425px] bg-gradient-to-br from-amber-950 via-orange-900 to-black border-orange-800/50"
+>
+  <DialogTitle id="general-swap-modal-title">Swap Assets</DialogTitle>
+  <DialogDescription id="general-swap-modal-desc">
+    Review and confirm your swap details.
+  </DialogDescription> 
         <DialogHeader>
           <DialogTitle>Instant Swap</DialogTitle>
           <DialogDescription className="text-white/70">

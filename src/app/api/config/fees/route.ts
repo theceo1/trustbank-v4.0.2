@@ -153,20 +153,33 @@ export async function POST(request: Request) {
       const markupMin = Number(amount) * markupMinPercent;
       if (markup < markupMin) markup = markupMin;
       // Korapay fee and VAT provided by frontend (from Korapay API) for preview, else default to 0
+      let korapay_raw: any = undefined;
+      if ('korapay_raw' in body) {
+        korapay_raw = body.korapay_raw;
+        // Log for backend visibility
+        // eslint-disable-next-line no-console
+        console.log('[FEE DEBUG] Received korapay_raw from frontend:', JSON.stringify(korapay_raw, null, 2));
+      }
       let korapay_fee = 0;
-      if ('korapay_fee' in body && typeof body.korapay_fee === 'number') {
-        korapay_fee = Number(body.korapay_fee);
-      }
       let vat = 0;
-      if ('vat' in body && typeof body.vat === 'number') {
-        vat = Number(body.vat);
+      if (korapay_raw) {
+        if (typeof korapay_raw.fee === 'number') {
+          korapay_fee = Number(korapay_raw.fee);
+        } else if (korapay_raw.data && typeof korapay_raw.data.fee === 'number') {
+          korapay_fee = Number(korapay_raw.data.fee);
+        }
+        if (typeof korapay_raw.vat === 'number') {
+          vat = Number(korapay_raw.vat);
+        } else if (korapay_raw.data && typeof korapay_raw.data.vat === 'number') {
+          vat = Number(korapay_raw.data.vat);
+        }
       }
-      // Service fee is just the markup
-      const serviceFee = markup;
-      const totalFee = serviceFee + korapay_fee + vat;
+      // Service fee is markup + korapay_fee
+      const serviceFee = markup + korapay_fee;
+      const totalFee = serviceFee + vat;
       const youReceive = Number(amount) - totalFee;
       // Respond with all values for frontend (preview only)
-      return NextResponse.json({
+      const responsePayload = {
         status: 'success',
         data: {
           amount: Number(amount),
@@ -178,8 +191,12 @@ export async function POST(request: Request) {
           you_receive: +youReceive.toFixed(2),
           markup_percent: markupPercent,
           currency: 'NGN',
+          korapay_raw // Echo raw korapay API response if present
         }
-      });
+      };
+      // eslint-disable-next-line no-console
+      console.log('[FEE DEBUG] Backend response to frontend:', JSON.stringify(responsePayload, null, 2));
+      return NextResponse.json(responsePayload);
     } else if (SUPPORTED_FEE_CURRENCIES.includes(currency.toUpperCase())) {
       // For supported crypto, fetch fee ranges from Quidax
       try {

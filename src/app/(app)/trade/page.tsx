@@ -34,6 +34,8 @@ import { useKycStatus } from '@/hooks/useKycStatus';
 import { Database } from '@/lib/database.types';
 import { formatNumber } from '@/lib/utils';
 import { cn } from '@/lib/utils';
+import FundWalletModal from '@/components/wallet/FundWalletModal';
+import { useProfile } from '@/hooks/useProfile';
 
 const SUPPORTED_CURRENCIES = [
   { value: 'NGN', label: 'Nigerian Naira' },
@@ -187,6 +189,17 @@ const DEBUG = true;
 import BuyVAModal from '@/components/trades/BuyVAModal';
 
 export default function TradePage() {
+  // User profile for FundWalletModal
+  const { profile, isInitialized } = useProfile();
+  const userProfile = (isInitialized && profile && (profile as any).email)
+    ? {
+        name: profile.first_name || profile.last_name || profile.user_id || '',
+        email: (profile as any).email,
+      }
+    : null;
+
+  // Fund Wallet modal state
+  const [showFundModal, setShowFundModal] = useState(false);
   // ...existing states...
   const [amount, setAmount] = useState('');
   const [amountError, setAmountError] = useState<string | null>(null);
@@ -677,6 +690,10 @@ export default function TradePage() {
   };
 
   const handleTrade = async () => {
+    if (tab === 'buy' && parseFloat(balances['ngn'] || '0') < parseFloat(amount)) {
+      toast({ title: 'Insufficient NGN', description: 'Please fund your wallet first.' });
+      return;
+    }
     if (!quotation) return;
     
     try {
@@ -808,7 +825,7 @@ export default function TradePage() {
   };
 
   return (
-    <div className="container mx-auto px-4 sm:px-6 space-y-8">
+    <>
       {/* BuyVAModal for Buy Flow */}
       <BuyVAModal
         open={showVAModal}
@@ -818,6 +835,8 @@ export default function TradePage() {
         expiry={vamExpiry}
         onMarkPaid={handleMarkPaid}
       />
+
+      {/* Alert for KYC */}
       {!hasBasicKyc && (
         <Alert className="border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20">
           <AlertTitle className="flex items-center gap-2">
@@ -867,7 +886,31 @@ export default function TradePage() {
                 </TabsTrigger>
               </TabsList>
 
-              <div className="space-y-6">
+              {tab === 'buy' && (
+        <div className="flex items-center justify-between mb-2">
+          <span className={`font-semibold ${parseFloat(balances['ngn'] || '0') === 0 ? 'text-red-500' : ''}`}>NGN Wallet: ₦{formatNumber(balances['ngn'] || 0)}</span>
+          <Button
+            onClick={() => setShowFundModal(true)}
+            variant="outline"
+            size="sm"
+          >
+            Fund Wallet
+          </Button>
+        </div>
+      )}
+      {showFundModal && userProfile && (
+  <FundWalletModal
+    isOpen={showFundModal}
+    onClose={() => setShowFundModal(false)}
+    onSuccess={() => {
+      setShowFundModal(false);
+      fetchBalances();
+    }}
+    user={userProfile as { name: string; email: string }}
+  />
+)}
+
+      <div className="space-y-6">
                 {/* Currency Selection */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -1070,18 +1113,18 @@ export default function TradePage() {
               </div>
             </div>
 
-            {feeConfig && (
+            {feeConfig?.user_tier && (
               <div className="space-y-4">
                 <div className="space-y-2">
                   <h4 className="font-medium text-sm">Your Trading Fees</h4>
                   <div className="space-y-1">
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Current Tier</span>
-                      <span>{feeConfig.user_tier.tier_level}</span>
+                      <span>{feeConfig?.user_tier?.tier_level ?? '-'}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Fee Rate</span>
-                      <span>{feeConfig.user_tier.fee_percentage}%</span>
+                      <span>{feeConfig?.user_tier?.fee_percentage ?? 0}%</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Network Fee</span>
@@ -1090,10 +1133,10 @@ export default function TradePage() {
                   </div>
                 </div>
 
-                {feeConfig.user_tier.next_tier && (
+                {feeConfig?.user_tier?.next_tier && (
                   <Alert className="bg-green-50 dark:bg-green-900/20 border-green-200">
                     <AlertDescription className="text-sm text-green-600">
-                      Trade {formatCurrency(feeConfig.user_tier.next_tier.min - feeConfig.user_tier.trading_volume, 'USD')} more to reach next tier ({feeConfig.user_tier.next_tier.fee}% fee)
+                      Trade {formatCurrency((feeConfig?.user_tier?.next_tier?.min ?? 0) - (feeConfig?.user_tier?.trading_volume ?? 0), 'USD')} more to reach next tier ({feeConfig?.user_tier?.next_tier?.fee ?? 0}% fee)
                     </AlertDescription>
                   </Alert>
                 )}
@@ -1143,8 +1186,8 @@ export default function TradePage() {
                 <span className="font-medium">
                   {rate ? (
                     tab === 'buy'
-                      ? `1 ${selectedCrypto} = ₦${formatNumber(rate)}`
-                      : `1 ${selectedCrypto} = ₦${formatNumber(rate)}`
+                      ? `1 ${selectedCrypto} = ₦${formatNumber(rate ?? 0)}`
+                      : `1 ${selectedCrypto} = ₦${formatNumber(rate ?? 0)}`
                   ) : (
                     'Calculating...'
                   )}
@@ -1194,9 +1237,14 @@ export default function TradePage() {
             <Button
               onClick={handleTrade}
               className="sm:flex-1 bg-green-500 hover:bg-green-600"
-              disabled={loading || !quotation}
+              disabled={loading || !quotation || (tab === 'buy' && parseFloat(balances['ngn'] || '0') < parseFloat(amount))}
+              aria-disabled={tab === 'buy' && parseFloat(balances['ngn'] || '0') < parseFloat(amount)}
             >
-              {loading ? (
+              {tab === 'buy' && parseFloat(balances['ngn'] || '0') < parseFloat(amount) ? (
+                <span className="flex items-center gap-2 text-red-500">
+                  Insufficient NGN – Fund wallet
+                </span>
+              ) : loading ? (
                 <span className="flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Processing...
@@ -1207,15 +1255,13 @@ export default function TradePage() {
             </Button>
           </DialogFooter>
 
-
         </DialogContent>
       </Dialog>
-
-    {/* Recent Transactions Table */}
-    <div className="mt-12">
-      <h2 className="text-xl font-semibold mb-4">Recent Transactions</h2>
-      <TransactionHistory refreshKey={refreshKey} />
-    </div>
-  </div>
-);
+      {/* Recent Transactions Table */}
+      <div className="mt-12">
+        <h2 className="text-xl font-semibold mb-4">Recent Transactions</h2>
+        <TransactionHistory refreshKey={refreshKey} />
+      </div>
+    </>
+  );
 }

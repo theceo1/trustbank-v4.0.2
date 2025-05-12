@@ -1,3 +1,4 @@
+//src/components/trades/BuyPreviewModal.tsx
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
@@ -20,7 +21,14 @@ export default function BuyPreviewModal({
 }: BuyPreviewModalProps) {
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent>
+      <DialogContent
+  aria-describedby="buy-preview-modal-desc"
+  aria-labelledby="buy-preview-modal-title"
+>
+  <DialogTitle id="buy-preview-modal-title">Trade Preview</DialogTitle>
+  <DialogDescription id="buy-preview-modal-desc">
+    Review your trade details before confirming.
+  </DialogDescription>
         <DialogTitle>Confirm Your Purchase</DialogTitle>
         <DialogDescription>
           You are about to buy <b>{cryptoAmount} {crypto}</b> for <b>₦{ngnAmount.toLocaleString()}</b>.<br />

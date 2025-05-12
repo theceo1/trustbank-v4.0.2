@@ -15,6 +15,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Icons } from "@/components/ui/icons";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { WithdrawPreview } from './WithdrawPreview';
+import WithdrawSuccessModal from './WithdrawSuccessModal';
 
 interface Bank {
   code: string;
@@ -91,6 +92,9 @@ function getFeeTier(volumeUsd: number) {
 }
 
 export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModalProps) {
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successModalStatus, setSuccessModalStatus] = useState<'processing' | 'success' | 'failed'>('processing');
+  const [successModalError, setSuccessModalError] = useState("");
   // Helper to reset modal state
   function resetState() {
     setAmount("");
@@ -112,7 +116,9 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
     setWithdrawStatus('initiated');
     setSelectedNetwork("");
     setDestinationAddress("");
-    // Add any other state resets as needed
+    setShowSuccessModal(false);
+    setSuccessModalStatus('processing');
+    setSuccessModalError("");
   }
 
   // Wrap onClose to reset state
@@ -435,26 +441,38 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
     try {
       setWithdrawStatus('processing');
       setIsLoading(true);
-      // Here you would make the actual withdrawal API call
-      // For now, we'll just simulate it
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setWithdrawStatus('completed');
-      toast({
-        title: "Success",
-        description: "Withdrawal request submitted successfully",
+      setShowSuccessModal(true);
+      setSuccessModalStatus('processing');
+      setSuccessModalError("");
+
+      // Call backend to process withdrawal (Korapay payout)
+      const res = await fetch('/api/payments/withdraw', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: Number(amount),
+          bankCode: selectedBank,
+          accountNumber,
+          accountName,
+          userId,
+          currency: wallet?.currency || 'NGN',
+        }),
       });
-      // Wait a bit to show completed state before closing
-      setTimeout(() => {
-        onClose();
-      }, 1200);
-    } catch (error) {
+      const data = await res.json();
+      if (!res.ok || !data.status || data.status === 'failed') {
+        setSuccessModalStatus('failed');
+        setSuccessModalError(data.error || data.message || 'Withdrawal failed.');
+        setWithdrawStatus('initiated');
+        setIsLoading(false);
+        return;
+      }
+      setSuccessModalStatus(data.status === 'success' ? 'success' : 'processing');
+      setWithdrawStatus(data.status === 'success' ? 'completed' : 'processing');
+      setIsLoading(false);
+    } catch (error: any) {
+      setSuccessModalStatus('failed');
+      setSuccessModalError(error?.message || 'Withdrawal failed.');
       setWithdrawStatus('initiated');
-      toast({
-        title: "Error",
-        description: "Failed to process withdrawal. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
       setIsLoading(false);
     }
   };
@@ -751,7 +769,15 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
   return (
     <TooltipProvider>
       <Dialog open={isOpen} onOpenChange={open => { if (!open) handleClose(); }}>
-        <DialogContent className="sm:max-w-[425px] bg-gradient-to-br from-indigo-950 via-purple-900 to-black border-purple-800/50">
+        <DialogContent
+          aria-describedby="withdraw-modal-desc"
+          aria-labelledby="withdraw-modal-title"
+          className="sm:max-w-[425px] bg-gradient-to-br from-indigo-950 via-purple-900 to-black border-purple-800/50"
+        >
+          <DialogTitle id="withdraw-modal-title">Withdraw Funds</DialogTitle>
+          <DialogDescription id="withdraw-modal-desc">
+            Enter withdrawal details and confirm to proceed.
+          </DialogDescription> 
           <DialogHeader>
             <DialogTitle className="text-white">Withdraw {wallet?.currency?.toUpperCase()}</DialogTitle>
             <DialogDescription className="text-white/70">
@@ -788,6 +814,19 @@ export function WithdrawModal({ isOpen, wallet, onClose, userId }: WithdrawModal
             ) : renderForm()}
           </div>
         </DialogContent>
+        <WithdrawSuccessModal
+          open={showSuccessModal}
+          onClose={() => {
+            setShowSuccessModal(false);
+            handleClose();
+          }}
+          status={successModalStatus}
+          amount={Number(amount) || 0}
+          bankName={selectedBankName || '-'}
+          accountNumber={accountNumber || '-'}
+          accountName={accountName || '-'}
+          error={successModalError}
+        />
       </Dialog>
     </TooltipProvider>
   );

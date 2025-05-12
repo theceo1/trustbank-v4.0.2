@@ -114,7 +114,15 @@ export function GeneralDepositModal({ isOpen, onClose }: { isOpen: boolean; onCl
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px] bg-gradient-to-br from-black via-green-950 to-black border-green-800/50">
+      <DialogContent
+  aria-describedby="general-deposit-modal-desc"
+  aria-labelledby="general-deposit-modal-title"
+  className="sm:max-w-[425px] bg-gradient-to-br from-black via-green-950 to-black border-green-800/50"
+>
+  <DialogTitle id="general-deposit-modal-title">Deposit Funds</DialogTitle>
+  <DialogDescription id="general-deposit-modal-desc">
+    Enter the amount and complete your deposit.
+  </DialogDescription> 
         <DialogHeader>
           <DialogTitle className="text-white">Deposit Funds</DialogTitle>
           <DialogDescription className="text-white/70">

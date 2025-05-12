@@ -1,3 +1,4 @@
+//src/components/wallet/CryptoDepositModal.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -152,7 +153,15 @@ const CryptoDepositModal = ({ isOpen, onClose, wallet }: CryptoDepositModalProps
 
   return (
     <Dialog open={isOpen} onOpenChange={open => { if (!open) onClose(); }}>
-      <DialogContent className="bg-gradient-to-br from-green-600 via-green-500 to-green-400 bg-clip-padding text-black border-none shadow-2xl max-w-xs w-[94vw] mx-auto p-2 rounded-lg min-w-[220px]">
+      <DialogContent
+  aria-describedby="crypto-deposit-modal-desc"
+  aria-labelledby="crypto-deposit-modal-title"
+  className="bg-gradient-to-br from-green-600 via-green-500 to-green-400 bg-clip-padding text-black border-none shadow-2xl max-w-xs w-[94vw] mx-auto p-2 rounded-lg min-w-[220px]"
+>
+  <DialogTitle id="crypto-deposit-modal-title">Crypto Deposit</DialogTitle>
+  <DialogDescription id="crypto-deposit-modal-desc">
+    Copy the address below to deposit your crypto assets.
+  </DialogDescription>
 
 
         <DialogTitle className="text-lg font-bold text-center mb-2 md:mb-3 text-black">Deposit Crypto</DialogTitle>
